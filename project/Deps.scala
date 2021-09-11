@@ -20,12 +20,14 @@ object Deps {
 
   object V {
     val akkaV = "10.2.6"
-    val akkaStreamV = "2.6.15"
+    val akkaStreamV = "2.6.16"
     val akkaActorV: String = akkaStreamV
 
     val scalaFxV = "16.0.0-R24"
     val javaFxV = "17-ea+8"
-    val bitcoinsV = "1.7.0-115-1f715a7d-SNAPSHOT"
+    val bitcoinsV = "1.7.0-151-4b803445-SNAPSHOT"
+
+    val grizzledSlf4jV = "1.3.4"
   }
 
   object Compile {
@@ -42,11 +44,17 @@ object Deps {
     val akkaSlf4j =
       "com.typesafe.akka" %% "akka-slf4j" % V.akkaStreamV withSources () withJavadoc ()
 
+    val grizzledSlf4j =
+      "org.clapper" %% "grizzled-slf4j" % V.grizzledSlf4jV withSources () withJavadoc ()
+
     val bitcoinsTor =
       "org.bitcoin-s" %% "bitcoin-s-tor" % V.bitcoinsV withSources () withJavadoc ()
 
     val bitcoinsLnd =
       "org.bitcoin-s" %% "bitcoin-s-lnd-rpc" % V.bitcoinsV withSources () withJavadoc ()
+
+    val bitcoinsTestkitCore =
+      "org.bitcoin-s" %% "bitcoin-s-testkit-core" % V.bitcoinsV withSources () withJavadoc ()
 
     val bitcoinsDbCommons =
       "org.bitcoin-s" %% "bitcoin-s-db-commons" % V.bitcoinsV withSources () withJavadoc ()
@@ -84,7 +92,7 @@ object Deps {
                                javaFxWeb)
   }
 
-  val core: List[ModuleID] = List(
+  val backend: List[ModuleID] = List(
     Compile.bitcoinsTor,
     Compile.bitcoinsLnd,
     Compile.bitcoinsDbCommons,
@@ -92,7 +100,11 @@ object Deps {
     Compile.akkaHttp,
     Compile.akkaStream,
     Compile.akkaSlf4j,
-    Compile.scalaFx
-  ) ++ Compile.javaFxDeps
+    Compile.grizzledSlf4j
+  )
 
+  val coreTest: List[ModuleID] = List(Compile.bitcoinsTestkitCore) ++ backend
+
+  val gui: List[ModuleID] =
+    List(Compile.scalaFx, Compile.grizzledSlf4j) ++ Compile.javaFxDeps
 }

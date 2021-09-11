@@ -1,22 +1,15 @@
-package com.lnvortex.networking.peer
+package com.lnvortex.core
 
-import org.bitcoins.core.api.db.DbRowAutoInc
 import org.bitcoins.tor.Socks5ProxyParams
 
 import java.net.InetSocketAddress
 
 case class Peer(
     socket: InetSocketAddress,
-    socks5ProxyParams: Option[Socks5ProxyParams],
-    id: Option[Long] = None)
-    extends DbRowAutoInc[Peer] {
-
-  override def copyWithId(id: Long): Peer = {
-    this.copy(id = Some(id))
-  }
+    socks5ProxyParams: Option[Socks5ProxyParams]) {
 
   override def toString: String =
-    s"Peer(${socket.getHostString}:${socket.getPort})"
+    s"Peer(${socket.getHostString}:${socket.getPort}, $socks5ProxyParams)"
 
 }
 

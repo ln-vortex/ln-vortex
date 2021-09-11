@@ -1,10 +1,10 @@
-package com.lnvortex.config
+package com.lnvortex.core
 
 import com.typesafe.config.Config
 import grizzled.slf4j.Logging
 import org.bitcoins.commons.config.AppConfigFactory
 import org.bitcoins.core.util.FutureUtil
-import org.bitcoins.db.{DbAppConfig, DbManagement, JdbcProfileComponent}
+import org.bitcoins.db._
 import org.bitcoins.tor.config.TorAppConfig
 import org.bitcoins.tor.{Socks5ProxyParams, TorParams}
 
@@ -31,14 +31,14 @@ case class VortexAppConfig(
 
   override val appConfig: VortexAppConfig = this
 
+  import profile.api._
+
   override def newConfigOfType(configs: Seq[Config]): VortexAppConfig =
     VortexAppConfig(directory, configs: _*)
 
   override val baseDatadir: Path = directory
 
-  override def start(): Future[Unit] = {
-    FutureUtil.unit
-  }
+  override def start(): Future[Unit] = FutureUtil.unit
 
   override def stop(): Future[Unit] = Future.unit
 
@@ -51,14 +51,12 @@ case class VortexAppConfig(
   lazy val torParams: Option[TorParams] = torConf.torParams
 
   lazy val listenAddress: InetSocketAddress = {
-    val str = config.getString(s"bitcoin-s.$moduleName.listen")
+    val str = config.getString(s"$moduleName.listen")
     val uri = new URI("tcp://" + str)
     new InetSocketAddress(uri.getHost, uri.getPort)
   }
 
-  override lazy val allTables: List[
-    profile.api.TableQuery[profile.api.Table[_]]] =
-    List.empty
+  override lazy val allTables: List[TableQuery[Table[_]]] = List.empty
 }
 
 object VortexAppConfig extends AppConfigFactory[VortexAppConfig] {

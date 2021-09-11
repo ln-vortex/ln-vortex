@@ -14,8 +14,6 @@ enablePlugins(ReproducibleBuildsPlugin,
               GraalVMNativeImagePlugin,
               WindowsPlugin)
 
-libraryDependencies ++= Deps.core
-
 Compile / doc := (target.value / "none")
 scalacOptions ++= Seq("release", "11")
 
@@ -39,3 +37,52 @@ wixFeatures += WindowsFeature(
     AddShortCuts(Seq("bin/ln-vortex.bat"))
   )
 )
+
+lazy val root = project
+  .in(file("."))
+  .aggregate(
+    core,
+    client,
+    server,
+    coreTest
+  )
+  .dependsOn(
+    core,
+    client,
+    server,
+    coreTest
+  )
+  .settings(CommonSettings.settings: _*)
+  .settings(
+    name := "ln-vortex",
+    publish / skip := true
+  )
+
+lazy val core = project
+  .in(file("core"))
+  .settings(CommonSettings.settings: _*)
+  .settings(name := "core", libraryDependencies ++= Deps.backend)
+
+lazy val coreTest = project
+  .in(file("core-test"))
+  .settings(CommonSettings.testSettings: _*)
+  .settings(name := "core-test", libraryDependencies ++= Deps.coreTest)
+  .dependsOn(core)
+
+lazy val client = project
+  .in(file("client"))
+  .settings(CommonSettings.settings: _*)
+  .settings(name := "client", libraryDependencies ++= Deps.backend)
+  .dependsOn(core)
+
+lazy val server = project
+  .in(file("server"))
+  .settings(CommonSettings.settings: _*)
+  .settings(name := "server", libraryDependencies ++= Deps.backend)
+  .dependsOn(core)
+
+lazy val gui = project
+  .in(file("gui"))
+  .settings(CommonSettings.settings: _*)
+  .settings(name := "gui", libraryDependencies ++= Deps.gui)
+  .dependsOn(client)

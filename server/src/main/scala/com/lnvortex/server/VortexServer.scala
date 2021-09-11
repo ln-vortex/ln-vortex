@@ -1,4 +1,4 @@
-package com.lnvortex.networking
+package com.lnvortex.server
 
 import akka.actor._
 import akka.event.LoggingReceive
@@ -43,7 +43,7 @@ class VortexServer(
       log.info(s"Received a connection from $remoteAddress")
       val _ = context.actorOf(
         Props(
-          new VortexConnectionHandler(dlcWalletApi,
+          new ClientConnectionHandler(dlcWalletApi,
                                       connection,
                                       None,
                                       dataHandlerFactory)))
