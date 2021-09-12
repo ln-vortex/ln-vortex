@@ -8,8 +8,6 @@ import com.lnvortex.core.{VortexMessage, VortexMessageParser}
 import grizzled.slf4j.Logging
 import scodec.bits.ByteVector
 
-import scala.concurrent.Promise
-
 class ClientConnectionHandler(
     vortexClient: VortexClient,
     connection: ActorRef,

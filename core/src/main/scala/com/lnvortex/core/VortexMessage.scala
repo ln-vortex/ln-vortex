@@ -121,6 +121,7 @@ object AskMixAdvertisement extends VortexMessageFactory[AskMixAdvertisement] {
 
 case class MixAdvertisement(
     amount: CurrencyUnit,
+    fee: CurrencyUnit,
     publicKey: SchnorrPublicKey,
     nonce: SchnorrNonce,
     time: UInt64)
@@ -128,7 +129,7 @@ case class MixAdvertisement(
   override val tpe: BigSizeUInt = MixAdvertisement.tpe
 
   override val value: ByteVector = {
-    amount.satoshis.toUInt64.bytes ++ publicKey.bytes ++ nonce.bytes ++ time.bytes
+    amount.satoshis.toUInt64.bytes ++ fee.satoshis.toUInt64.bytes ++ publicKey.bytes ++ nonce.bytes ++ time.bytes
   }
 }
 
@@ -141,18 +142,19 @@ object MixAdvertisement extends VortexMessageFactory[MixAdvertisement] {
     val iter = ValueIterator(value)
 
     val amount = iter.takeSats()
+    val fee = iter.takeSats()
     val publicKey = SchnorrPublicKey(iter.take(32))
     val nonce = SchnorrNonce(iter.take(32))
     val time = iter.takeU64()
 
-    MixAdvertisement(amount, publicKey, nonce, time)
+    MixAdvertisement(amount, fee, publicKey, nonce, time)
   }
 }
 
 // todo add input proofs
 /** First message from client to server
   * @param inputs inputs Alice is spending in the coin join
-  * @param blindedOutput Response from BlindingTweaks.freshBlindingTweaks
+  * @param blindedOutput Response from BlindingTweaks.freshBlindingTweaks & BlindingTweaks.generateChallenge
   * @param changeOutput output Alice should receive
   */
 case class AliceInit(
