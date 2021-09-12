@@ -3,7 +3,7 @@ package com.lnvortex.core
 import grizzled.slf4j.Logging
 import org.bitcoins.core.config.{BitcoinNetwork, Networks}
 import org.bitcoins.core.currency._
-import org.bitcoins.core.number.UInt64
+import org.bitcoins.core.number._
 import org.bitcoins.core.protocol._
 import org.bitcoins.core.protocol.tlv.TLV._
 import org.bitcoins.core.protocol.tlv._
@@ -120,6 +120,7 @@ object AskMixAdvertisement extends VortexMessageFactory[AskMixAdvertisement] {
 }
 
 case class MixAdvertisement(
+    version: UInt16,
     amount: CurrencyUnit,
     fee: CurrencyUnit,
     publicKey: SchnorrPublicKey,
@@ -129,7 +130,12 @@ case class MixAdvertisement(
   override val tpe: BigSizeUInt = MixAdvertisement.tpe
 
   override val value: ByteVector = {
-    amount.satoshis.toUInt64.bytes ++ fee.satoshis.toUInt64.bytes ++ publicKey.bytes ++ nonce.bytes ++ time.bytes
+    version.bytes ++
+      amount.satoshis.toUInt64.bytes ++
+      fee.satoshis.toUInt64.bytes ++
+      publicKey.bytes ++
+      nonce.bytes ++
+      time.bytes
   }
 }
 
@@ -141,13 +147,14 @@ object MixAdvertisement extends VortexMessageFactory[MixAdvertisement] {
   override def fromTLVValue(value: ByteVector): MixAdvertisement = {
     val iter = ValueIterator(value)
 
+    val version = iter.takeU16()
     val amount = iter.takeSats()
     val fee = iter.takeSats()
     val publicKey = SchnorrPublicKey(iter.take(32))
     val nonce = SchnorrNonce(iter.take(32))
     val time = iter.takeU64()
 
-    MixAdvertisement(amount, fee, publicKey, nonce, time)
+    MixAdvertisement(version, amount, fee, publicKey, nonce, time)
   }
 }
 

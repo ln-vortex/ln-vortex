@@ -15,6 +15,7 @@ class VortexClientTest extends VortexClientFixture {
   behavior of "VortexClient"
 
   val dummyAdvertisement: MixAdvertisement = MixAdvertisement(
+    version = UInt16.zero,
     amount = Satoshis(200000),
     fee = Satoshis.zero,
     publicKey = ECPublicKey.freshPublicKey.schnorrPublicKey,
@@ -25,6 +26,12 @@ class VortexClientTest extends VortexClientFixture {
   val dummyTweaks: BlindingTweaks = BlindingTweaks.freshBlindingTweaks(
     dummyAdvertisement.publicKey,
     dummyAdvertisement.nonce)
+
+  it must "fail to process an unknown version MixAdvertisement" in {
+    vortexClient =>
+      assertThrows[RuntimeException](
+        vortexClient.setRound(dummyAdvertisement.copy(version = UInt16.max)))
+  }
 
   it must "correctly sign a psbt" in { vortexClient =>
     val lnd = vortexClient.lndRpcClient

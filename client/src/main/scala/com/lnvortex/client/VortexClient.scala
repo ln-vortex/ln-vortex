@@ -6,6 +6,7 @@ import com.lnvortex.core.crypto.BlindSchnorrUtil
 import com.lnvortex.core.crypto.BlindingTweaks.freshBlindingTweaks
 import grizzled.slf4j.Logging
 import org.bitcoins.commons.jsonmodels.lnd.UTXOResult
+import org.bitcoins.core.number.UInt16
 import org.bitcoins.core.protocol.transaction._
 import org.bitcoins.core.psbt.PSBT
 import org.bitcoins.core.util.StartStopAsync
@@ -25,8 +26,15 @@ case class VortexClient(lndRpcClient: LndRpcClient)(implicit
 
   private[client] var roundDetails: RoundDetails[_, _] = NoDetails
 
+  private val knownVersions = Vector(UInt16.zero)
+
   private[client] def setRound(adv: MixAdvertisement): Unit = {
-    roundDetails = KnownRound(adv)
+    if (knownVersions.contains(adv.version)) {
+      roundDetails = KnownRound(adv)
+    } else {
+      throw new RuntimeException(
+        s"Received unknown mix version ${adv.version.toInt}, consider updating software")
+    }
   }
 
   lazy val peer: Peer = Peer(socket = config.coordinatorAddress,

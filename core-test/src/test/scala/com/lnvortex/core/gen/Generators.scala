@@ -16,13 +16,14 @@ object Generators {
 
   def mixAdvertisement: Gen[MixAdvertisement] = {
     for {
+      version <- NumberGenerator.uInt16
       amount <- CurrencyUnitGenerator.positiveSatoshis
       fee <- CurrencyUnitGenerator.positiveSatoshis
       pubkey <- CryptoGenerators.schnorrPublicKey
       nonce <- CryptoGenerators.schnorrNonce
       time <- NumberGenerator.uInt64
     } yield {
-      MixAdvertisement(amount, fee, pubkey, nonce, time)
+      MixAdvertisement(version, amount, fee, pubkey, nonce, time)
     }
   }
 
