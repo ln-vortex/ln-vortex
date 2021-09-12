@@ -3,7 +3,7 @@ package com.lnvortex.server
 import akka.actor._
 import akka.event.LoggingReceive
 import akka.io.{IO, Tcp}
-import org.bitcoins.core.api.dlc.wallet.DLCWalletApi
+import com.lnvortex.server
 import org.bitcoins.tor._
 
 import java.io.IOException
@@ -11,10 +11,11 @@ import java.net.InetSocketAddress
 import scala.concurrent.{Future, Promise}
 
 class VortexServer(
-    dlcWalletApi: DLCWalletApi,
+    coordinator: VortexCoordinator,
     bindAddress: InetSocketAddress,
     boundAddress: Option[Promise[InetSocketAddress]],
-    dataHandlerFactory: DLCDataHandler.Factory = DLCDataHandler.defaultFactory)
+    dataHandlerFactory: ServerDataHandler.Factory =
+      ServerDataHandler.defaultFactory)
     extends Actor
     with ActorLogging {
 
@@ -30,7 +31,7 @@ class VortexServer(
       boundAddress.foreach(_.success(localAddress))
       socket = sender()
 
-    case DLCServer.Disconnect =>
+    case VortexServer.Disconnect =>
       socket ! Tcp.Unbind
 
     case c @ Tcp.CommandFailed(_: Tcp.Bind) =>
@@ -43,9 +44,8 @@ class VortexServer(
       log.info(s"Received a connection from $remoteAddress")
       val _ = context.actorOf(
         Props(
-          new ClientConnectionHandler(dlcWalletApi,
+          new ServerConnectionHandler(coordinator,
                                       connection,
-                                      None,
                                       dataHandlerFactory)))
   }
 
@@ -63,26 +63,26 @@ class VortexServer(
 
 }
 
-object DLCServer {
+object VortexServer {
 
   case object Disconnect
 
   def props(
-      dlcWalletApi: DLCWalletApi,
+      vortexCoordinator: VortexCoordinator,
       bindAddress: InetSocketAddress,
       boundAddress: Option[Promise[InetSocketAddress]] = None,
-      dataHandlerFactory: DLCDataHandler.Factory): Props = Props(
-    new VortexServer(dlcWalletApi,
+      dataHandlerFactory: server.ServerDataHandler.Factory): Props = Props(
+    new VortexServer(vortexCoordinator,
                      bindAddress,
                      boundAddress,
                      dataHandlerFactory))
 
   def bind(
-      dlcWalletApi: DLCWalletApi,
+      vortexCoordinator: VortexCoordinator,
       bindAddress: InetSocketAddress,
       torParams: Option[TorParams],
-      dataHandlerFactory: DLCDataHandler.Factory =
-        DLCDataHandler.defaultFactory)(implicit
+      dataHandlerFactory: ServerDataHandler.Factory =
+        ServerDataHandler.defaultFactory)(implicit
       system: ActorSystem): Future[(InetSocketAddress, ActorRef)] = {
     import system.dispatcher
 
@@ -102,7 +102,10 @@ object DLCServer {
         case None => Future.successful(None)
       }
       actorRef = system.actorOf(
-        props(dlcWalletApi, bindAddress, Some(promise), dataHandlerFactory))
+        props(vortexCoordinator,
+              bindAddress,
+              Some(promise),
+              dataHandlerFactory))
       boundAddress <- promise.future
     } yield {
       val addr = onionAddress.getOrElse(boundAddress)

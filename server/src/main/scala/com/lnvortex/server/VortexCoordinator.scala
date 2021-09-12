@@ -9,29 +9,28 @@ import org.bitcoins.lnd.rpc.LndRpcClient
 import java.net.InetSocketAddress
 import scala.concurrent._
 
-case class VortexNode(lndRpcClient: LndRpcClient)(implicit
+case class VortexCoordinator(lndRpcClient: LndRpcClient)(implicit
     system: ActorSystem,
-    config: VortexAppConfig)
+    val config: VortexAppConfig)
     extends StartStopAsync[Unit]
     with Logging {
 
-  implicit val ec: ExecutionContextExecutor = system.dispatcher
+  var currentAdvertisement: MixAdvertisement = _
+
+  import system.dispatcher
 
   private[node] lazy val serverBindF: Future[(InetSocketAddress, ActorRef)] = {
     logger.info(
-      s"Binding server to ${config.listenAddress}, with tor hidden service: ${config.torParams.isDefined}")
+      s"Binding coordinator to ${config.listenAddress}, with tor hidden service: ${config.torParams.isDefined}")
 
-//    DLCServer
-//      .bind(
-//        wallet,
-//        config.listenAddress,
-//        config.torParams
-//      )
-//      .map { case (addr, actor) =>
-//        hostAddressP.success(addr)
-//        (addr, actor)
-//      }
-    null
+    VortexServer
+      .bind(vortexCoordinator = this,
+            bindAddress = config.listenAddress,
+            torParams = config.torParams)
+      .map { case (addr, actor) =>
+        hostAddressP.success(addr)
+        (addr, actor)
+      }
   }
 
   private val hostAddressP: Promise[InetSocketAddress] =
