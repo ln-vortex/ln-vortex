@@ -15,7 +15,8 @@ object Deps {
         "mac"
       }
     case n if n.startsWith("Windows") => "win"
-    case x                            => throw new Exception(s"Unknown platform $x!")
+    case x =>
+      throw new Exception(s"Unknown platform $x!")
   }
 
   object V {
@@ -25,7 +26,7 @@ object Deps {
 
     val scalaFxV = "16.0.0-R24"
     val javaFxV = "17-ea+8"
-    val bitcoinsV = "1.7.0-154-911fd342-SNAPSHOT"
+    val bitcoinsV = "1.7.0-154-911fd342-20210912-1450-SNAPSHOT"
 
     val grizzledSlf4jV = "1.3.4"
   }
@@ -55,6 +56,9 @@ object Deps {
 
     val bitcoinsTestkitCore =
       "org.bitcoin-s" %% "bitcoin-s-testkit-core" % V.bitcoinsV withSources () withJavadoc ()
+
+    val bitcoinsTestkit =
+      "org.bitcoin-s" %% "bitcoin-s-testkit" % V.bitcoinsV withSources () withJavadoc ()
 
     val bitcoinsDbCommons =
       "org.bitcoin-s" %% "bitcoin-s-db-commons" % V.bitcoinsV withSources () withJavadoc ()
@@ -104,6 +108,9 @@ object Deps {
   )
 
   val coreTest: List[ModuleID] = List(Compile.bitcoinsTestkitCore) ++ backend
+
+  val clientServerTest: List[ModuleID] =
+    List(Compile.bitcoinsTestkit) ++ backend
 
   val gui: List[ModuleID] =
     List(Compile.scalaFx, Compile.grizzledSlf4j) ++ Compile.javaFxDeps

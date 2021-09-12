@@ -1,8 +1,10 @@
 package com.lnvortex.core
 
+import akka.actor.ActorSystem
 import com.typesafe.config.Config
 import grizzled.slf4j.Logging
-import org.bitcoins.commons.config.AppConfigFactory
+import org.bitcoins.commons.config.AppConfigFactoryBase
+import org.bitcoins.core.currency.Satoshis
 import org.bitcoins.core.util.FutureUtil
 import org.bitcoins.db._
 import org.bitcoins.tor.config.TorAppConfig
@@ -10,6 +12,7 @@ import org.bitcoins.tor.{Socks5ProxyParams, TorParams}
 
 import java.net.{InetSocketAddress, URI}
 import java.nio.file.{Path, Paths}
+import java.time.Duration
 import scala.concurrent._
 import scala.util.Properties
 
@@ -20,11 +23,13 @@ import scala.util.Properties
   */
 case class VortexAppConfig(
     private val directory: Path,
-    private val conf: Config*)(implicit ec: ExecutionContext)
+    private val conf: Config*)(implicit system: ActorSystem)
     extends DbAppConfig
     with JdbcProfileComponent[VortexAppConfig]
     with DbManagement
     with Logging {
+  import system.dispatcher
+
   override val configOverrides: List[Config] = conf.toList
   override val moduleName: String = VortexAppConfig.moduleName
   override type ConfigType = VortexAppConfig
@@ -62,20 +67,30 @@ case class VortexAppConfig(
     new InetSocketAddress(uri.getHost, uri.getPort)
   }
 
+  lazy val mixFee: Satoshis = {
+    val long = config.getLong(s"$moduleName.mixFee")
+    Satoshis(long)
+  }
+
+  lazy val interval: Duration = {
+    config.getDuration(s"$moduleName.mixInterval")
+  }
+
   override lazy val allTables: List[TableQuery[Table[_]]] = List.empty
 }
 
-object VortexAppConfig extends AppConfigFactory[VortexAppConfig] {
+object VortexAppConfig
+    extends AppConfigFactoryBase[VortexAppConfig, ActorSystem] {
   override val moduleName: String = "vortex"
 
   val DEFAULT_DATADIR: Path = Paths.get(Properties.userHome, ".ln-vortex")
 
   override def fromDefaultDatadir(confs: Vector[Config] = Vector.empty)(implicit
-      ec: ExecutionContext): VortexAppConfig = {
+      ec: ActorSystem): VortexAppConfig = {
     fromDatadir(DEFAULT_DATADIR, confs)
   }
 
   override def fromDatadir(datadir: Path, confs: Vector[Config])(implicit
-      ec: ExecutionContext): VortexAppConfig =
+      ec: ActorSystem): VortexAppConfig =
     VortexAppConfig(datadir, confs: _*)
 }

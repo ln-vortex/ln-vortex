@@ -23,15 +23,14 @@ case class VortexClient(lndRpcClient: LndRpcClient)(implicit
 
   private val handlerP = Promise[ActorRef]()
 
-  private var roundDetails: RoundDetails[_, _] = NoDetails
+  private[client] var roundDetails: RoundDetails[_, _] = NoDetails
 
   private[client] def setRound(adv: MixAdvertisement): Unit = {
     roundDetails = KnownRound(adv)
   }
 
-  val peer: Peer =
-    Peer(socket = config.coordinatorAddress,
-         socks5ProxyParams = config.socks5ProxyParams)
+  lazy val peer: Peer = Peer(socket = config.coordinatorAddress,
+                             socks5ProxyParams = config.socks5ProxyParams)
 
   override def start(): Future[Unit] = {
     for {
@@ -52,16 +51,10 @@ case class VortexClient(lndRpcClient: LndRpcClient)(implicit
 
   def getOutputReferences(outpoints: Vector[TransactionOutPoint]): Future[
     Vector[OutputReference]] = {
-    val txIds = outpoints.map(_.txIdBE)
-    lndRpcClient.getTransactions.map { all =>
-      val detailsMap =
-        all.filter(tx => txIds.contains(tx.txId)).map(d => (d.txId, d)).toMap
-
-      outpoints.map { outpoint =>
-        val details = detailsMap(outpoint.txIdBE)
-        val output = details.tx.outputs(outpoint.vout.toInt)
-
-        OutputReference(outpoint, output)
+    lndRpcClient.listUnspent.map { all =>
+      all.filter(t => outpoints.contains(t.outPointOpt.get)).map { utxoRes =>
+        val output = TransactionOutput(utxoRes.amount, utxoRes.spk)
+        OutputReference(utxoRes.outPointOpt.get, output)
       }
     }
   }
@@ -133,16 +126,51 @@ case class VortexClient(lndRpcClient: LndRpcClient)(implicit
     }
   }
 
-  def validateAndSignPsbt(psbt: PSBT): Future[PSBT] = {
+  def validateAndSignPsbt(unsigned: PSBT): Future[PSBT] = {
     roundDetails match {
       case state @ (NoDetails | _: KnownRound | _: InputsRegistered |
           _: PSBTSigned) =>
         sys.error(s"At invalid state $state, cannot validateAndSignPsbt")
       case state: MixOutputRegistered =>
         roundDetails = state.nextStage()
+        val inputs = state.initDetails.inputs
+        lazy val myOutpoints = inputs.map(_.outPoint)
+        lazy val txOutpoints = unsigned.transaction.inputs.map(_.previousOutput)
+        // should we care if they don't have our inputs?
+        lazy val hasInputs = myOutpoints.forall(txOutpoints.contains)
 
-        // todo validate psbt has our outputs
-        lndRpcClient.finalizePSBT(psbt)
+        lazy val hasChangeOutput =
+          unsigned.transaction.outputs.contains(state.initDetails.changeOutput)
+        lazy val hasMixOutput =
+          unsigned.transaction.outputs.contains(state.initDetails.mixOutput)
+
+        if (hasMixOutput && hasChangeOutput && hasInputs) {
+          val sigFs = inputs.map { input =>
+            val idx = txOutpoints.indexOf(input.outPoint)
+            lndRpcClient
+              .computeInputScript(unsigned.transaction, idx, input.output)
+              .map { case (scriptSig, witness) =>
+                (scriptSig, witness, idx)
+              }
+          }
+
+          val withInputInfo = inputs.foldLeft(unsigned) { case (psbt, outRef) =>
+            val idx = txOutpoints.indexOf(outRef.outPoint)
+            psbt.addWitnessUTXOToInput(outRef.output, idx)
+          }
+
+          Future.sequence(sigFs).map { sigs =>
+            sigs.foldLeft(withInputInfo) {
+              case (psbt, (scriptSig, witness, idx)) =>
+                psbt.addFinalizedScriptWitnessToInput(scriptSig, witness, idx)
+            }
+          }
+        } else {
+          Future.failed(
+            new RuntimeException(
+              "Received PSBT did not contain our inputs or outputs"))
+        }
+
     }
   }
 
@@ -154,8 +182,9 @@ case class VortexClient(lndRpcClient: LndRpcClient)(implicit
       case state: PSBTSigned =>
         roundDetails = state.nextStage()
         println(signedTx)
+        // todo publish tx to peer
 
-        Future.unit
+        handlerP.future.map(_ ! AskMixAdvertisement)
     }
   }
 }

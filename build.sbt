@@ -75,6 +75,13 @@ lazy val client = project
   .settings(name := "client", libraryDependencies ++= Deps.backend)
   .dependsOn(core)
 
+lazy val clientServerTest = project
+  .in(file("client-server-test"))
+  .settings(CommonSettings.testSettings: _*)
+  .settings(name := "client-server-test",
+            libraryDependencies ++= Deps.clientServerTest)
+  .dependsOn(client) // todo add server
+
 lazy val server = project
   .in(file("server"))
   .settings(CommonSettings.settings: _*)
