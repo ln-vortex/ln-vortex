@@ -1,7 +1,9 @@
 package com.lnvortex.core
 
 import grizzled.slf4j.Logging
+import org.bitcoins.core.config.{BitcoinNetwork, Networks}
 import org.bitcoins.core.currency._
+import org.bitcoins.core.number.UInt64
 import org.bitcoins.core.protocol._
 import org.bitcoins.core.protocol.tlv.TLV._
 import org.bitcoins.core.protocol.tlv._
@@ -30,7 +32,8 @@ sealed abstract class ServerVortexMessage extends VortexMessage
 object VortexMessage extends Factory[VortexMessage] with Logging {
 
   val allFactories: Vector[VortexMessageFactory[VortexMessage]] =
-    Vector(MixAdvertisement,
+    Vector(AskMixAdvertisement,
+           MixAdvertisement,
            AliceInit,
            AliceInitResponse,
            BobMessage,
@@ -93,15 +96,39 @@ object UnknownVortexMessage extends Factory[UnknownVortexMessage] {
   }
 }
 
+case class AskMixAdvertisement(network: BitcoinNetwork)
+    extends ClientVortexMessage {
+  override val tpe: BigSizeUInt = AskMixAdvertisement.tpe
+
+  override val value: ByteVector = {
+    network.chainParams.genesisBlock.blockHeader.hashBE.bytes
+  }
+}
+
+object AskMixAdvertisement extends VortexMessageFactory[AskMixAdvertisement] {
+  override val tpe: BigSizeUInt = BigSizeUInt(696965L)
+
+  override val typeName: String = "AskMixAdvertisement"
+
+  override def fromTLVValue(value: ByteVector): AskMixAdvertisement = {
+    val network = Networks.fromChainHash(DoubleSha256DigestBE(value)) match {
+      case network: BitcoinNetwork => network
+    }
+
+    AskMixAdvertisement(network)
+  }
+}
+
 case class MixAdvertisement(
     amount: CurrencyUnit,
     publicKey: SchnorrPublicKey,
-    nonce: SchnorrNonce)
+    nonce: SchnorrNonce,
+    time: UInt64)
     extends ServerVortexMessage {
   override val tpe: BigSizeUInt = MixAdvertisement.tpe
 
   override val value: ByteVector = {
-    amount.satoshis.toUInt64.bytes ++ publicKey.bytes ++ nonce.bytes
+    amount.satoshis.toUInt64.bytes ++ publicKey.bytes ++ nonce.bytes ++ time.bytes
   }
 }
 
@@ -116,11 +143,13 @@ object MixAdvertisement extends VortexMessageFactory[MixAdvertisement] {
     val amount = iter.takeSats()
     val publicKey = SchnorrPublicKey(iter.take(32))
     val nonce = SchnorrNonce(iter.take(32))
+    val time = iter.takeU64()
 
-    MixAdvertisement(amount, publicKey, nonce)
+    MixAdvertisement(amount, publicKey, nonce, time)
   }
 }
 
+// todo add input proofs
 /** First message from client to server
   * @param inputs inputs Alice is spending in the coin join
   * @param blindedOutput Response from BlindingTweaks.freshBlindingTweaks

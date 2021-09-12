@@ -6,13 +6,22 @@ import org.scalacheck.Gen
 
 object Generators {
 
+  def askMixAdvertisement: Gen[AskMixAdvertisement] = {
+    for {
+      network <- ChainParamsGenerator.bitcoinNetworkParams
+    } yield {
+      AskMixAdvertisement(network)
+    }
+  }
+
   def mixAdvertisement: Gen[MixAdvertisement] = {
     for {
       amount <- CurrencyUnitGenerator.positiveSatoshis
       pubkey <- CryptoGenerators.schnorrPublicKey
       nonce <- CryptoGenerators.schnorrNonce
+      time <- NumberGenerator.uInt64
     } yield {
-      MixAdvertisement(amount, pubkey, nonce)
+      MixAdvertisement(amount, pubkey, nonce, time)
     }
   }
 

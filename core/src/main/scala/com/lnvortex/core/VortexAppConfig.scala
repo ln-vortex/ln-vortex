@@ -56,6 +56,12 @@ case class VortexAppConfig(
     new InetSocketAddress(uri.getHost, uri.getPort)
   }
 
+  lazy val coordinatorAddress: InetSocketAddress = {
+    val str = config.getString(s"$moduleName.coordinator")
+    val uri = new URI("tcp://" + str)
+    new InetSocketAddress(uri.getHost, uri.getPort)
+  }
+
   override lazy val allTables: List[TableQuery[Table[_]]] = List.empty
 }
 

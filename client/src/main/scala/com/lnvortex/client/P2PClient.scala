@@ -4,7 +4,6 @@ import akka.actor._
 import akka.event.LoggingReceive
 import akka.io.{IO, Tcp}
 import com.lnvortex.core.Peer
-import org.bitcoins.lnd.rpc.LndRpcClient
 import org.bitcoins.tor.Socks5Connection.{Socks5Connect, Socks5Connected}
 import org.bitcoins.tor.{Socks5Connection, Socks5ProxyParams}
 
@@ -66,12 +65,12 @@ class P2PClient(
         case None =>
           val peerAddress = peerOrProxyAddress
           log.info(s"connected to $peerAddress")
-          val _ = context.actorOf(
+          val actorRef = context.actorOf(
             Props(
               new ClientConnectionHandler(vortex,
                                           connection,
-                                          handlerP,
                                           dataHandlerFactory)))
+          handlerP.foreach(_.success(actorRef))
           connectedAddress.foreach(_.success(peerAddress))
       }
   }
@@ -87,12 +86,10 @@ class P2PClient(
       throw ex
     case Socks5Connected(_) =>
       log.info(s"connected to $remoteAddress via SOCKS5 proxy $proxyAddress")
-      val _ = context.actorOf(
-        Props(
-          new ClientConnectionHandler(vortex,
-                                      proxy,
-                                      handlerP,
-                                      dataHandlerFactory)))
+      val handler =
+        new ClientConnectionHandler(vortex, proxy, dataHandlerFactory)
+      val actorRef = context.actorOf(Props(handler))
+      handlerP.foreach(_.success(actorRef))
       connectedAddress.foreach(_.success(remoteAddress))
     case Terminated(actor) if actor == proxy =>
       context stop self
@@ -120,15 +117,14 @@ object P2PClient {
 
   def connect(
       peer: Peer,
-      lndRpcClient: LndRpcClient,
+      vortex: VortexClient,
       handlerP: Option[Promise[ActorRef]],
       dataHandlerFactory: ClientDataHandler.Factory =
         ClientDataHandler.defaultFactory)(implicit
       system: ActorSystem): Future[InetSocketAddress] = {
     val promise = Promise[InetSocketAddress]()
     val actor =
-      system.actorOf(
-        props(lndRpcClient, Some(promise), handlerP, dataHandlerFactory))
+      system.actorOf(props(vortex, Some(promise), handlerP, dataHandlerFactory))
     actor ! Connect(peer)
     promise.future
   }

@@ -13,16 +13,11 @@ import scala.concurrent.Promise
 class ClientConnectionHandler(
     vortexClient: VortexClient,
     connection: ActorRef,
-    handlerP: Option[Promise[ActorRef]],
     dataHandlerFactory: ClientDataHandler.Factory)
     extends Actor
     with ActorLogging {
 
-  private val handler = {
-    val h = dataHandlerFactory(vortexClient, context, self)
-    handlerP.foreach(_.success(h))
-    h
-  }
+  private val handler = dataHandlerFactory(vortexClient, context, self)
 
   override def preStart(): Unit = {
     context.watch(connection)
@@ -106,12 +101,8 @@ object ClientConnectionHandler extends Logging {
   def props(
       vortexClient: VortexClient,
       connection: ActorRef,
-      handlerP: Option[Promise[ActorRef]],
       dataHandlerFactory: ClientDataHandler.Factory): Props = {
     Props(
-      new ClientConnectionHandler(vortexClient,
-                                  connection,
-                                  handlerP,
-                                  dataHandlerFactory))
+      new ClientConnectionHandler(vortexClient, connection, dataHandlerFactory))
   }
 }
