@@ -5,6 +5,7 @@ import org.bitcoins.core.config.{BitcoinNetwork, Networks}
 import org.bitcoins.core.currency._
 import org.bitcoins.core.number._
 import org.bitcoins.core.protocol._
+import org.bitcoins.core.protocol.script._
 import org.bitcoins.core.protocol.tlv.TLV._
 import org.bitcoins.core.protocol.tlv._
 import org.bitcoins.core.protocol.transaction._
@@ -231,9 +232,16 @@ case class BobMessage(sig: SchnorrDigitalSignature, output: TransactionOutput)
 
   override val value: ByteVector = sig.bytes ++ u16Prefix(output.bytes)
 
-  def verifySig(publicKey: SchnorrPublicKey): Boolean = {
-    val challenge = CryptoUtil.sha256(output.bytes).bytes
-    publicKey.verify(challenge, sig)
+  def verifySigAndOutput(publicKey: SchnorrPublicKey): Boolean = {
+    output.scriptPubKey match {
+      case _: P2WSHWitnessSPKV0 =>
+        val challenge = CryptoUtil.sha256(output.bytes).bytes
+        publicKey.verify(challenge, sig)
+      case _: P2WPKHWitnessSPKV0 | _: WitnessCommitment |
+          _: UnassignedWitnessScriptPubKey | EmptyScriptPubKey |
+          _: NonWitnessScriptPubKey =>
+        false
+    }
   }
 }
 

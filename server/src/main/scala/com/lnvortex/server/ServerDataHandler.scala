@@ -4,6 +4,7 @@ import akka.actor._
 import akka.event.LoggingReceive
 import com.lnvortex.core._
 import org.bitcoins.core.protocol.tlv._
+import org.bitcoins.crypto.{CryptoUtil, ECPrivateKey, Sha256Digest}
 
 import scala.concurrent._
 
@@ -13,6 +14,9 @@ class ServerDataHandler(
     extends Actor
     with ActorLogging {
   implicit val ec: ExecutionContextExecutor = context.system.dispatcher
+
+  private val id: Sha256Digest =
+    CryptoUtil.sha256(ECPrivateKey.freshPrivateKey.bytes)
 
   override def preStart(): Unit = {
     val _ = context.watch(connectionHandler)
@@ -37,7 +41,8 @@ class ServerDataHandler(
     message match {
       case AskMixAdvertisement(network) =>
         if (coordinator.config.network == network) {
-          connectionHandler ! coordinator.currentAdvertisement
+          val adv = coordinator.getAdvertisement(id, connectionHandler)
+          connectionHandler ! adv
           Future.unit
         } else {
           log.warning(
@@ -45,10 +50,15 @@ class ServerDataHandler(
           Future.unit
         }
       case init: AliceInit =>
+        val response = coordinator.registerAlice(id, init)
+        connectionHandler ! response
+
         Future.unit
       case bob: BobMessage =>
+        val _ = coordinator.verifyAndRegisterBob(bob)
+        // todo queue up for unsigned psbt
         Future.unit
-      case psbt: SignedPsbtMessage =>
+      case SignedPsbtMessage(psbt) =>
         Future.unit
     }
   }

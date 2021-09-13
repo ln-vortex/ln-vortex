@@ -3,9 +3,10 @@ package com.lnvortex.core
 import akka.actor.ActorSystem
 import com.typesafe.config.Config
 import grizzled.slf4j.Logging
-import org.bitcoins.commons.config.AppConfigFactoryBase
+import org.bitcoins.commons.config._
 import org.bitcoins.core.currency.Satoshis
 import org.bitcoins.core.util.FutureUtil
+import org.bitcoins.crypto._
 import org.bitcoins.db._
 import org.bitcoins.tor.config.TorAppConfig
 import org.bitcoins.tor.{Socks5ProxyParams, TorParams}
@@ -67,6 +68,11 @@ case class VortexAppConfig(
     new InetSocketAddress(uri.getHost, uri.getPort)
   }
 
+  lazy val mixAmount: Satoshis = {
+    val long = config.getLong(s"$moduleName.mixAmount")
+    Satoshis(long)
+  }
+
   lazy val mixFee: Satoshis = {
     val long = config.getLong(s"$moduleName.mixFee")
     Satoshis(long)
@@ -74,6 +80,17 @@ case class VortexAppConfig(
 
   lazy val interval: Duration = {
     config.getDuration(s"$moduleName.mixInterval")
+  }
+
+  lazy val seedPath: Path = directory.resolve("seed.json")
+
+  lazy val aesPasswordOpt: Option[AesPassword] = {
+    val passOpt = config.getStringOrNone(s"bitcoin-s.keymanager.aesPassword")
+    passOpt.flatMap(AesPassword.fromStringOpt)
+  }
+
+  lazy val bip39PasswordOpt: Option[String] = {
+    config.getStringOrNone(s"bitcoin-s.keymanager.bip39password")
   }
 
   override lazy val allTables: List[TableQuery[Table[_]]] = List.empty

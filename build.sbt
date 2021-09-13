@@ -85,7 +85,7 @@ lazy val clientServerTest = project
 lazy val server = project
   .in(file("server"))
   .settings(CommonSettings.settings: _*)
-  .settings(name := "server", libraryDependencies ++= Deps.backend)
+  .settings(name := "server", libraryDependencies ++= Deps.server)
   .dependsOn(core)
 
 lazy val gui = project

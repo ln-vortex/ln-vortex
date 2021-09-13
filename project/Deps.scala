@@ -48,6 +48,9 @@ object Deps {
     val grizzledSlf4j =
       "org.clapper" %% "grizzled-slf4j" % V.grizzledSlf4jV withSources () withJavadoc ()
 
+    val bitcoinsKeyManager =
+      "org.bitcoin-s" %% "bitcoin-s-key-manager" % V.bitcoinsV withSources () withJavadoc ()
+
     val bitcoinsTor =
       "org.bitcoin-s" %% "bitcoin-s-tor" % V.bitcoinsV withSources () withJavadoc ()
 
@@ -106,6 +109,8 @@ object Deps {
     Compile.akkaSlf4j,
     Compile.grizzledSlf4j
   )
+
+  val server: List[ModuleID] = List(Compile.bitcoinsKeyManager) ++ backend
 
   val coreTest: List[ModuleID] = List(Compile.bitcoinsTestkitCore) ++ backend
 

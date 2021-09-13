@@ -1,68 +1,109 @@
 package com.lnvortex.core
 
-import com.lnvortex.core.gen.Generators
+import com.lnvortex.core.crypto.{BlindSchnorrUtil, BlindingTweaks}
+import org.bitcoins.core.currency._
+import org.bitcoins.core.protocol.script.P2WSHWitnessSPKV0
+import org.bitcoins.core.protocol.transaction.TransactionOutput
+import org.bitcoins.crypto._
+import org.bitcoins.testkitcore.gen.ScriptGenerators
 import org.bitcoins.testkitcore.util.BitcoinSUnitTest
 
 class VortexMessageTest extends BitcoinSUnitTest {
 
-  it must "have unique types" in {
-    val allTypes = VortexMessage.allFactories.map(_.tpe)
-    assert(allTypes.distinct == allTypes)
-  }
+  val privKey: ECPrivateKey = ECPrivateKey.freshPrivateKey
+  val pubKey: SchnorrPublicKey = privKey.schnorrPublicKey
+  val kVal: ECPrivateKey = ECPrivateKey.freshPrivateKey
+  val nonce: SchnorrNonce = kVal.schnorrNonce
 
-  "AskMixAdvertisement" must "have serialization symmetry" in {
-    forAll(Generators.askMixAdvertisement) { msg =>
-      assert(AskMixAdvertisement(msg.bytes) == msg)
-      assert(VortexMessage(msg.bytes) == msg)
+  val tweaks: BlindingTweaks =
+    BlindingTweaks.freshBlindingTweaks(pubKey, nonce)
+  val amount: CurrencyUnit = Bitcoins.one
+
+  it must "correctly verify a Bob message" in {
+    forAll(ScriptGenerators.p2wshSPKV0.map(_._1)) { spk =>
+      val output = TransactionOutput(amount, spk)
+      val hash = CryptoUtil.sha256(output.bytes).bytes
+
+      val challenge =
+        BlindSchnorrUtil.generateChallenge(pubKey, nonce, tweaks, hash)
+
+      val blindSig = BlindSchnorrUtil.generateBlindSig(privKey, kVal, challenge)
+
+      val sig =
+        BlindSchnorrUtil.unblindSignature(blindSig, pubKey, nonce, tweaks, hash)
+
+      val bobMsg = BobMessage(sig, output)
+
+      val verify = bobMsg.verifySigAndOutput(pubKey)
+
+      assert(verify)
     }
   }
 
-  "MixAdvertisement" must "have serialization symmetry" in {
-    forAll(Generators.mixAdvertisement) { msg =>
-      assert(MixAdvertisement(msg.bytes) == msg)
-      assert(VortexMessage(msg.bytes) == msg)
+  it must "fail to verify a Bob message with non p2wsh spks" in {
+    forAll(
+      ScriptGenerators.scriptPubKey
+        .map(_._1)
+        .suchThat(!_.isInstanceOf[P2WSHWitnessSPKV0])) { spk =>
+      val output = TransactionOutput(amount, spk)
+      val hash = CryptoUtil.sha256(output.bytes).bytes
+
+      val challenge =
+        BlindSchnorrUtil.generateChallenge(pubKey, nonce, tweaks, hash)
+
+      val blindSig = BlindSchnorrUtil.generateBlindSig(privKey, kVal, challenge)
+
+      val sig =
+        BlindSchnorrUtil.unblindSignature(blindSig, pubKey, nonce, tweaks, hash)
+
+      val bobMsg = BobMessage(sig, output)
+
+      val verify = bobMsg.verifySigAndOutput(pubKey)
+
+      assert(!verify)
     }
   }
 
-  "AliceInit" must "have serialization symmetry" in {
-    forAll(Generators.aliceInit) { msg =>
-      assert(AliceInit(msg.bytes) == msg)
-      assert(VortexMessage(msg.bytes) == msg)
+  it must "fail to verify a Bob message with different tweaks sig" in {
+    forAll(ScriptGenerators.p2wshSPKV0.map(_._1)) { spk =>
+      val output = TransactionOutput(amount, spk)
+      val hash = CryptoUtil.sha256(output.bytes).bytes
+
+      val challenge =
+        BlindSchnorrUtil.generateChallenge(pubKey, nonce, tweaks, hash)
+
+      val blindSig = BlindSchnorrUtil.generateBlindSig(privKey, kVal, challenge)
+
+      val newTweaks = BlindingTweaks.freshBlindingTweaks(pubKey, nonce)
+
+      assertThrows[IllegalArgumentException](
+        BlindSchnorrUtil.unblindSignature(blindSig = blindSig,
+                                          signerPubKey = pubKey,
+                                          signerNonce = nonce,
+                                          blindingTweaks = newTweaks,
+                                          message = hash))
     }
   }
 
-  "AliceInitResponse" must "have serialization symmetry" in {
-    forAll(Generators.aliceInitResponse) { msg =>
-      assert(AliceInitResponse(msg.bytes) == msg)
-      assert(VortexMessage(msg.bytes) == msg)
+  it must "fail to verify a Bob message with wrong keys" in {
+    forAll(ScriptGenerators.p2wshSPKV0.map(_._1)) { spk =>
+      val output = TransactionOutput(amount, spk)
+      val hash = CryptoUtil.sha256(output.bytes).bytes
+
+      val challenge =
+        BlindSchnorrUtil.generateChallenge(pubKey, nonce, tweaks, hash)
+
+      val blindSig = BlindSchnorrUtil.generateBlindSig(privKey, kVal, challenge)
+
+      val sig =
+        BlindSchnorrUtil.unblindSignature(blindSig, pubKey, nonce, tweaks, hash)
+
+      val bobMsg = BobMessage(sig, output)
+
+      val verify = bobMsg.verifySigAndOutput(kVal.schnorrPublicKey)
+
+      assert(!verify)
     }
   }
 
-  "BobMessage" must "have serialization symmetry" in {
-    forAll(Generators.bobMessage) { msg =>
-      assert(BobMessage(msg.bytes) == msg)
-      assert(VortexMessage(msg.bytes) == msg)
-    }
-  }
-
-  "UnsignedPsbtMessage" must "have serialization symmetry" in {
-    forAll(Generators.unsignedPsbtMessage) { msg =>
-      assert(UnsignedPsbtMessage(msg.bytes) == msg)
-      assert(VortexMessage(msg.bytes) == msg)
-    }
-  }
-
-  "SignedPsbtMessage" must "have serialization symmetry" in {
-    forAll(Generators.signedPsbtMessage) { msg =>
-      assert(SignedPsbtMessage(msg.bytes) == msg)
-      assert(VortexMessage(msg.bytes) == msg)
-    }
-  }
-
-  "SignedTxMessage" must "have serialization symmetry" in {
-    forAll(Generators.signedTxMessage) { msg =>
-      assert(SignedTxMessage(msg.bytes) == msg)
-      assert(VortexMessage(msg.bytes) == msg)
-    }
-  }
 }
