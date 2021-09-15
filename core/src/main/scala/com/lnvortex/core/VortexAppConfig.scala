@@ -4,16 +4,13 @@ import akka.actor.ActorSystem
 import com.typesafe.config.Config
 import grizzled.slf4j.Logging
 import org.bitcoins.commons.config._
-import org.bitcoins.core.currency.Satoshis
-import org.bitcoins.core.util.FutureUtil
-import org.bitcoins.crypto._
+import org.bitcoins.core.util.{FutureUtil, NetworkUtil}
 import org.bitcoins.db._
 import org.bitcoins.tor.config.TorAppConfig
 import org.bitcoins.tor.{Socks5ProxyParams, TorParams}
 
-import java.net.{InetSocketAddress, URI}
+import java.net.InetSocketAddress
 import java.nio.file.{Path, Paths}
-import java.time.Duration
 import scala.concurrent._
 import scala.util.Properties
 
@@ -56,41 +53,9 @@ case class VortexAppConfig(
 
   lazy val torParams: Option[TorParams] = torConf.torParams
 
-  lazy val listenAddress: InetSocketAddress = {
-    val str = config.getString(s"$moduleName.listen")
-    val uri = new URI("tcp://" + str)
-    new InetSocketAddress(uri.getHost, uri.getPort)
-  }
-
   lazy val coordinatorAddress: InetSocketAddress = {
     val str = config.getString(s"$moduleName.coordinator")
-    val uri = new URI("tcp://" + str)
-    new InetSocketAddress(uri.getHost, uri.getPort)
-  }
-
-  lazy val mixAmount: Satoshis = {
-    val long = config.getLong(s"$moduleName.mixAmount")
-    Satoshis(long)
-  }
-
-  lazy val mixFee: Satoshis = {
-    val long = config.getLong(s"$moduleName.mixFee")
-    Satoshis(long)
-  }
-
-  lazy val interval: Duration = {
-    config.getDuration(s"$moduleName.mixInterval")
-  }
-
-  lazy val seedPath: Path = directory.resolve("seed.json")
-
-  lazy val aesPasswordOpt: Option[AesPassword] = {
-    val passOpt = config.getStringOrNone(s"bitcoin-s.keymanager.aesPassword")
-    passOpt.flatMap(AesPassword.fromStringOpt)
-  }
-
-  lazy val bip39PasswordOpt: Option[String] = {
-    config.getStringOrNone(s"bitcoin-s.keymanager.bip39password")
+    NetworkUtil.parseInetSocketAddress(str, 12523)
   }
 
   override lazy val allTables: List[TableQuery[Table[_]]] = List.empty

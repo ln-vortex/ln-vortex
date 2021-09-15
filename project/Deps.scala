@@ -26,7 +26,7 @@ object Deps {
 
     val scalaFxV = "16.0.0-R24"
     val javaFxV = "17-ea+8"
-    val bitcoinsV = "1.7.0-154-911fd342-20210912-1450-SNAPSHOT"
+    val bitcoinsV = "1.7.0-160-87b8c4a1-SNAPSHOT"
 
     val grizzledSlf4jV = "1.3.4"
   }
@@ -62,6 +62,9 @@ object Deps {
 
     val bitcoinsTestkit =
       "org.bitcoin-s" %% "bitcoin-s-testkit" % V.bitcoinsV withSources () withJavadoc ()
+
+    val bitcoinsFeeProvider =
+      "org.bitcoin-s" %% "bitcoin-s-fee-provider" % V.bitcoinsV withSources () withJavadoc ()
 
     val bitcoinsDbCommons =
       "org.bitcoin-s" %% "bitcoin-s-db-commons" % V.bitcoinsV withSources () withJavadoc ()
@@ -110,7 +113,8 @@ object Deps {
     Compile.grizzledSlf4j
   )
 
-  val server: List[ModuleID] = List(Compile.bitcoinsKeyManager) ++ backend
+  val server: List[ModuleID] =
+    List(Compile.bitcoinsKeyManager, Compile.bitcoinsFeeProvider) ++ backend
 
   val coreTest: List[ModuleID] = List(Compile.bitcoinsTestkitCore) ++ backend
 

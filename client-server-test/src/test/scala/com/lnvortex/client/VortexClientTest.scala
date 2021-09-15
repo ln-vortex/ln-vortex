@@ -17,7 +17,7 @@ class VortexClientTest extends VortexClientFixture {
   val dummyAdvertisement: MixAdvertisement = MixAdvertisement(
     version = UInt16.zero,
     amount = Satoshis(200000),
-    fee = Satoshis.zero,
+    mixFee = Satoshis.zero,
     publicKey = ECPublicKey.freshPublicKey.schnorrPublicKey,
     nonce = ECPublicKey.freshPublicKey.schnorrNonce,
     time = UInt64.zero

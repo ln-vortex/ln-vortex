@@ -123,7 +123,9 @@ object AskMixAdvertisement extends VortexMessageFactory[AskMixAdvertisement] {
 case class MixAdvertisement(
     version: UInt16,
     amount: CurrencyUnit,
-    fee: CurrencyUnit,
+    mixFee: CurrencyUnit,
+    inputFee: CurrencyUnit,
+    outputFee: CurrencyUnit,
     publicKey: SchnorrPublicKey,
     nonce: SchnorrNonce,
     time: UInt64)
@@ -133,7 +135,9 @@ case class MixAdvertisement(
   override val value: ByteVector = {
     version.bytes ++
       amount.satoshis.toUInt64.bytes ++
-      fee.satoshis.toUInt64.bytes ++
+      mixFee.satoshis.toUInt64.bytes ++
+      inputFee.satoshis.toUInt64.bytes ++
+      outputFee.satoshis.toUInt64.bytes ++
       publicKey.bytes ++
       nonce.bytes ++
       time.bytes
@@ -150,12 +154,21 @@ object MixAdvertisement extends VortexMessageFactory[MixAdvertisement] {
 
     val version = iter.takeU16()
     val amount = iter.takeSats()
-    val fee = iter.takeSats()
+    val mixFee = iter.takeSats()
+    val inputFee = iter.takeSats()
+    val outputFee = iter.takeSats()
     val publicKey = SchnorrPublicKey(iter.take(32))
     val nonce = SchnorrNonce(iter.take(32))
     val time = iter.takeU64()
 
-    MixAdvertisement(version, amount, fee, publicKey, nonce, time)
+    MixAdvertisement(version = version,
+                     amount = amount,
+                     mixFee = mixFee,
+                     inputFee = inputFee,
+                     outputFee = outputFee,
+                     publicKey = publicKey,
+                     nonce = nonce,
+                     time = time)
   }
 }
 

@@ -19,11 +19,13 @@ object Generators {
       version <- NumberGenerator.uInt16
       amount <- CurrencyUnitGenerator.positiveSatoshis
       fee <- CurrencyUnitGenerator.positiveSatoshis
+      inFee <- CurrencyUnitGenerator.positiveSatoshis
+      outFee <- CurrencyUnitGenerator.positiveSatoshis
       pubkey <- CryptoGenerators.schnorrPublicKey
       nonce <- CryptoGenerators.schnorrNonce
       time <- NumberGenerator.uInt64
     } yield {
-      MixAdvertisement(version, amount, fee, pubkey, nonce, time)
+      MixAdvertisement(version, amount, fee, inFee, outFee, pubkey, nonce, time)
     }
   }
 

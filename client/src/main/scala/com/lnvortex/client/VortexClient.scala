@@ -6,7 +6,9 @@ import com.lnvortex.core.crypto.BlindSchnorrUtil
 import com.lnvortex.core.crypto.BlindingTweaks.freshBlindingTweaks
 import grizzled.slf4j.Logging
 import org.bitcoins.commons.jsonmodels.lnd.UTXOResult
+import org.bitcoins.core.currency.Satoshis
 import org.bitcoins.core.number.UInt16
+import org.bitcoins.core.policy.Policy
 import org.bitcoins.core.protocol.transaction._
 import org.bitcoins.core.psbt.PSBT
 import org.bitcoins.core.util.StartStopAsync
@@ -77,11 +79,17 @@ case class VortexClient(lndRpcClient: LndRpcClient)(implicit
           handler <- handlerP.future
           outputRefs <- getOutputReferences(outpoints)
 
+          selectedAmt = outputRefs.map(_.output.value).sum
+          inputFees = Satoshis(outputRefs.size) * round.inputFee
+          outputFees = Satoshis(2) * round.outputFee
+          onChainFees = inputFees + outputFees
+          changeAmt = selectedAmt - round.amount - round.mixFee - onChainFees
+
+          _ = require(
+            changeAmt > Policy.dustThreshold,
+            s"Not enough coins selected, need ${changeAmt - Policy.dustThreshold} more")
+
           changeAddr <- lndRpcClient.getNewAddress
-          // todo add on chain fees
-          changeAmt = outputRefs
-            .map(_.output.value)
-            .sum - round.amount - round.fee
           changeOutput = TransactionOutput(changeAmt, changeAddr.scriptPubKey)
 
           // todo negotiate channel, get output, hash it
