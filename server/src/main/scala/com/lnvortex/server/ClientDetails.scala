@@ -73,7 +73,7 @@ case class Unsigned(
     unsignedPSBT: PSBT,
     signedP: Promise[PSBT],
     indexes: Vector[Int])
-    extends ClientDetails {
+    extends ReadyToSign {
   override val isInitialized: Boolean = true
   override val isSigned: Boolean = false
 
@@ -102,7 +102,7 @@ case class Signed(
     signedP: Promise[PSBT],
     indexes: Vector[Int],
     signedPSBT: PSBT)
-    extends ClientDetails {
+    extends ReadyToSign {
   override val isInitialized: Boolean = true
   override val isSigned: Boolean = true
 }

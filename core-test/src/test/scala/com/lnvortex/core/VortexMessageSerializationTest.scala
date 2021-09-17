@@ -24,6 +24,12 @@ class VortexMessageSerializationTest extends BitcoinSUnitTest {
     }
   }
 
+  "InputReference" must "have serialization symmetry" in {
+    forAll(Generators.inputReference) { msg =>
+      assert(InputReference(msg.bytes) == msg)
+    }
+  }
+
   "AliceInit" must "have serialization symmetry" in {
     forAll(Generators.aliceInit) { msg =>
       assert(AliceInit(msg.bytes) == msg)

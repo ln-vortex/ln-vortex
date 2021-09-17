@@ -172,23 +172,50 @@ object MixAdvertisement extends VortexMessageFactory[MixAdvertisement] {
   }
 }
 
-// todo add input proofs
+case class InputReference(
+    outputReference: OutputReference,
+    inputProof: ScriptWitness)
+    extends NetworkElement
+    with TLVUtil {
+
+  val output: TransactionOutput = outputReference.output
+  val outPoint: TransactionOutPoint = outputReference.outPoint
+
+  override val bytes: ByteVector = {
+    u16Prefix(outputReference.bytes) ++ u16Prefix(inputProof.bytes)
+  }
+}
+
+object InputReference extends Factory[InputReference] {
+
+  override def fromBytes(bytes: ByteVector): InputReference = {
+    val iter = ValueIterator(bytes)
+    val outputRef =
+      iter.takeU16Prefixed[OutputReference](i => OutputReference(iter.take(i)))
+
+    val inputProof =
+      iter.takeU16Prefixed[ScriptWitness](i => ScriptWitness(iter.take(i)))
+
+    InputReference(outputRef, inputProof)
+  }
+}
+
 /** First message from client to server
   * @param inputs inputs Alice is spending in the coin join
   * @param blindedOutput Response from BlindingTweaks.freshBlindingTweaks & BlindingTweaks.generateChallenge
   * @param changeOutput output Alice should receive
   */
 case class AliceInit(
-    inputs: Vector[OutputReference],
+    inputs: Vector[InputReference],
     blindedOutput: FieldElement,
     changeOutput: TransactionOutput)
     extends ClientVortexMessage {
   override val tpe: BigSizeUInt = AliceInit.tpe
 
   override val value: ByteVector = {
-    u16PrefixedList[OutputReference](
+    u16PrefixedList[InputReference](
       inputs,
-      (t: OutputReference) => u16Prefix(t.bytes)) ++
+      (t: InputReference) => u16Prefix(t.bytes)) ++
       blindedOutput.bytes ++
       u16Prefix(changeOutput.bytes)
   }
@@ -202,9 +229,9 @@ object AliceInit extends VortexMessageFactory[AliceInit] {
   override def fromTLVValue(value: ByteVector): AliceInit = {
     val iter = ValueIterator(value)
 
-    val inputs = iter.takeU16PrefixedList[OutputReference](() =>
-      iter.takeU16Prefixed[OutputReference](len =>
-        OutputReference(iter.take(len))))
+    val inputs = iter.takeU16PrefixedList[InputReference](() =>
+      iter.takeU16Prefixed[InputReference](len =>
+        InputReference(iter.take(len))))
 
     val blindedOutput = FieldElement(iter.take(32))
 

@@ -29,10 +29,17 @@ object Generators {
     }
   }
 
+  def inputReference: Gen[InputReference] = {
+    for {
+      outputRef <- TransactionGenerators.outputReference
+      scriptWit <- WitnessGenerators.scriptWitness
+    } yield InputReference(outputRef, scriptWit)
+  }
+
   def aliceInit: Gen[AliceInit] = {
     for {
       numInputs <- Gen.choose(1, 7)
-      inputs <- Gen.listOfN(numInputs, TransactionGenerators.outputReference)
+      inputs <- Gen.listOfN(numInputs, inputReference)
       blindedOutput <- CryptoGenerators.fieldElement
       changeOutput <- TransactionGenerators.output
     } yield AliceInit(inputs.toVector, blindedOutput, changeOutput)

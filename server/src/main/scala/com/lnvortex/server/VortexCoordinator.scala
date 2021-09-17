@@ -7,7 +7,7 @@ import com.lnvortex.server.config.VortexCoordinatorAppConfig
 import com.lnvortex.server.models._
 import grizzled.slf4j.Logging
 import org.bitcoins.core.crypto.ExtKeyVersion.SegWitMainNetPriv
-import org.bitcoins.core.crypto.{BIP39Seed, ExtPrivateKey}
+import org.bitcoins.core.crypto.ExtPrivateKeyHardened
 import org.bitcoins.core.currency.CurrencyUnit
 import org.bitcoins.core.hd._
 import org.bitcoins.core.number._
@@ -45,24 +45,15 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
   private[server] val bannedUtxoDAO = BannedUtxoDAO()
   private[server] val aliceDAO = AliceDAO()
   private[server] val inputsDAO = RegisteredInputDAO()
+  private[server] val outputsDAO = RegisteredOutputDAO()
   private[server] val roundDAO = RoundDAO()
 
   /** The root private key for this oracle */
-  private[this] val extPrivateKey: ExtPrivateKey = {
-    val decryptedSeed = WalletStorage.decryptSeedFromDisk(
-      config.seedPath,
-      config.aesPasswordOpt) match {
-      case Left(error)     => sys.error(error.toString)
-      case Right(mnemonic) => mnemonic
-    }
-
-    decryptedSeed match {
-      case DecryptedMnemonic(mnemonicCode, _) =>
-        val seed = BIP39Seed.fromMnemonic(mnemonicCode, config.bip39PasswordOpt)
-        seed.toExtPrivateKey(SegWitMainNetPriv)
-      case DecryptedExtPrivKey(xprv, _) => xprv
-    }
-  }
+  private[this] val extPrivateKey: ExtPrivateKeyHardened =
+    WalletStorage.getPrivateKeyFromDisk(config.seedPath,
+                                        SegWitMainNetPriv,
+                                        config.aesPasswordOpt,
+                                        config.bip39PasswordOpt)
 
   private val pubKeyPath = BIP32Path.fromHardenedString("m/69'/0'/0'")
 
@@ -103,7 +94,9 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
 
   var feeRate: SatoshisPerVirtualByte = SatoshisPerVirtualByte.fromLong(10)
 
-  def inputFee: CurrencyUnit = feeRate * 148 // p2wpkh input size
+  var currentRoundId: Sha256Digest = Sha256Digest.empty
+
+  def inputFee: CurrencyUnit = feeRate * 149 // p2wpkh input size
   def outputFee: CurrencyUnit = feeRate * 43 // p2wsh output size
 
   private def nextRoundTime: Long =
@@ -121,43 +114,48 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       time = UInt64(nextRoundTime)
     )
 
-  private[server] val clientDetailsMap: mutable.Map[
+  private[server] val connectionHandlerMap: mutable.Map[
     Sha256Digest,
-    ClientDetails] = mutable.Map.empty
+    ActorRef] = mutable.Map.empty
 
-  private[server] val registeredOutputs: mutable.Map[
-    SchnorrDigitalSignature,
-    TransactionOutput] = mutable.Map.empty
+  private[server] val signedPMap: mutable.Map[Sha256Digest, Promise[PSBT]] =
+    mutable.Map.empty
+
+  // todo update round dbs everywhere
 
   def getAdvertisement(
-      id: Sha256Digest,
-      connectionHandler: ActorRef): MixAdvertisement = {
-    clientDetailsMap.get(id) match {
-      case Some(details) => advTemplate.copy(nonce = details.nonce)
+      peerId: Sha256Digest,
+      connectionHandler: ActorRef): Future[MixAdvertisement] = {
+    aliceDAO.read(peerId).flatMap {
+      case Some(alice) =>
+        Future.successful(advTemplate.copy(nonce = alice.nonce))
       case None =>
         val (nonce, path) = nextNonce()
 
-        val newDetail = Advertised(id, connectionHandler, nonce, path)
-        val _ = clientDetailsMap.put(id, newDetail)
+        val aliceDb = AliceDbs.newAlice(peerId, currentRoundId, path, nonce)
 
-        advTemplate.copy(nonce = nonce)
+        connectionHandlerMap.put(peerId, connectionHandler)
+
+        aliceDAO.create(aliceDb).map(_ => advTemplate.copy(nonce = nonce))
     }
   }
 
-  def nextRound(): Unit = {
+  def newRound(): Unit = {
     advTemplate = advTemplate.copy(time = UInt64(nextRoundTime))
-    clientDetailsMap.clear()
+    connectionHandlerMap.clear()
+    signedPMap.clear()
   }
 
   def registerAlice(
-      id: Sha256Digest,
+      peerId: Sha256Digest,
       aliceInit: AliceInit): Future[AliceInitResponse] = {
     require(aliceInit.inputs.forall(
               _.output.scriptPubKey.scriptType == WITNESS_V0_KEYHASH),
-            s"${id.hex} attempted to register non p2wpkh inputs")
+            s"${peerId.hex} attempted to register non p2wpkh inputs")
 
     val verifyInputFs = aliceInit.inputs.map {
-      case OutputReference(outPoint, output) =>
+      case InputReference(outputReference, _) =>
+        import outputReference._
         for {
           notBanned <- bannedUtxoDAO.read(outPoint).map(_.isEmpty)
 
@@ -165,133 +163,160 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
           isRealInput = txResult.vout.exists(out =>
             TransactionOutput(out.value,
                               ScriptPubKey(out.scriptPubKey.hex)) == output)
+          // todo validate input proof
         } yield notBanned && isRealInput
     }
 
-    Future.sequence(verifyInputFs).map { verifyInputs =>
+    Future.sequence(verifyInputFs).flatMap { verifyInputs =>
       val verify = verifyInputs.forall(v => v)
 
       if (verify) {
         // todo verify change output isn't too large
 
-        clientDetailsMap(id) match {
-          case details: Advertised =>
+        aliceDAO.read(peerId).flatMap {
+          case Some(aliceDb) =>
             val nonceKey =
-              extPrivateKey.deriveChildPrivKey(details.noncePath).key
-            val sig = BlindSchnorrUtil.generateBlindSig(privKey,
-                                                        nonceKey,
-                                                        aliceInit.blindedOutput)
+              extPrivateKey.deriveChildPrivKey(aliceDb.noncePath).key
+            val sig = BlindSchnorrUtil
+              .generateBlindSig(privKey, nonceKey, aliceInit.blindedOutput)
 
-            clientDetailsMap.put(id, details.toInitialized(aliceInit))
+            val inputDbs = aliceInit.inputs.map(
+              RegisteredInputDbs.fromInputReference(_, currentRoundId, peerId))
 
-            AliceInitResponse(sig)
-          case state @ (_: Initialized | _: Unsigned | _: Signed) =>
-            sys.error(s"Alice is already registered at state $state")
+            val updated =
+              aliceDb.copy(blindedOutputOpt = Some(aliceInit.blindedOutput),
+                           changeOutputOpt = Some(aliceInit.changeOutput),
+                           blindOutputSigOpt = Some(sig))
+
+            for {
+              _ <- aliceDAO.update(updated)
+              _ <- inputsDAO.createAll(inputDbs)
+            } yield AliceInitResponse(sig)
+          case None =>
+            Future.failed(
+              new RuntimeException(s"No alice found with ${peerId.hex}"))
         }
       } else {
-        throw new RuntimeException("Received invalid inputs")
+        Future.failed(
+          new RuntimeException("Alice registered with invalid inputs"))
       }
     }
   }
 
-  def verifyAndRegisterBob(bob: BobMessage): Boolean = {
+  def verifyAndRegisterBob(bob: BobMessage): Future[Boolean] = {
     if (bob.verifySigAndOutput(publicKey)) {
-      registeredOutputs.put(bob.sig, bob.output)
-      true
+      val db = RegisteredOutputDb(bob.output, bob.sig, null)
+      outputsDAO.create(db).map(_ => true)
     } else {
       logger.warn(s"Received invalid signature for output ${bob.output}")
-      false
+      Future.successful(false)
     }
   }
 
   private[server] def constructUnsignedTransaction(
-      mixAddr: BitcoinAddress): Transaction = {
-    val initialized = clientDetailsMap
-      .filter(_._2.isInitialized)
-      .toVector
-      .flatMap { case (id, details) =>
-        details match {
-          case init: Initialized => Some(init)
-          case _: Advertised | _: Unsigned | _: Signed =>
-            clientDetailsMap.remove(id)
-            None
-        }
+      mixAddr: BitcoinAddress): Future[Transaction] = {
+    val dbsF = for {
+      inputDbs <- inputsDAO.findByRoundId(currentRoundId)
+      outputDbs <- outputsDAO.findByRoundId(currentRoundId)
+      roundDb <- roundDAO.read(currentRoundId).map(_.get)
+    } yield (inputDbs, outputDbs, roundDb)
+
+    dbsF.flatMap { case (inputDbs, outputDbs, roundDb) =>
+      val txBuilder = RawTxBuilder().setFinalizer(
+        FilterDustFinalizer.andThen(ShuffleFinalizer))
+
+      // add mix outputs
+      txBuilder ++= outputDbs.map(_.output)
+      // add inputs & change outputs
+      txBuilder ++= inputDbs.map { inputDb =>
+        val input = TransactionInput(inputDb.outPoint,
+                                     EmptyScriptSignature,
+                                     TransactionConstants.sequence)
+        (input, inputDb.output)
       }
 
-    val txBuilder = RawTxBuilder().setFinalizer(ShuffleFinalizer)
+      // add mix fee output
+      val mixFee = inputDbs.size * config.mixFee
+      txBuilder += TransactionOutput(mixFee, mixAddr.scriptPubKey)
 
-    // add mix outputs
-    txBuilder ++= registeredOutputs.values.toVector
-    // add inputs
-    txBuilder ++= initialized.flatMap(_.aliceInit.inputs).map {
-      outputReference =>
-        TransactionInput(outputReference.outPoint,
-                         EmptyScriptSignature,
-                         TransactionConstants.sequence)
-    }
-    // add change outputs
-    txBuilder ++= initialized.map(_.aliceInit.changeOutput)
+      val transaction = txBuilder.buildTx()
 
-    // add mix fee output
-    val mixFee = initialized.size * config.mixFee
-    txBuilder += TransactionOutput(mixFee, mixAddr.scriptPubKey)
+      val outPoints = transaction.inputs.map(_.previousOutput)
 
-    val transaction = txBuilder.buildTx()
-
-    initialized.foreach { init =>
-      val indexes = init.aliceInit.inputs.map { ref =>
-        transaction.inputs.map(_.previousOutput).indexOf(ref.outPoint)
-      }
       val psbt = PSBT.fromUnsignedTx(transaction)
-      init.toUnsigned(psbt, Promise[PSBT](), indexes)
-    }
 
-    transaction
+      val updatedRound = roundDb.copy(psbtOpt = Some(psbt))
+      val updatedInputs = inputDbs.map { db =>
+        val index = outPoints.indexOf(db.outPoint)
+        db.copy(indexOpt = Some(index))
+      }
+
+      inputDbs.map(_.peerId).distinct.foreach { peerId =>
+        signedPMap.put(peerId, Promise[PSBT]())
+      }
+
+      for {
+        _ <- inputsDAO.updateAll(updatedInputs)
+        _ <- roundDAO.update(updatedRound)
+      } yield transaction
+    }
   }
 
-  def registerPSBTSignature(id: Sha256Digest, psbt: PSBT): Try[Transaction] = {
-    val details = clientDetailsMap(id)
+  def registerPSBTSignature(
+      peerId: Sha256Digest,
+      psbt: PSBT): Future[Transaction] = {
 
-    details match {
-      case state @ (_: Advertised | _: Initialized | _: Signed) =>
-        sys.error(s"Alice is at invalid state $state")
-      case unsigned: Unsigned =>
-        val sameTx = unsigned.unsignedPSBT.transaction == psbt.transaction
-        lazy val verify = unsigned.indexes.forall(psbt.verifyFinalizedInput)
-        if (sameTx && verify) {
-          val details = unsigned.toSigned(psbt)
-          clientDetailsMap.put(id, details)
+    val dbsF = for {
+      roundOpt <- roundDAO.read(currentRoundId)
+      inputs <- inputsDAO.findByRoundId(currentRoundId)
+    } yield (roundOpt, inputs.filter(_.indexOpt.isDefined))
 
-          val fs = clientDetailsMap.values.map {
-            case state @ (_: Initialized | _: Advertised) =>
-              throw new RuntimeException(s"Got client at state $state")
-            case ready: ReadyToSign =>
-              ready.signedP.future
-          }
-          Try {
-            val psbts = Await.result(Future.sequence(fs), 60.seconds)
+    dbsF.flatMap {
+      case (None, _) =>
+        Future.failed(
+          new RuntimeException(s"No round found with id ${currentRoundId.hex}"))
+      case (Some(roundDb), inputs) =>
+        roundDb.psbtOpt match {
+          case Some(unsignedPsbt) =>
+            require(inputs.size == unsignedPsbt.inputMaps.size)
+            val sameTx = unsignedPsbt.transaction == psbt.transaction
+            lazy val verify =
+              inputs.flatMap(_.indexOpt).forall(psbt.verifyFinalizedInput)
+            if (sameTx && verify) {
 
-            val head = psbts.head
-            val combined = psbts.tail.foldLeft(head)(_.combinePSBT(_))
+              val signedFs = signedPMap.values.map(_.future)
 
-            combined.extractTransactionAndValidate
-          }.flatten
-        } else {
-          val bannedUntil = TimeUtil.now.plusSeconds(86400) // 1 day
+              val signedT = Try {
+                val psbts = Await.result(Future.sequence(signedFs), 60.seconds)
 
-          val dbs = unsigned.aliceInit.inputs
-            .map(_.outPoint)
-            .map(BannedUtxoDb(_, bannedUntil, "Invalid psbt signature"))
+                val head = psbts.head
+                val combined = psbts.tail.foldLeft(head)(_.combinePSBT(_))
 
-          // dropping this future, maybe should fix
-          bannedUtxoDAO.createAll(dbs)
+                combined.extractTransactionAndValidate
+              }.flatten
 
-          unsigned.signedP.failure(
-            new RuntimeException("Invalid input signature"))
+              Future.fromTry(signedT)
+            } else {
+              val bannedUntil = TimeUtil.now.plusSeconds(86400) // 1 day
 
-          Failure(
-            new IllegalArgumentException(
-              "Received invalid signature from peer"))
+              val dbs = inputs
+                .map(_.outPoint)
+                .map(BannedUtxoDb(_, bannedUntil, "Invalid psbt signature"))
+
+              signedPMap(peerId).failure(
+                new RuntimeException("Invalid input signature"))
+
+              bannedUtxoDAO
+                .createAll(dbs)
+                .flatMap(_ =>
+                  Future.failed(
+                    new IllegalArgumentException(
+                      s"Received invalid signature from peer ${peerId.hex}")))
+            }
+          case None =>
+            signedPMap(peerId).failure(
+              new RuntimeException("Round in valid state"))
+            Future.failed(new RuntimeException("Round in valid state"))
         }
     }
   }
