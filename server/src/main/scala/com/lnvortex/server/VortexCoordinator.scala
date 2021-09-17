@@ -8,7 +8,7 @@ import com.lnvortex.server.models._
 import grizzled.slf4j.Logging
 import org.bitcoins.core.crypto.ExtKeyVersion.SegWitMainNetPriv
 import org.bitcoins.core.crypto.ExtPrivateKeyHardened
-import org.bitcoins.core.currency.CurrencyUnit
+import org.bitcoins.core.currency.{CurrencyUnit, Satoshis}
 import org.bitcoins.core.hd._
 import org.bitcoins.core.number._
 import org.bitcoins.core.protocol.BitcoinAddress
@@ -153,6 +153,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
               _.output.scriptPubKey.scriptType == WITNESS_V0_KEYHASH),
             s"${peerId.hex} attempted to register non p2wpkh inputs")
 
+    val roundDbF = roundDAO.read(currentRoundId).map(_.get)
     val peerNonceF = aliceDAO.read(peerId).map(_.get.nonce)
 
     val verifyInputFs = aliceInit.inputs.map { inputRef: InputReference =>
@@ -179,11 +180,25 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       } yield notBanned && isRealInput && validProof
     }
 
-    Future.sequence(verifyInputFs).flatMap { verifyInputs =>
-      val verify = verifyInputs.forall(v => v)
+    val f = for {
+      verifyInputs <- Future.sequence(verifyInputFs)
+      roundDb <- roundDbF
+    } yield (verifyInputs, roundDb)
 
-      if (verify) {
-        // todo verify change output isn't too large
+    f.flatMap { case (verifyInputVec, roundDb) =>
+      val validInputs = verifyInputVec.forall(v => v)
+
+      val inputAmt = aliceInit.inputs.map(_.output.value).sum
+      val inputFees = Satoshis(aliceInit.inputs.size) * roundDb.inputFee
+      val outputFees = Satoshis(2) * roundDb.outputFee
+      val onChainFees = inputFees + outputFees
+      val changeAmt = inputAmt - roundDb.amount - roundDb.mixFee - onChainFees
+
+      val validChange =
+        aliceInit.changeOutput.value <= changeAmt &&
+          aliceInit.changeOutput.scriptPubKey.scriptType == WITNESS_V0_KEYHASH
+
+      if (validInputs && validChange) {
 
         aliceDAO.read(peerId).flatMap {
           case Some(aliceDb) =>
@@ -228,7 +243,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
 
   def verifyAndRegisterBob(bob: BobMessage): Future[Boolean] = {
     if (bob.verifySigAndOutput(publicKey)) {
-      val db = RegisteredOutputDb(bob.output, bob.sig, null)
+      val db = RegisteredOutputDb(bob.output, bob.sig, currentRoundId)
       outputsDAO.create(db).map(_ => true)
     } else {
       logger.warn(s"Received invalid signature for output ${bob.output}")

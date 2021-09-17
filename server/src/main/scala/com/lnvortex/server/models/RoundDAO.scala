@@ -55,6 +55,12 @@ case class RoundDAO()(implicit
 
     def feeRate: Rep[SatoshisPerVirtualByte] = column("fee_rate")
 
+    def mixFee: Rep[CurrencyUnit] = column("mix_fee")
+
+    def inputFee: Rep[CurrencyUnit] = column("input_fee")
+
+    def outputFee: Rep[CurrencyUnit] = column("output_fee")
+
     def amount: Rep[CurrencyUnit] = column("amount")
 
     def psbtOpt: Rep[Option[PSBT]] = column("psbt")
@@ -68,6 +74,9 @@ case class RoundDAO()(implicit
        status,
        roundTime,
        feeRate,
+       mixFee,
+       inputFee,
+       outputFee,
        amount,
        psbtOpt,
        transactionOpt,

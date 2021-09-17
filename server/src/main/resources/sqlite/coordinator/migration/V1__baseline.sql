@@ -7,12 +7,17 @@ CREATE TABLE `banned_utxos`
 
 CREATE TABLE `rounds`
 (
-    `round_id`   VARCHAR(254) PRIMARY KEY NOT NULL,
-    `status`     VARCHAR(254)             NOT NULL,
-    `round_time` TIMESTAMP                NOT NULL,
-    `fee_rate`   VARCHAR(254)             NOT NULL,
-    `amount`     INTEGER                  NOT NULL,
-    `profit`     INTEGER
+    `round_id`    VARCHAR(254) PRIMARY KEY NOT NULL,
+    `status`      VARCHAR(254)             NOT NULL,
+    `round_time`  TIMESTAMP                NOT NULL,
+    `fee_rate`    VARCHAR(254)             NOT NULL,
+    `mix_fee`     INTEGER                  NOT NULL,
+    `input_fee`   INTEGER                  NOT NULL,
+    `output_fee`  INTEGER                  NOT NULL,
+    `amount`      INTEGER                  NOT NULL,
+    `psbt`        VARCHAR(254),
+    `transaction` VARCHAR(254),
+    `profit`      INTEGER
 );
 
 CREATE TABLE `alices`
