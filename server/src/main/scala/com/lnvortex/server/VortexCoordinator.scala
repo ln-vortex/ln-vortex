@@ -2,14 +2,10 @@ package com.lnvortex.server
 
 import akka.actor.{ActorRef, ActorSystem}
 import com.lnvortex.core._
-import com.lnvortex.core.crypto.BlindSchnorrUtil
 import com.lnvortex.server.config.VortexCoordinatorAppConfig
 import com.lnvortex.server.models._
 import grizzled.slf4j.Logging
-import org.bitcoins.core.crypto.ExtKeyVersion.SegWitMainNetPriv
-import org.bitcoins.core.crypto.ExtPrivateKeyHardened
 import org.bitcoins.core.currency.{CurrencyUnit, Satoshis}
-import org.bitcoins.core.hd._
 import org.bitcoins.core.number._
 import org.bitcoins.core.protocol.BitcoinAddress
 import org.bitcoins.core.protocol.script.{EmptyScriptSignature, ScriptPubKey}
@@ -22,12 +18,9 @@ import org.bitcoins.core.wallet.fee.SatoshisPerVirtualByte
 import org.bitcoins.crypto._
 import org.bitcoins.feeprovider.MempoolSpaceProvider
 import org.bitcoins.feeprovider.MempoolSpaceTarget.FastestFeeTarget
-import org.bitcoins.keymanager._
 import org.bitcoins.rpc.client.common.BitcoindRpcClient
 
 import java.net.InetSocketAddress
-import java.util.concurrent.atomic.AtomicInteger
-import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.concurrent._
 import scala.concurrent.duration.DurationInt
@@ -48,51 +41,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
   private[server] val outputsDAO = RegisteredOutputDAO()
   private[server] val roundDAO = RoundDAO()
 
-  /** The root private key for this oracle */
-  private[this] val extPrivateKey: ExtPrivateKeyHardened =
-    WalletStorage.getPrivateKeyFromDisk(config.seedPath,
-                                        SegWitMainNetPriv,
-                                        config.aesPasswordOpt,
-                                        config.bip39PasswordOpt)
-
-  private val pubKeyPath = BIP32Path.fromHardenedString("m/69'/0'/0'")
-
-  private val hdChain = {
-    val purpose = HDPurposes.Legacy
-    val coin = HDCoin(purpose, HDCoinType.Bitcoin)
-    val account = HDAccount(coin, 0)
-    HDChain(HDChainType.External, account)
-  }
-
-  private val nonceCounter: AtomicInteger = {
-    val startingIndex = Await.result(aliceDAO.nextNonceIndex(), 5.seconds)
-    new AtomicInteger(startingIndex)
-  }
-
-  private def nextNoncePath: BIP32Path = {
-    val path = HDAddress(hdChain, nonceCounter.getAndIncrement()).toPath
-    // make hardened for security
-    // this is very important, otherwise will leak key data
-    val hardened = path.map(_.copy(hardened = true))
-
-    BIP32Path(hardened.toVector)
-  }
-
-  @tailrec
-  private[this] def nextNonce(): (SchnorrNonce, BIP32Path) = {
-    val path = nextNoncePath
-    val nonceT = extPrivateKey.deriveChildPubKey(nextNoncePath)
-
-    nonceT match {
-      case Success(nonce) => (nonce.key.schnorrNonce, path)
-      case Failure(_)     => nextNonce()
-    }
-  }
-
-  private[this] val privKey: ECPrivateKey =
-    extPrivateKey.deriveChildPrivKey(pubKeyPath).key
-
-  val publicKey: SchnorrPublicKey = privKey.schnorrPublicKey
+  private[this] val km = new CoordinatorKeyManager()
 
   val feeProvider: MempoolSpaceProvider =
     MempoolSpaceProvider(FastestFeeTarget, config.network, None)
@@ -114,7 +63,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       mixFee = config.mixFee,
       inputFee = inputFee,
       outputFee = outputFee,
-      publicKey = publicKey,
+      publicKey = km.publicKey,
       nonce = ECPublicKey.freshPublicKey.schnorrNonce,
       time = UInt64(nextRoundTime)
     )
@@ -135,7 +84,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       case Some(alice) =>
         Future.successful(advTemplate.copy(nonce = alice.nonce))
       case None =>
-        val (nonce, path) = nextNonce()
+        val (nonce, path) = km.nextNonce()
 
         val aliceDb = AliceDbs.newAlice(peerId, currentRoundId, path, nonce)
 
@@ -207,10 +156,8 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
 
         aliceDAO.read(peerId).flatMap {
           case Some(aliceDb) =>
-            val nonceKey =
-              extPrivateKey.deriveChildPrivKey(aliceDb.noncePath).key
-            val sig = BlindSchnorrUtil
-              .generateBlindSig(privKey, nonceKey, aliceInit.blindedOutput)
+            val sig =
+              km.createBlindSig(aliceInit.blindedOutput, aliceDb.noncePath)
 
             val inputDbs = aliceInit.inputs.map(
               RegisteredInputDbs.fromInputReference(_, currentRoundId, peerId))
@@ -247,7 +194,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
   }
 
   def verifyAndRegisterBob(bob: BobMessage): Future[Boolean] = {
-    if (bob.verifySigAndOutput(publicKey)) {
+    if (bob.verifySigAndOutput(km.publicKey)) {
       val db = RegisteredOutputDb(bob.output, bob.sig, currentRoundId)
       outputsDAO.create(db).map(_ => true)
     } else {

@@ -18,12 +18,12 @@ case class AliceDb(
     blindOutputSigOpt: Option[FieldElement]
 ) {
 
-  // todo make hardened path
-  val noncePath: HDPath = {
+  val noncePath: BIP32Path = {
     val coin = HDCoin(purpose, this.coin)
     val account = HDAccount(coin, accountIdx)
     val chain = HDChain(this.chain, account)
-    HDAddress(chain, nonceIndex).toPath
+    val path = HDAddress(chain, nonceIndex).path
+    BIP32Path(path)
   }
 }
 
