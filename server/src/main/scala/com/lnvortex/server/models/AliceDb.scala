@@ -32,16 +32,21 @@ object AliceDbs {
   def newAlice(
       peerId: Sha256Digest,
       roundId: Sha256Digest,
-      noncePath: HDPath,
+      noncePath: BIP32Path,
       nonce: SchnorrNonce): AliceDb = {
+    require(noncePath.size == 5,
+            s"nonce path must have a size of 5, got ${noncePath.size}")
+    val purpose = noncePath.path.head
+    val _ :+ coin :+ account :+ chain :+ address = noncePath.path
+
     AliceDb(
       peerId = peerId,
       roundId = roundId,
-      purpose = noncePath.purpose,
-      coin = noncePath.coin.coinType,
-      accountIdx = noncePath.account.index,
-      chain = noncePath.chain.chainType,
-      nonceIndex = noncePath.address.index,
+      purpose = HDPurpose(purpose.index),
+      coin = HDCoinType.fromInt(coin.index),
+      accountIdx = account.index,
+      chain = HDChainType.fromInt(chain.index),
+      nonceIndex = address.index,
       nonce = nonce,
       blindedOutputOpt = None,
       changeOutputOpt = None,

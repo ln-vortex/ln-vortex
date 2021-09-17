@@ -69,12 +69,17 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
     new AtomicInteger(startingIndex)
   }
 
-  private def nextNoncePath: HDPath = {
-    HDAddress(hdChain, nonceCounter.getAndIncrement()).toPath
+  private def nextNoncePath: BIP32Path = {
+    val path = HDAddress(hdChain, nonceCounter.getAndIncrement()).toPath
+    // make hardened for security
+    // this is very important, otherwise will leak key data
+    val hardened = path.map(_.copy(hardened = true))
+
+    BIP32Path(hardened.toVector)
   }
 
   @tailrec
-  private def nextNonce(): (SchnorrNonce, HDPath) = {
+  private[this] def nextNonce(): (SchnorrNonce, BIP32Path) = {
     val path = nextNoncePath
     val nonceT = extPrivateKey.deriveChildPubKey(nextNoncePath)
 

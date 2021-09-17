@@ -43,14 +43,18 @@ lazy val root = project
   .aggregate(
     core,
     client,
+    clientServerTest,
     server,
-    coreTest
+    coreTest,
+    gui
   )
   .dependsOn(
     core,
     client,
+    clientServerTest,
     server,
-    coreTest
+    coreTest,
+    gui
   )
   .settings(CommonSettings.settings: _*)
   .settings(
@@ -80,7 +84,7 @@ lazy val clientServerTest = project
   .settings(CommonSettings.testSettings: _*)
   .settings(name := "client-server-test",
             libraryDependencies ++= Deps.clientServerTest)
-  .dependsOn(client) // todo add server
+  .dependsOn(client, server)
 
 lazy val server = project
   .in(file("server"))
