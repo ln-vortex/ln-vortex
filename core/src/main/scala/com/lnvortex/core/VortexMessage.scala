@@ -172,34 +172,6 @@ object MixAdvertisement extends VortexMessageFactory[MixAdvertisement] {
   }
 }
 
-case class InputReference(
-    outputReference: OutputReference,
-    inputProof: ScriptWitness)
-    extends NetworkElement
-    with TLVUtil {
-
-  val output: TransactionOutput = outputReference.output
-  val outPoint: TransactionOutPoint = outputReference.outPoint
-
-  override val bytes: ByteVector = {
-    u16Prefix(outputReference.bytes) ++ u16Prefix(inputProof.bytes)
-  }
-}
-
-object InputReference extends Factory[InputReference] {
-
-  override def fromBytes(bytes: ByteVector): InputReference = {
-    val iter = ValueIterator(bytes)
-    val outputRef =
-      iter.takeU16Prefixed[OutputReference](i => OutputReference(iter.take(i)))
-
-    val inputProof =
-      iter.takeU16Prefixed[ScriptWitness](i => ScriptWitness(iter.take(i)))
-
-    InputReference(outputRef, inputProof)
-  }
-}
-
 /** First message from client to server
   * @param inputs inputs Alice is spending in the coin join
   * @param blindedOutput Response from BlindingTweaks.freshBlindingTweaks & BlindingTweaks.generateChallenge

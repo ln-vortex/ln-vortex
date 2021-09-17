@@ -9,9 +9,10 @@ import org.bitcoins.commons.jsonmodels.lnd.UTXOResult
 import org.bitcoins.core.currency.Satoshis
 import org.bitcoins.core.number.UInt16
 import org.bitcoins.core.policy.Policy
+import org.bitcoins.core.protocol.script.ScriptWitness
 import org.bitcoins.core.protocol.transaction._
 import org.bitcoins.core.psbt.PSBT
-import org.bitcoins.core.util.StartStopAsync
+import org.bitcoins.core.util.{FutureUtil, StartStopAsync}
 import org.bitcoins.crypto._
 import org.bitcoins.lnd.rpc.LndRpcClient
 
@@ -69,6 +70,14 @@ case class VortexClient(lndRpcClient: LndRpcClient)(implicit
     }
   }
 
+  private[client] def createInputProof(
+      nonce: SchnorrNonce,
+      outputRef: OutputReference): Future[ScriptWitness] = {
+    val tx = InputReference.constructInputProofTx(outputRef, nonce)
+
+    lndRpcClient.computeInputScript(tx, 0, outputRef.output).map(_._2)
+  }
+
   def registerCoins(outpoints: Vector[TransactionOutPoint]): Future[Unit] = {
     roundDetails match {
       case state @ (NoDetails | _: InitializedRound[_]) =>
@@ -89,6 +98,12 @@ case class VortexClient(lndRpcClient: LndRpcClient)(implicit
             changeAmt > Policy.dustThreshold,
             s"Not enough coins selected, need ${changeAmt - Policy.dustThreshold} more")
 
+          inputProofs <- FutureUtil.sequentially(outputRefs)(
+            createInputProof(round.nonce, _))
+          inputRefs = outputRefs.zip(inputProofs).map { case (outRef, proof) =>
+            InputReference(outRef, proof)
+          }
+
           changeAddr <- lndRpcClient.getNewAddress
           changeOutput = TransactionOutput(changeAmt, changeAddr.scriptPubKey)
 
@@ -107,7 +122,7 @@ case class VortexClient(lndRpcClient: LndRpcClient)(implicit
           val details = InitDetails(outputRefs, changeOutput, mixOutput, tweaks)
           roundDetails = knownRound.nextStage(details)
 
-          handler ! AliceInit(outputRefs, challenge, changeOutput)
+          handler ! AliceInit(inputRefs, challenge, changeOutput)
         }
     }
   }

@@ -9,6 +9,7 @@ import org.bitcoins.core.protocol.transaction._
 import org.bitcoins.core.psbt.PSBT
 import org.bitcoins.crypto._
 
+import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
 class VortexClientTest extends VortexClientFixture {
@@ -18,6 +19,8 @@ class VortexClientTest extends VortexClientFixture {
     version = UInt16.zero,
     amount = Satoshis(200000),
     mixFee = Satoshis.zero,
+    inputFee = Satoshis.zero,
+    outputFee = Satoshis.zero,
     publicKey = ECPublicKey.freshPublicKey.schnorrPublicKey,
     nonce = ECPublicKey.freshPublicKey.schnorrNonce,
     time = UInt64.zero
@@ -151,5 +154,23 @@ class VortexClientTest extends VortexClientFixture {
       res <- recoverToSucceededIf[RuntimeException](
         vortexClient.validateAndSignPsbt(psbt))
     } yield res
+  }
+
+  it must "correctly create input proofs" in { vortexClient =>
+    for {
+      utxos <- vortexClient.listCoins()
+      outRefs <- vortexClient.getOutputReferences(utxos.map(_.outPointOpt.get))
+      proofFs = outRefs.map(
+        vortexClient.createInputProof(dummyAdvertisement.nonce, _))
+      proofs <- Future.sequence(proofFs)
+    } yield {
+      val inputRefs = outRefs.zip(proofs).map { case (outRef, proof) =>
+        InputReference(outRef, proof)
+      }
+
+      assert(
+        inputRefs.forall(
+          InputReference.verifyInputProof(_, dummyAdvertisement.nonce)))
+    }
   }
 }

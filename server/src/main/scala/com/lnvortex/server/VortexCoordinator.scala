@@ -153,18 +153,30 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
               _.output.scriptPubKey.scriptType == WITNESS_V0_KEYHASH),
             s"${peerId.hex} attempted to register non p2wpkh inputs")
 
-    val verifyInputFs = aliceInit.inputs.map {
-      case InputReference(outputReference, _) =>
-        import outputReference._
-        for {
-          notBanned <- bannedUtxoDAO.read(outPoint).map(_.isEmpty)
+    val peerNonceF = aliceDAO.read(peerId).map(_.get.nonce)
 
-          txResult <- bitcoind.getRawTransaction(outPoint.txIdBE)
-          isRealInput = txResult.vout.exists(out =>
+    val verifyInputFs = aliceInit.inputs.map { inputRef: InputReference =>
+      import inputRef._
+      for {
+        banDbOpt <- bannedUtxoDAO.read(outPoint)
+        notBanned = banDbOpt match {
+          case Some(banDb) =>
+            TimeUtil.now.isAfter(banDb.bannedUntil)
+          case None => true
+        }
+
+        txResult <- bitcoind.getRawTransaction(outPoint.txIdBE)
+        txOutT = Try(txResult.vout(outPoint.vout.toInt))
+        isRealInput = txOutT match {
+          case Failure(_) => false
+          case Success(out) =>
             TransactionOutput(out.value,
-                              ScriptPubKey(out.scriptPubKey.hex)) == output)
-          // todo validate input proof
-        } yield notBanned && isRealInput
+                              ScriptPubKey(out.scriptPubKey.hex)) == output
+        }
+
+        peerNonce <- peerNonceF
+        validProof = InputReference.verifyInputProof(inputRef, peerNonce)
+      } yield notBanned && isRealInput && validProof
     }
 
     Future.sequence(verifyInputFs).flatMap { verifyInputs =>
@@ -197,8 +209,19 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
               new RuntimeException(s"No alice found with ${peerId.hex}"))
         }
       } else {
-        Future.failed(
-          new RuntimeException("Alice registered with invalid inputs"))
+
+        val bannedUntil = TimeUtil.now.plusSeconds(3600) // 1 hour
+
+        val banDbs = aliceInit.inputs
+          .map(_.outPoint)
+          .map(
+            BannedUtxoDb(_, bannedUntil, "Invalid inputs and proofs received"))
+
+        bannedUtxoDAO
+          .createAll(banDbs)
+          .flatMap(_ =>
+            Future.failed(
+              new RuntimeException("Alice registered with invalid inputs")))
       }
     }
   }
