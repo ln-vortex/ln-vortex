@@ -274,7 +274,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       }
 
       // add mix fee output
-      val mixFee = inputDbs.size * config.mixFee
+      val mixFee = Satoshis(inputDbs.size) * config.mixFee
       txBuilder += TransactionOutput(mixFee, mixAddr.scriptPubKey)
 
       val transaction = txBuilder.buildTx()
@@ -370,7 +370,8 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
   private val hostAddressP: Promise[InetSocketAddress] =
     Promise[InetSocketAddress]()
 
-  private[node] lazy val serverBindF: Future[(InetSocketAddress, ActorRef)] = {
+  private[server] lazy val serverBindF: Future[
+    (InetSocketAddress, ActorRef)] = {
     logger.info(
       s"Binding coordinator to ${config.listenAddress}, with tor hidden service: ${config.torParams.isDefined}")
 

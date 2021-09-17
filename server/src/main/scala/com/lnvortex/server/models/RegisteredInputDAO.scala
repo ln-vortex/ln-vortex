@@ -78,12 +78,14 @@ case class RegisteredInputDAO()(implicit
 
     def inputProof: Rep[ScriptWitness] = column("input_proof")
 
+    def indexOpt: Rep[Option[Int]] = column("index")
+
     def roundId: Rep[Sha256Digest] = column("round_id")
 
     def peerId: Rep[Sha256Digest] = column("peer_id")
 
     def * : ProvenShape[RegisteredInputDb] =
-      (outPoint, output, inputProof, roundId, peerId).<>(
+      (outPoint, output, inputProof, indexOpt, roundId, peerId).<>(
         RegisteredInputDb.tupled,
         RegisteredInputDb.unapply)
 

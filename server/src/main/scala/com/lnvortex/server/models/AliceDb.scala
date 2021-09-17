@@ -39,7 +39,7 @@ object AliceDbs {
       roundId = roundId,
       purpose = noncePath.purpose,
       coin = noncePath.coin.coinType,
-      account = noncePath.account,
+      accountIdx = noncePath.account.index,
       chain = noncePath.chain.chainType,
       nonceIndex = noncePath.address.index,
       nonce = nonce,

@@ -59,7 +59,9 @@ class ServerDataHandler(
         // todo queue up for unsigned psbt
         Future.unit
       case SignedPsbtMessage(psbt) =>
-        Future.unit
+        coordinator.registerPSBTSignature(id, psbt).map { signedTx =>
+          connectionHandler ! SignedTxMessage(signedTx)
+        }
     }
   }
 }

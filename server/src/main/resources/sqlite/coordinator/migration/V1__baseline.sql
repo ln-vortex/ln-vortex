@@ -41,6 +41,7 @@ CREATE TABLE `registered_inputs`
     `outpoint`    VARCHAR(254) PRIMARY KEY NOT NULL,
     `output`      VARCHAR(254)             NOT NULL,
     `input_proof` VARCHAR(254)             NOT NULL,
+    `index`       INTEGER,
     `round_id`    VARCHAR(254)             NOT NULL,
     `peer_id`     VARCHAR(254)             NOT NULL,
     constraint `fk_roundId` foreign key (`round_id`) references `rounds` (`round_id`) on update NO ACTION on delete NO ACTION,
