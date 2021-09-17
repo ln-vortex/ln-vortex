@@ -21,6 +21,7 @@ import org.bitcoins.feeprovider.MempoolSpaceTarget.FastestFeeTarget
 import org.bitcoins.rpc.client.common.BitcoindRpcClient
 
 import java.net.InetSocketAddress
+import java.time.Instant
 import scala.collection.mutable
 import scala.concurrent._
 import scala.concurrent.duration.DurationInt
@@ -43,20 +44,27 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
 
   private[this] val km = new CoordinatorKeyManager()
 
-  val feeProvider: MempoolSpaceProvider =
+  private val feeProvider: MempoolSpaceProvider =
     MempoolSpaceProvider(FastestFeeTarget, config.network, None)
 
-  var feeRate: SatoshisPerVirtualByte = SatoshisPerVirtualByte.fromLong(10)
+  private var feeRate: SatoshisPerVirtualByte =
+    SatoshisPerVirtualByte.fromLong(10)
 
-  var currentRoundId: Sha256Digest = Sha256Digest.empty
+  private var currentRoundId: Sha256Digest =
+    CryptoUtil.sha256(ECPrivateKey.freshPrivateKey.bytes)
 
   def inputFee: CurrencyUnit = feeRate * 149 // p2wpkh input size
   def outputFee: CurrencyUnit = feeRate * 43 // p2wsh output size
 
-  private def nextRoundTime: Long =
-    TimeUtil.currentEpochSecond + config.interval.getSeconds
+  // On startup consider a round just happened so
+  // next round occurs at the interval time
+  private var lastRoundTime: Long = TimeUtil.currentEpochSecond
 
-  private var advTemplate: MixAdvertisement =
+  private def nextRoundTime: Long = {
+    lastRoundTime + config.interval.getSeconds
+  }
+
+  private def advTemplate: MixAdvertisement =
     MixAdvertisement(
       version = version,
       amount = config.mixAmount,
@@ -75,6 +83,34 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
   private[server] val signedPMap: mutable.Map[Sha256Digest, Promise[PSBT]] =
     mutable.Map.empty
 
+  def newRound(): Future[RoundDb] = {
+    val feeRateF = updateFeeRate()
+
+    lastRoundTime = TimeUtil.currentEpochSecond
+    connectionHandlerMap.clear()
+    signedPMap.clear()
+    // generate new round id
+    currentRoundId = CryptoUtil.sha256(ECPrivateKey.freshPrivateKey.bytes)
+
+    for {
+      feeRate <- feeRateF
+      roundDb = RoundDb(
+        roundId = currentRoundId,
+        status = RoundStatus.Pending,
+        roundTime = Instant.ofEpochSecond(nextRoundTime),
+        feeRate = feeRate,
+        mixFee = config.mixFee,
+        inputFee = inputFee,
+        outputFee = outputFee,
+        amount = config.mixAmount,
+        psbtOpt = None,
+        transactionOpt = None,
+        profitOpt = None
+      )
+      created <- roundDAO.create(roundDb)
+    } yield created
+  }
+
   // todo update round dbs everywhere
 
   def getAdvertisement(
@@ -92,12 +128,6 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
 
         aliceDAO.create(aliceDb).map(_ => advTemplate.copy(nonce = nonce))
     }
-  }
-
-  def newRound(): Unit = {
-    advTemplate = advTemplate.copy(time = UInt64(nextRoundTime))
-    connectionHandlerMap.clear()
-    signedPMap.clear()
   }
 
   def registerAlice(
@@ -311,9 +341,10 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
     }
   }
 
-  def updateFeeRate(): Future[Unit] = {
+  def updateFeeRate(): Future[SatoshisPerVirtualByte] = {
     feeProvider.getFeeRate.map { res =>
       feeRate = res
+      res
     }
   }
 
@@ -338,7 +369,10 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
   }
 
   override def start(): Future[Unit] = {
-    serverBindF.map(_ => ())
+    for {
+      _ <- newRound()
+      _ <- serverBindF
+    } yield ()
   }
 
   override def stop(): Future[Unit] = {
