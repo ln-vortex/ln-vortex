@@ -3,7 +3,7 @@ package com.lnvortex.server.models
 import com.lnvortex.server.config.VortexCoordinatorAppConfig
 import org.bitcoins.core.hd._
 import org.bitcoins.core.protocol.transaction.TransactionOutput
-import org.bitcoins.crypto.{FieldElement, Sha256Digest}
+import org.bitcoins.crypto.{FieldElement, SchnorrNonce, Sha256Digest}
 import org.bitcoins.db.{CRUD, DbCommonsColumnMappers, SlickUtil}
 import slick.lifted.ProvenShape
 
@@ -18,9 +18,6 @@ case class AliceDAO()(implicit
   import profile.api._
 
   private val mappers = new DbCommonsColumnMappers(profile)
-
-  implicit val bip32PathMapper: BaseColumnType[BIP32Path] =
-    MappedColumnType.base[BIP32Path, String](_.toString, BIP32Path.fromString)
 
   import mappers._
 
@@ -62,11 +59,13 @@ case class AliceDAO()(implicit
 
     def coin: Rep[HDCoinType] = column("coin")
 
-    def account: Rep[HDAccount] = column("account")
+    def accountIdx: Rep[Int] = column("account")
 
     def chain: Rep[HDChainType] = column("chain")
 
     def nonceIndex: Rep[Int] = column("nonce_index")
+
+    def nonce: Rep[SchnorrNonce] = column("nonce")
 
     def blindedOutputOpt: Rep[Option[FieldElement]] = column("blinded_output")
 
@@ -81,9 +80,10 @@ case class AliceDAO()(implicit
        roundId,
        purpose,
        coin,
-       account,
+       accountIdx,
        chain,
        nonceIndex,
+       nonce,
        blindedOutputOpt,
        changeOutputOpt,
        blindedOutputOpt).<>(AliceDb.tupled, AliceDb.unapply)

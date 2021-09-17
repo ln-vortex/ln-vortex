@@ -9,7 +9,7 @@ case class AliceDb(
     roundId: Sha256Digest,
     purpose: HDPurpose,
     coin: HDCoinType,
-    account: HDAccount,
+    accountIdx: Int,
     chain: HDChainType,
     nonceIndex: Int,
     nonce: SchnorrNonce,
@@ -21,7 +21,7 @@ case class AliceDb(
   // todo make hardened path
   val noncePath: HDPath = {
     val coin = HDCoin(purpose, this.coin)
-    val account = HDAccount(coin, this.account.index)
+    val account = HDAccount(coin, accountIdx)
     val chain = HDChain(this.chain, account)
     HDAddress(chain, nonceIndex).toPath
   }

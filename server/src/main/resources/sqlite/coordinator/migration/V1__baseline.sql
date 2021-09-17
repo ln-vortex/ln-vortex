@@ -24,7 +24,12 @@ CREATE TABLE `alices`
 (
     `peer_id`          VARCHAR(254) PRIMARY KEY NOT NULL,
     `round_id`         VARCHAR(254)             NOT NULL,
-    `nonce_path`       VARCHAR(254)             NOT NULL,
+    `purpose`          INTEGER                  NOT NULL,
+    `coin`             INTEGER                  NOT NULL,
+    `account`          INTEGER                  NOT NULL,
+    `chain`            INTEGER                  NOT NULL,
+    `nonce_index`      VARCHAR(254)             NOT NULL,
+    `nonce`            INTEGER                  NOT NULL,
     `blinded_output`   VARCHAR(254),
     `change_output`    VARCHAR(254),
     `blind_output_sig` VARCHAR(254),
