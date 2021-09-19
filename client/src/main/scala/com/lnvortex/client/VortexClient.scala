@@ -70,12 +70,20 @@ case class VortexClient(lndRpcClient: LndRpcClient)(implicit
     }
   }
 
+  /** Creates a proof of ownership for the input and then locks it
+    * @param nonce Round Nonce for the peer
+    * @param outputRef OutputReference for the input
+    * @return Signed ScriptWitness
+    */
   private[client] def createInputProof(
       nonce: SchnorrNonce,
       outputRef: OutputReference): Future[ScriptWitness] = {
     val tx = InputReference.constructInputProofTx(outputRef, nonce)
 
-    lndRpcClient.computeInputScript(tx, 0, outputRef.output).map(_._2)
+    for {
+      (_, scriptWit) <- lndRpcClient.computeInputScript(tx, 0, outputRef.output)
+      _ <- lndRpcClient.leaseOutput(outputRef.outPoint, 3600)
+    } yield scriptWit
   }
 
   def registerCoins(outpoints: Vector[TransactionOutPoint]): Future[Unit] = {
