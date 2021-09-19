@@ -4,7 +4,7 @@ import com.lnvortex.core.RoundStatus
 import com.lnvortex.server.config.VortexCoordinatorAppConfig
 import org.bitcoins.core.protocol.script.ScriptWitness
 import org.bitcoins.core.protocol.transaction._
-import org.bitcoins.crypto.Sha256Digest
+import org.bitcoins.crypto.{DoubleSha256Digest, Sha256Digest}
 import org.bitcoins.db.{CRUD, DbCommonsColumnMappers, SlickUtil}
 import slick.lifted.{ForeignKeyQuery, ProvenShape}
 
@@ -23,6 +23,11 @@ case class RegisteredInputDAO()(implicit
   implicit val roundStatusMapper: BaseColumnType[RoundStatus] =
     MappedColumnType.base[RoundStatus, String](_.toString,
                                                RoundStatus.fromString)
+
+  implicit val doubleSha256DigestMapper: BaseColumnType[DoubleSha256Digest] =
+    MappedColumnType.base[DoubleSha256Digest, String](
+      _.hex,
+      DoubleSha256Digest.fromHex)
 
   import mappers._
 
@@ -55,7 +60,7 @@ case class RegisteredInputDAO()(implicit
     findByPrimaryKeys(ts.map(_.outPoint))
 
   def findByRoundId(
-      roundId: Sha256Digest): Future[Vector[RegisteredInputDb]] = {
+      roundId: DoubleSha256Digest): Future[Vector[RegisteredInputDb]] = {
     val query = table.filter(_.roundId === roundId).result
 
     safeDatabase.runVec(query)
@@ -80,7 +85,7 @@ case class RegisteredInputDAO()(implicit
 
     def indexOpt: Rep[Option[Int]] = column("index")
 
-    def roundId: Rep[Sha256Digest] = column("round_id")
+    def roundId: Rep[DoubleSha256Digest] = column("round_id")
 
     def peerId: Rep[Sha256Digest] = column("peer_id")
 

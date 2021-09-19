@@ -10,7 +10,7 @@ case class RegisteredInputDb(
     output: TransactionOutput,
     inputProof: ScriptWitness,
     indexOpt: Option[Int],
-    roundId: Sha256Digest,
+    roundId: DoubleSha256Digest,
     peerId: Sha256Digest
 )
 
@@ -18,7 +18,7 @@ object RegisteredInputDbs {
 
   def fromInputReference(
       inputRef: InputReference,
-      roundId: Sha256Digest,
+      roundId: DoubleSha256Digest,
       peerId: Sha256Digest): RegisteredInputDb = {
     import inputRef._
 

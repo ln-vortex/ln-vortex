@@ -1,6 +1,7 @@
 package com.lnvortex.server
 
 import akka.actor.{ActorRef, ActorSystem}
+import com.lnvortex.core.RoundStatus._
 import com.lnvortex.core._
 import com.lnvortex.server.config.VortexCoordinatorAppConfig
 import com.lnvortex.server.models._
@@ -50,8 +51,8 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
   private var feeRate: SatoshisPerVirtualByte =
     SatoshisPerVirtualByte.fromLong(10)
 
-  private var currentRoundId: Sha256Digest =
-    CryptoUtil.sha256(ECPrivateKey.freshPrivateKey.bytes)
+  private var currentRoundId: DoubleSha256Digest =
+    CryptoUtil.doubleSHA256(ECPrivateKey.freshPrivateKey.bytes)
 
   def inputFee: CurrencyUnit = feeRate * 149 // p2wpkh input size
   def outputFee: CurrencyUnit = feeRate * 43 // p2wsh output size
@@ -90,25 +91,29 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
     connectionHandlerMap.clear()
     signedPMap.clear()
     // generate new round id
-    currentRoundId = CryptoUtil.sha256(ECPrivateKey.freshPrivateKey.bytes)
+    currentRoundId = CryptoUtil.doubleSHA256(ECPrivateKey.freshPrivateKey.bytes)
 
     for {
       feeRate <- feeRateF
-      roundDb = RoundDb(
+      roundDb = RoundDbs.newRound(
         roundId = currentRoundId,
-        status = RoundStatus.Pending,
         roundTime = Instant.ofEpochSecond(nextRoundTime),
         feeRate = feeRate,
         mixFee = config.mixFee,
         inputFee = inputFee,
         outputFee = outputFee,
-        amount = config.mixAmount,
-        psbtOpt = None,
-        transactionOpt = None,
-        profitOpt = None
+        amount = config.mixAmount
       )
       created <- roundDAO.create(roundDb)
     } yield created
+  }
+
+  private[server] def changeStatus(state: RoundStatus): Future[Unit] = {
+    for {
+      roundDb <- roundDAO.read(currentRoundId).map(_.get)
+      updated = roundDb.copy(status = state)
+      _ <- roundDAO.update(updated)
+    } yield ()
   }
 
   // todo update round dbs everywhere
@@ -137,7 +142,13 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
               _.output.scriptPubKey.scriptType == WITNESS_V0_KEYHASH),
             s"${peerId.hex} attempted to register non p2wpkh inputs")
 
-    val roundDbF = roundDAO.read(currentRoundId).map(_.get)
+    val roundDbF = roundDAO.read(currentRoundId).map {
+      case None => throw new RuntimeException("No roundDb found")
+      case Some(roundDb) =>
+        require(roundDb.status == RegisterAlices)
+        roundDb
+    }
+
     val peerNonceF = aliceDAO.read(peerId).map(_.get.nonce)
 
     val verifyInputFs = aliceInit.inputs.map { inputRef: InputReference =>
@@ -183,7 +194,6 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
           aliceInit.changeOutput.scriptPubKey.scriptType == WITNESS_V0_KEYHASH
 
       if (validInputs && validChange) {
-
         aliceDAO.read(peerId).flatMap {
           case Some(aliceDb) =>
             val sig =
@@ -206,7 +216,6 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
               new RuntimeException(s"No alice found with ${peerId.hex}"))
         }
       } else {
-
         val bannedUntil = TimeUtil.now.plusSeconds(3600) // 1 hour
 
         val banDbs = aliceInit.inputs
@@ -226,7 +235,16 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
   def verifyAndRegisterBob(bob: BobMessage): Future[Boolean] = {
     if (bob.verifySigAndOutput(km.publicKey)) {
       val db = RegisteredOutputDb(bob.output, bob.sig, currentRoundId)
-      outputsDAO.create(db).map(_ => true)
+      for {
+        roundOpt <- roundDAO.read(currentRoundId)
+        _ = roundOpt match {
+          case Some(round) => require(round.status == RegisterOutputs)
+          case None =>
+            throw new RuntimeException(
+              s"No round found for roundId ${currentRoundId.hex}")
+        }
+        _ <- outputsDAO.create(db)
+      } yield true
     } else {
       logger.warn(s"Received invalid signature for output ${bob.output}")
       Future.successful(false)
@@ -265,7 +283,8 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
 
       val psbt = PSBT.fromUnsignedTx(transaction)
 
-      val updatedRound = roundDb.copy(psbtOpt = Some(psbt))
+      val updatedRound =
+        roundDb.copy(psbtOpt = Some(psbt), status = SigningPhase)
       val updatedInputs = inputDbs.map { db =>
         val index = outPoints.indexOf(db.outPoint)
         db.copy(indexOpt = Some(index))
@@ -296,6 +315,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
         Future.failed(
           new RuntimeException(s"No round found with id ${currentRoundId.hex}"))
       case (Some(roundDb), inputs) =>
+        require(roundDb.status == SigningPhase)
         roundDb.psbtOpt match {
           case Some(unsignedPsbt) =>
             require(inputs.size == unsignedPsbt.inputMaps.size)
@@ -307,7 +327,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
               val signedFs = signedPMap.values.map(_.future)
 
               val signedT = Try {
-                val psbts = Await.result(Future.sequence(signedFs), 60.seconds)
+                val psbts = Await.result(Future.sequence(signedFs), 180.seconds)
 
                 val head = psbts.head
                 val combined = psbts.tail.foldLeft(head)(_.combinePSBT(_))

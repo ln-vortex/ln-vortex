@@ -12,11 +12,11 @@ object RoundStatus extends StringFactory[RoundStatus] {
     override val order: Int = 0
   }
 
-  case object AlicesRegistered extends RoundStatus {
+  case object RegisterAlices extends RoundStatus {
     override val order: Int = 1
   }
 
-  case object OutputsRegistered extends RoundStatus {
+  case object RegisterOutputs extends RoundStatus {
     override val order: Int = 2
   }
 
@@ -33,8 +33,8 @@ object RoundStatus extends StringFactory[RoundStatus] {
   }
 
   val all: Vector[RoundStatus] = Vector(Pending,
-                                        AlicesRegistered,
-                                        OutputsRegistered,
+                                        RegisterAlices,
+                                        RegisterOutputs,
                                         SigningPhase,
                                         Signed,
                                         Canceled)

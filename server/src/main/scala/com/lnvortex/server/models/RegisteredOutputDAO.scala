@@ -2,7 +2,7 @@ package com.lnvortex.server.models
 
 import com.lnvortex.server.config.VortexCoordinatorAppConfig
 import org.bitcoins.core.protocol.transaction.TransactionOutput
-import org.bitcoins.crypto.{SchnorrDigitalSignature, Sha256Digest}
+import org.bitcoins.crypto._
 import org.bitcoins.db.{CRUD, DbCommonsColumnMappers, SlickUtil}
 import slick.lifted.{ForeignKeyQuery, ProvenShape}
 
@@ -27,6 +27,11 @@ case class RegisteredOutputDAO()(implicit
     RoundDAO().table
   }
 
+  implicit val doubleSha256DigestMapper: BaseColumnType[DoubleSha256Digest] =
+    MappedColumnType.base[DoubleSha256Digest, String](
+      _.hex,
+      DoubleSha256Digest.fromHex)
+
   override def createAll(
       ts: Vector[RegisteredOutputDb]): Future[Vector[RegisteredOutputDb]] =
     createAllNoAutoInc(ts, safeDatabase)
@@ -42,7 +47,7 @@ case class RegisteredOutputDAO()(implicit
     findByPrimaryKeys(ts.map(_.output))
 
   def findByRoundId(
-      roundId: Sha256Digest): Future[Vector[RegisteredOutputDb]] = {
+      roundId: DoubleSha256Digest): Future[Vector[RegisteredOutputDb]] = {
     val query = table.filter(_.roundId === roundId).result
 
     safeDatabase.runVec(query)
@@ -55,7 +60,7 @@ case class RegisteredOutputDAO()(implicit
 
     def sig: Rep[SchnorrDigitalSignature] = column("sig")
 
-    def roundId: Rep[Sha256Digest] = column("round_id")
+    def roundId: Rep[DoubleSha256Digest] = column("round_id")
 
     def * : ProvenShape[RegisteredOutputDb] = (output, sig, roundId).<>(
       RegisteredOutputDb.tupled,

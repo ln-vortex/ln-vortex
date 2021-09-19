@@ -3,7 +3,7 @@ package com.lnvortex.server.models
 import com.lnvortex.server.config.VortexCoordinatorAppConfig
 import org.bitcoins.core.hd._
 import org.bitcoins.core.protocol.transaction.TransactionOutput
-import org.bitcoins.crypto.{FieldElement, SchnorrNonce, Sha256Digest}
+import org.bitcoins.crypto._
 import org.bitcoins.db.{CRUD, DbCommonsColumnMappers, SlickUtil}
 import slick.lifted.ProvenShape
 
@@ -21,6 +21,11 @@ case class AliceDAO()(implicit
 
   import mappers._
 
+  implicit val doubleSha256DigestMapper: BaseColumnType[DoubleSha256Digest] =
+    MappedColumnType.base[DoubleSha256Digest, String](
+      _.hex,
+      DoubleSha256Digest.fromHex)
+
   override val table: TableQuery[AliceTable] = TableQuery[AliceTable]
 
   override def createAll(ts: Vector[AliceDb]): Future[Vector[AliceDb]] =
@@ -28,13 +33,13 @@ case class AliceDAO()(implicit
 
   override protected def findByPrimaryKeys(
       ids: Vector[Sha256Digest]): Query[AliceTable, AliceDb, Seq] =
-    table.filter(_.roundId.inSet(ids))
+    table.filter(_.peerId.inSet(ids))
 
   override protected def findAll(
       ts: Vector[AliceDb]): Query[AliceTable, AliceDb, Seq] =
-    findByPrimaryKeys(ts.map(_.roundId))
+    findByPrimaryKeys(ts.map(_.peerId))
 
-  def findByRoundId(roundId: Sha256Digest): Future[Vector[AliceDb]] = {
+  def findByRoundId(roundId: DoubleSha256Digest): Future[Vector[AliceDb]] = {
     val query = table.filter(_.roundId === roundId).result
 
     safeDatabase.runVec(query)
@@ -53,7 +58,7 @@ case class AliceDAO()(implicit
 
     def peerId: Rep[Sha256Digest] = column("peer_id", O.PrimaryKey)
 
-    def roundId: Rep[Sha256Digest] = column("round_id")
+    def roundId: Rep[DoubleSha256Digest] = column("round_id")
 
     def purpose: Rep[HDPurpose] = column("purpose")
 

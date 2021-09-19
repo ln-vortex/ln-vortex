@@ -6,7 +6,7 @@ import org.bitcoins.core.currency.CurrencyUnit
 import org.bitcoins.core.protocol.transaction.Transaction
 import org.bitcoins.core.psbt.PSBT
 import org.bitcoins.core.wallet.fee.SatoshisPerVirtualByte
-import org.bitcoins.crypto.Sha256Digest
+import org.bitcoins.crypto._
 import org.bitcoins.db.{CRUD, DbCommonsColumnMappers, SlickUtil}
 import slick.lifted.ProvenShape
 
@@ -16,8 +16,8 @@ import scala.concurrent.{ExecutionContext, Future}
 case class RoundDAO()(implicit
     val ec: ExecutionContext,
     override val appConfig: VortexCoordinatorAppConfig)
-    extends CRUD[RoundDb, Sha256Digest]
-    with SlickUtil[RoundDb, Sha256Digest] {
+    extends CRUD[RoundDb, DoubleSha256Digest]
+    with SlickUtil[RoundDb, DoubleSha256Digest] {
 
   import profile.api._
 
@@ -30,6 +30,11 @@ case class RoundDAO()(implicit
   implicit val psbtMapper: BaseColumnType[PSBT] =
     MappedColumnType.base[PSBT, String](_.base64, PSBT.fromBase64)
 
+  implicit val doubleSha256DigestMapper: BaseColumnType[DoubleSha256Digest] =
+    MappedColumnType.base[DoubleSha256Digest, String](
+      _.hex,
+      DoubleSha256Digest.fromHex)
+
   import mappers._
 
   override val table: TableQuery[RoundTable] = TableQuery[RoundTable]
@@ -38,7 +43,7 @@ case class RoundDAO()(implicit
     createAllNoAutoInc(ts, safeDatabase)
 
   override protected def findByPrimaryKeys(
-      ids: Vector[Sha256Digest]): Query[RoundTable, RoundDb, Seq] =
+      ids: Vector[DoubleSha256Digest]): Query[RoundTable, RoundDb, Seq] =
     table.filter(_.roundId.inSet(ids))
 
   override protected def findAll(
@@ -47,7 +52,7 @@ case class RoundDAO()(implicit
 
   class RoundTable(tag: Tag) extends Table[RoundDb](tag, schemaName, "rounds") {
 
-    def roundId: Rep[Sha256Digest] = column("round_id", O.PrimaryKey)
+    def roundId: Rep[DoubleSha256Digest] = column("round_id", O.PrimaryKey)
 
     def status: Rep[RoundStatus] = column("status")
 

@@ -6,7 +6,7 @@ import org.bitcoins.crypto._
 
 case class AliceDb(
     peerId: Sha256Digest,
-    roundId: Sha256Digest,
+    roundId: DoubleSha256Digest,
     purpose: HDPurpose,
     coin: HDCoinType,
     accountIdx: Int,
@@ -31,7 +31,7 @@ object AliceDbs {
 
   def newAlice(
       peerId: Sha256Digest,
-      roundId: Sha256Digest,
+      roundId: DoubleSha256Digest,
       noncePath: BIP32Path,
       nonce: SchnorrNonce): AliceDb = {
     require(noncePath.size == 5,
