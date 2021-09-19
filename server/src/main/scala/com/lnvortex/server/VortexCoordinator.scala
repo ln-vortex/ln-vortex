@@ -62,7 +62,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
   private var lastRoundTime: Long = TimeUtil.currentEpochSecond
 
   private def nextRoundTime: Long = {
-    lastRoundTime + config.interval.getSeconds
+    lastRoundTime + config.interval.toSeconds
   }
 
   private def advTemplate: MixAdvertisement =
@@ -105,7 +105,13 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
         amount = config.mixAmount
       )
       created <- roundDAO.create(roundDb)
-    } yield created
+    } yield {
+      system.scheduler.scheduleOnce(config.interval) {
+        changeStatus(RoundStatus.RegisterOutputs)
+        ()
+      }
+      created
+    }
   }
 
   private[server] def changeStatus(state: RoundStatus): Future[Unit] = {
@@ -335,7 +341,10 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
                 combined.extractTransactionAndValidate
               }.flatten
 
-              Future.fromTry(signedT)
+              for {
+                tx <- Future.fromTry(signedT)
+                _ <- newRound()
+              } yield tx
             } else {
               val bannedUntil = TimeUtil.now.plusSeconds(86400) // 1 day
 
@@ -361,7 +370,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
     }
   }
 
-  def updateFeeRate(): Future[SatoshisPerVirtualByte] = {
+  private def updateFeeRate(): Future[SatoshisPerVirtualByte] = {
     feeProvider.getFeeRate.map { res =>
       feeRate = res
       res

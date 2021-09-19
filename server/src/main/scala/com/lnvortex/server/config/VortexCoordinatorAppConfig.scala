@@ -15,6 +15,7 @@ import java.net.{InetSocketAddress, URI}
 import java.nio.file.{Path, Paths}
 import java.time.Duration
 import scala.concurrent._
+import scala.concurrent.duration.{FiniteDuration, SECONDS}
 import scala.util.Properties
 
 /** Configuration for Ln Vortex
@@ -73,8 +74,9 @@ case class VortexCoordinatorAppConfig(
     Satoshis(long)
   }
 
-  lazy val interval: Duration = {
-    config.getDuration(s"$moduleName.mixInterval")
+  lazy val interval: FiniteDuration = {
+    val dur = config.getDuration(s"$moduleName.mixInterval")
+    FiniteDuration(dur.getSeconds, SECONDS)
   }
 
   lazy val seedPath: Path = directory.resolve("seed.json")
