@@ -13,9 +13,8 @@ import org.bitcoins.tor.{Socks5ProxyParams, TorParams}
 
 import java.net.{InetSocketAddress, URI}
 import java.nio.file.{Path, Paths}
-import java.time.Duration
 import scala.concurrent._
-import scala.concurrent.duration.{FiniteDuration, SECONDS}
+import scala.concurrent.duration._
 import scala.util.Properties
 
 /** Configuration for Ln Vortex

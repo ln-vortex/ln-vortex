@@ -41,23 +41,20 @@ class ServerDataHandler(
     message match {
       case AskMixAdvertisement(network) =>
         if (coordinator.config.network == network) {
-          val adv = coordinator.getAdvertisement(id, connectionHandler)
-          connectionHandler ! adv
-          Future.unit
+          coordinator.getAdvertisement(id, connectionHandler).map { adv =>
+            connectionHandler ! adv
+          }
         } else {
           log.warning(
             s"Received AskMixAdvertisement for different network $network")
           Future.unit
         }
       case init: AliceInit =>
-        val response = coordinator.registerAlice(id, init)
-        connectionHandler ! response
-
-        Future.unit
+        coordinator.registerAlice(id, init).map { response =>
+          connectionHandler ! response
+        }
       case bob: BobMessage =>
-        val _ = coordinator.verifyAndRegisterBob(bob)
-        // todo queue up for unsigned psbt
-        Future.unit
+        coordinator.verifyAndRegisterBob(bob).map(_ => ())
       case SignedPsbtMessage(psbt) =>
         coordinator.registerPSBTSignature(id, psbt).map { signedTx =>
           connectionHandler ! SignedTxMessage(signedTx)
