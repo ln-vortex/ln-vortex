@@ -1,26 +1,35 @@
 package com.lnvortex.client
 
-import com.lnvortex.core.MixAdvertisement
+import com.lnvortex.core.MixDetails
+import org.bitcoins.crypto.SchnorrNonce
 
 sealed trait RoundDetails[T, N <: RoundDetails[_, _]] {
   def order: Int
   def nextStage(t: T): N
 }
 
-case object NoDetails extends RoundDetails[MixAdvertisement, KnownRound] {
+case object NoDetails extends RoundDetails[MixDetails, KnownRound] {
   override val order: Int = 0
 
-  override def nextStage(round: MixAdvertisement): KnownRound = {
+  override def nextStage(round: MixDetails): KnownRound = {
     KnownRound(round)
   }
 }
 
-case class KnownRound(round: MixAdvertisement)
-    extends RoundDetails[InitDetails, InputsRegistered] {
+case class KnownRound(round: MixDetails)
+    extends RoundDetails[SchnorrNonce, ReceivedNonce] {
   override val order: Int = 1
 
+  override def nextStage(nonce: SchnorrNonce): ReceivedNonce =
+    ReceivedNonce(round, nonce)
+}
+
+case class ReceivedNonce(round: MixDetails, nonce: SchnorrNonce)
+    extends RoundDetails[InitDetails, InputsRegistered] {
+  override val order: Int = 2
+
   override def nextStage(initDetails: InitDetails): InputsRegistered =
-    InputsRegistered(round, initDetails)
+    InputsRegistered(round, nonce, initDetails)
 }
 
 sealed trait InitializedRound[N <: RoundDetails[_, _]]
@@ -29,26 +38,34 @@ sealed trait InitializedRound[N <: RoundDetails[_, _]]
   def nextStage(): N = nextStage(())
 }
 
-case class InputsRegistered(round: MixAdvertisement, initDetails: InitDetails)
+case class InputsRegistered(
+    round: MixDetails,
+    nonce: SchnorrNonce,
+    initDetails: InitDetails)
     extends InitializedRound[MixOutputRegistered] {
-  override val order: Int = 2
+  override val order: Int = 3
 
   override def nextStage(t: Unit): MixOutputRegistered =
-    MixOutputRegistered(round, initDetails)
+    MixOutputRegistered(round, nonce, initDetails)
 }
 
 case class MixOutputRegistered(
-    round: MixAdvertisement,
+    round: MixDetails,
+    nonce: SchnorrNonce,
     initDetails: InitDetails)
     extends InitializedRound[PSBTSigned] {
-  override val order: Int = 3
+  override val order: Int = 4
 
-  override def nextStage(t: Unit): PSBTSigned = PSBTSigned(round, initDetails)
+  override def nextStage(t: Unit): PSBTSigned =
+    PSBTSigned(round, nonce, initDetails)
 }
 
-case class PSBTSigned(round: MixAdvertisement, initDetails: InitDetails)
+case class PSBTSigned(
+    round: MixDetails,
+    nonce: SchnorrNonce,
+    initDetails: InitDetails)
     extends InitializedRound[NoDetails.type] {
-  override val order: Int = 4
+  override val order: Int = 5
 
   override def nextStage(t: Unit): NoDetails.type = NoDetails
 

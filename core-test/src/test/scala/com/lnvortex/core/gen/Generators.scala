@@ -6,27 +6,39 @@ import org.scalacheck.Gen
 
 object Generators {
 
-  def askMixAdvertisement: Gen[AskMixAdvertisement] = {
+  def askMixDetails: Gen[AskMixDetails] = {
     for {
       network <- ChainParamsGenerator.bitcoinNetworkParams
     } yield {
-      AskMixAdvertisement(network)
+      AskMixDetails(network)
     }
   }
 
-  def mixAdvertisement: Gen[MixAdvertisement] = {
+  def mixDetails: Gen[MixDetails] = {
     for {
       version <- NumberGenerator.uInt16
+      roundId <- CryptoGenerators.doubleSha256Digest
       amount <- CurrencyUnitGenerator.positiveSatoshis
       fee <- CurrencyUnitGenerator.positiveSatoshis
       inFee <- CurrencyUnitGenerator.positiveSatoshis
       outFee <- CurrencyUnitGenerator.positiveSatoshis
       pubkey <- CryptoGenerators.schnorrPublicKey
-      nonce <- CryptoGenerators.schnorrNonce
       time <- NumberGenerator.uInt64
     } yield {
-      MixAdvertisement(version, amount, fee, inFee, outFee, pubkey, nonce, time)
+      MixDetails(version, roundId, amount, fee, inFee, outFee, pubkey, time)
     }
+  }
+
+  def askNonce: Gen[AskNonce] = {
+    for {
+      roundId <- CryptoGenerators.doubleSha256Digest
+    } yield AskNonce(roundId)
+  }
+
+  def nonceMsg: Gen[NonceMessage] = {
+    for {
+      nonce <- CryptoGenerators.schnorrNonce
+    } yield NonceMessage(nonce)
   }
 
   def inputReference: Gen[InputReference] = {
@@ -36,19 +48,19 @@ object Generators {
     } yield InputReference(outputRef, scriptWit)
   }
 
-  def aliceInit: Gen[AliceInit] = {
+  def registerInputs: Gen[RegisterInputs] = {
     for {
       numInputs <- Gen.choose(1, 7)
       inputs <- Gen.listOfN(numInputs, inputReference)
       blindedOutput <- CryptoGenerators.fieldElement
       changeOutput <- TransactionGenerators.output
-    } yield AliceInit(inputs.toVector, blindedOutput, changeOutput)
+    } yield RegisterInputs(inputs.toVector, blindedOutput, changeOutput)
   }
 
-  def aliceInitResponse: Gen[AliceInitResponse] = {
+  def blindedSig: Gen[BlindedSig] = {
     for {
       blindOutputSig <- CryptoGenerators.fieldElement
-    } yield AliceInitResponse(blindOutputSig)
+    } yield BlindedSig(blindOutputSig)
   }
 
   def bobMessage: Gen[BobMessage] = {

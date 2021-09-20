@@ -1,7 +1,7 @@
 package com.lnvortex.server.models
 
 import com.lnvortex.core.RoundStatus
-import com.lnvortex.core.RoundStatus.Pending
+import com.lnvortex.core.RoundStatus._
 import org.bitcoins.core.currency.CurrencyUnit
 import org.bitcoins.core.protocol.transaction.Transaction
 import org.bitcoins.core.psbt.PSBT

@@ -45,6 +45,16 @@ case class AliceDAO()(implicit
     safeDatabase.runVec(query)
   }
 
+  def numRegisteredForRound(roundId: DoubleSha256Digest): Future[Int] = {
+    val query = table
+      .filter(t => t.roundId === roundId && t.blindedOutputOpt.isDefined)
+      .map(_.peerId)
+      .distinct
+      .size
+
+    safeDatabase.run(query.result.transactionally)
+  }
+
   def nextNonceIndex(): Future[Int] = {
     val query = table.map(_.nonceIndex).max
 

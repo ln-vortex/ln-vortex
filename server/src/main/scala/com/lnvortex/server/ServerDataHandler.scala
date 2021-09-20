@@ -39,18 +39,21 @@ class ServerDataHandler(
   private def handleVortexMessage(
       message: ClientVortexMessage): Future[Unit] = {
     message match {
-      case AskMixAdvertisement(network) =>
+      case AskMixDetails(network) =>
         if (coordinator.config.network == network) {
-          coordinator.getAdvertisement(id, connectionHandler).map { adv =>
-            connectionHandler ! adv
-          }
+          connectionHandler ! coordinator.mixDetails
+          Future.unit
         } else {
           log.warning(
             s"Received AskMixAdvertisement for different network $network")
           Future.unit
         }
-      case init: AliceInit =>
-        coordinator.registerAlice(id, init).map { response =>
+      case askNonce: AskNonce =>
+        coordinator.getNonce(id, connectionHandler, askNonce).map { msg =>
+          connectionHandler ! msg
+        }
+      case inputs: RegisterInputs =>
+        coordinator.registerAlice(id, inputs).map { response =>
           connectionHandler ! response
         }
       case bob: BobMessage =>

@@ -33,10 +33,13 @@ class ClientDataHandler(vortexClient: VortexClient, connectionHandler: ActorRef)
   private def handleVortexMessage(
       message: ServerVortexMessage): Future[Unit] = {
     message match {
-      case adv: MixAdvertisement =>
+      case adv: MixDetails =>
         vortexClient.setRound(adv)
         Future.unit
-      case AliceInitResponse(blindOutputSig) =>
+      case NonceMessage(schnorrNonce) =>
+        vortexClient.registerNonce(schnorrNonce)
+        Future.unit
+      case BlindedSig(blindOutputSig) =>
         for {
           _ <- vortexClient.processAliceInitResponse(blindOutputSig)
         } yield ()

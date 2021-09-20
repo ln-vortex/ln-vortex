@@ -63,6 +63,10 @@ case class VortexCoordinatorAppConfig(
     new InetSocketAddress(uri.getHost, uri.getPort)
   }
 
+  lazy val maxPeers: Int = {
+    config.getInt(s"$moduleName.maxPeers")
+  }
+
   lazy val mixAmount: Satoshis = {
     val long = config.getLong(s"$moduleName.mixAmount")
     Satoshis(long)

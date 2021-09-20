@@ -11,6 +11,24 @@ import scala.concurrent.Promise
 sealed trait ClientDetails {
   def id: Sha256Digest
   def connectionHandler: ActorRef
+
+  def isInitialized: Boolean
+  def isSigned: Boolean
+}
+
+case class Advertised(id: Sha256Digest, connectionHandler: ActorRef)
+    extends ClientDetails {
+  override val isInitialized: Boolean = false
+  override val isSigned: Boolean = false
+
+  def toNonceGiven(nonce: SchnorrNonce, noncePath: BIP32Path): NonceGiven = {
+    NonceGiven(id, connectionHandler, nonce, noncePath)
+  }
+}
+
+sealed trait ClientDetailsWithNonce {
+  def id: Sha256Digest
+  def connectionHandler: ActorRef
   def nonce: SchnorrNonce
   def noncePath: BIP32Path
 
@@ -18,17 +36,17 @@ sealed trait ClientDetails {
   def isSigned: Boolean
 }
 
-case class Advertised(
+case class NonceGiven(
     id: Sha256Digest,
     connectionHandler: ActorRef,
     nonce: SchnorrNonce,
-    noncePath: BIP32Path)
-    extends ClientDetails {
+    noncePath: BIP32Path
+) extends ClientDetailsWithNonce {
   override val isInitialized: Boolean = false
   override val isSigned: Boolean = false
 
-  def toInitialized(aliceInit: AliceInit): Initialized = {
-    Initialized(id, connectionHandler, nonce, noncePath, aliceInit)
+  def toInitialized(registerInputs: RegisterInputs): Initialized = {
+    Initialized(id, connectionHandler, nonce, noncePath, registerInputs)
   }
 }
 
@@ -37,7 +55,7 @@ case class Initialized(
     connectionHandler: ActorRef,
     nonce: SchnorrNonce,
     noncePath: BIP32Path,
-    aliceInit: AliceInit)
+    registerInputs: RegisterInputs)
     extends ClientDetails {
   override val isInitialized: Boolean = true
   override val isSigned: Boolean = false
@@ -51,7 +69,7 @@ case class Initialized(
       connectionHandler = connectionHandler,
       nonce = nonce,
       noncePath = noncePath,
-      aliceInit = aliceInit,
+      registerInputs = registerInputs,
       unsignedPSBT = unsignedPSBT,
       signedP = signedP,
       indexes = indexes
@@ -69,7 +87,7 @@ case class Unsigned(
     connectionHandler: ActorRef,
     nonce: SchnorrNonce,
     noncePath: BIP32Path,
-    aliceInit: AliceInit,
+    registerInputs: RegisterInputs,
     unsignedPSBT: PSBT,
     signedP: Promise[PSBT],
     indexes: Vector[Int])
@@ -77,7 +95,7 @@ case class Unsigned(
   override val isInitialized: Boolean = true
   override val isSigned: Boolean = false
 
-  require(aliceInit.inputs.size == indexes.size)
+  require(registerInputs.inputs.size == indexes.size)
 
   def toSigned(psbt: PSBT): Signed = {
     Signed(
@@ -85,7 +103,7 @@ case class Unsigned(
       connectionHandler = connectionHandler,
       nonce = nonce,
       noncePath = noncePath,
-      aliceInit = aliceInit,
+      registerInputs = registerInputs,
       signedP = signedP.success(psbt),
       indexes = indexes,
       signedPSBT = psbt
@@ -98,7 +116,7 @@ case class Signed(
     connectionHandler: ActorRef,
     nonce: SchnorrNonce,
     noncePath: BIP32Path,
-    aliceInit: AliceInit,
+    registerInputs: RegisterInputs,
     signedP: Promise[PSBT],
     indexes: Vector[Int],
     signedPSBT: PSBT)

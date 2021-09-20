@@ -10,16 +10,30 @@ class VortexMessageSerializationTest extends BitcoinSUnitTest {
     assert(allTypes.distinct == allTypes)
   }
 
-  "AskMixAdvertisement" must "have serialization symmetry" in {
-    forAll(Generators.askMixAdvertisement) { msg =>
-      assert(AskMixAdvertisement(msg.bytes) == msg)
+  "AskMixDetails" must "have serialization symmetry" in {
+    forAll(Generators.askMixDetails) { msg =>
+      assert(AskMixDetails(msg.bytes) == msg)
       assert(VortexMessage(msg.bytes) == msg)
     }
   }
 
-  "MixAdvertisement" must "have serialization symmetry" in {
-    forAll(Generators.mixAdvertisement) { msg =>
-      assert(MixAdvertisement(msg.bytes) == msg)
+  "MixDetails" must "have serialization symmetry" in {
+    forAll(Generators.mixDetails) { msg =>
+      assert(MixDetails(msg.bytes) == msg)
+      assert(VortexMessage(msg.bytes) == msg)
+    }
+  }
+
+  "AskNonce" must "have serialization symmetry" in {
+    forAll(Generators.askNonce) { msg =>
+      assert(AskNonce(msg.bytes) == msg)
+      assert(VortexMessage(msg.bytes) == msg)
+    }
+  }
+
+  "Nonce" must "have serialization symmetry" in {
+    forAll(Generators.nonceMsg) { msg =>
+      assert(NonceMessage(msg.bytes) == msg)
       assert(VortexMessage(msg.bytes) == msg)
     }
   }
@@ -30,16 +44,16 @@ class VortexMessageSerializationTest extends BitcoinSUnitTest {
     }
   }
 
-  "AliceInit" must "have serialization symmetry" in {
-    forAll(Generators.aliceInit) { msg =>
-      assert(AliceInit(msg.bytes) == msg)
+  "RegisterInputs" must "have serialization symmetry" in {
+    forAll(Generators.registerInputs) { msg =>
+      assert(RegisterInputs(msg.bytes) == msg)
       assert(VortexMessage(msg.bytes) == msg)
     }
   }
 
-  "AliceInitResponse" must "have serialization symmetry" in {
-    forAll(Generators.aliceInitResponse) { msg =>
-      assert(AliceInitResponse(msg.bytes) == msg)
+  "BlindedSig" must "have serialization symmetry" in {
+    forAll(Generators.blindedSig) { msg =>
+      assert(BlindedSig(msg.bytes) == msg)
       assert(VortexMessage(msg.bytes) == msg)
     }
   }

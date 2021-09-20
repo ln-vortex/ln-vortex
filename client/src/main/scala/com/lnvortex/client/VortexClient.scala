@@ -31,7 +31,7 @@ case class VortexClient(lndRpcClient: LndRpcClient)(implicit
 
   private val knownVersions = Vector(UInt16.zero)
 
-  private[client] def setRound(adv: MixAdvertisement): Unit = {
+  private[client] def setRound(adv: MixDetails): Unit = {
     if (knownVersions.contains(adv.version)) {
       roundDetails = KnownRound(adv)
     } else {
@@ -47,7 +47,7 @@ case class VortexClient(lndRpcClient: LndRpcClient)(implicit
     for {
       _ <- P2PClient.connect(peer, this, Some(handlerP))
       handler <- handlerP.future
-    } yield handler ! AskMixAdvertisement
+    } yield handler ! AskMixDetails
   }
 
   override def stop(): Future[Unit] = {
@@ -86,12 +86,21 @@ case class VortexClient(lndRpcClient: LndRpcClient)(implicit
     } yield scriptWit
   }
 
+  def registerNonce(nonce: SchnorrNonce): Unit = {
+    roundDetails match {
+      case state @ (NoDetails | _: ReceivedNonce | _: InitializedRound[_]) =>
+        throw new RuntimeException(s"Cannot register nonce at state $state")
+      case details: KnownRound =>
+        roundDetails = details.nextStage(nonce)
+    }
+  }
+
   def registerCoins(outpoints: Vector[TransactionOutPoint]): Future[Unit] = {
     roundDetails match {
-      case state @ (NoDetails | _: InitializedRound[_]) =>
+      case state @ (NoDetails | _: KnownRound | _: InitializedRound[_]) =>
         sys.error(s"At invalid state $state, cannot register coins")
-      case knownRound: KnownRound =>
-        val round = knownRound.round
+      case receivedNonce: ReceivedNonce =>
+        val round = receivedNonce.round
         for {
           handler <- handlerP.future
           outputRefs <- getOutputReferences(outpoints)
@@ -107,7 +116,7 @@ case class VortexClient(lndRpcClient: LndRpcClient)(implicit
             s"Not enough coins selected, need ${changeAmt - Policy.dustThreshold} more")
 
           inputProofs <- FutureUtil.sequentially(outputRefs)(
-            createInputProof(round.nonce, _))
+            createInputProof(receivedNonce.nonce, _))
           inputRefs = outputRefs.zip(inputProofs).map { case (outRef, proof) =>
             InputReference(outRef, proof)
           }
@@ -120,30 +129,31 @@ case class VortexClient(lndRpcClient: LndRpcClient)(implicit
           hashedOutput = CryptoUtil.sha256(mixOutput.bytes).bytes
 
           tweaks = freshBlindingTweaks(signerPubKey = round.publicKey,
-                                       signerNonce = round.nonce)
+                                       signerNonce = receivedNonce.nonce)
           challenge = BlindSchnorrUtil.generateChallenge(
             signerPubKey = round.publicKey,
-            signerNonce = round.nonce,
+            signerNonce = receivedNonce.nonce,
             blindingTweaks = tweaks,
             message = hashedOutput)
         } yield {
           val details = InitDetails(outputRefs, changeOutput, mixOutput, tweaks)
-          roundDetails = knownRound.nextStage(details)
+          roundDetails = receivedNonce.nextStage(details)
 
-          handler ! AliceInit(inputRefs, challenge, changeOutput)
+          handler ! RegisterInputs(inputRefs, challenge, changeOutput)
         }
     }
   }
 
   def processAliceInitResponse(blindOutputSig: FieldElement): Future[Unit] = {
     roundDetails match {
-      case state @ (NoDetails | _: KnownRound | _: MixOutputRegistered |
-          _: PSBTSigned) =>
+
+      case state @ (NoDetails | _: KnownRound | _: ReceivedNonce |
+          _: MixOutputRegistered | _: PSBTSigned) =>
         sys.error(s"At invalid state $state, cannot processAliceInitResponse")
       case details: InputsRegistered =>
         val mixOutput = details.initDetails.mixOutput
         val publicKey = details.round.publicKey
-        val nonce = details.round.nonce
+        val nonce = details.nonce
         val tweaks = details.initDetails.tweaks
 
         val challenge = CryptoUtil.sha256(mixOutput.bytes).bytes
@@ -167,8 +177,8 @@ case class VortexClient(lndRpcClient: LndRpcClient)(implicit
 
   def validateAndSignPsbt(unsigned: PSBT): Future[PSBT] = {
     roundDetails match {
-      case state @ (NoDetails | _: KnownRound | _: InputsRegistered |
-          _: PSBTSigned) =>
+      case state @ (NoDetails | _: KnownRound | _: ReceivedNonce |
+          _: InputsRegistered | _: PSBTSigned) =>
         sys.error(s"At invalid state $state, cannot validateAndSignPsbt")
       case state: MixOutputRegistered =>
         roundDetails = state.nextStage()
@@ -215,15 +225,15 @@ case class VortexClient(lndRpcClient: LndRpcClient)(implicit
 
   def completeRound(signedTx: Transaction): Future[Unit] = {
     roundDetails match {
-      case state @ (NoDetails | _: KnownRound | _: InputsRegistered |
-          _: MixOutputRegistered) =>
+      case state @ (NoDetails | _: KnownRound | _: ReceivedNonce |
+          _: InputsRegistered | _: MixOutputRegistered) =>
         sys.error(s"At invalid state $state, cannot processAliceInitResponse")
       case state: PSBTSigned =>
         roundDetails = state.nextStage()
         println(signedTx)
         // todo publish tx to peer
 
-        handlerP.future.map(_ ! AskMixAdvertisement)
+        handlerP.future.map(_ ! AskMixDetails)
     }
   }
 }

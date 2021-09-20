@@ -15,20 +15,21 @@ import scala.util.{Failure, Success}
 class VortexClientTest extends VortexClientFixture {
   behavior of "VortexClient"
 
-  val dummyAdvertisement: MixAdvertisement = MixAdvertisement(
+  val dummyAdvertisement: MixDetails = MixDetails(
     version = UInt16.zero,
+    roundId = DoubleSha256Digest.empty,
     amount = Satoshis(200000),
     mixFee = Satoshis.zero,
     inputFee = Satoshis.zero,
     outputFee = Satoshis.zero,
     publicKey = ECPublicKey.freshPublicKey.schnorrPublicKey,
-    nonce = ECPublicKey.freshPublicKey.schnorrNonce,
     time = UInt64.zero
   )
 
-  val dummyTweaks: BlindingTweaks = BlindingTweaks.freshBlindingTweaks(
-    dummyAdvertisement.publicKey,
-    dummyAdvertisement.nonce)
+  val nonce: SchnorrNonce = ECPublicKey.freshPublicKey.schnorrNonce
+
+  val dummyTweaks: BlindingTweaks =
+    BlindingTweaks.freshBlindingTweaks(dummyAdvertisement.publicKey, nonce)
 
   it must "fail to process an unknown version MixAdvertisement" in {
     vortexClient =>
@@ -50,7 +51,7 @@ class VortexClientTest extends VortexClientFixture {
                                 changeOutput = change,
                                 mixOutput = mix,
                                 tweaks = dummyTweaks)
-      testState = MixOutputRegistered(dummyAdvertisement, testDetails)
+      testState = MixOutputRegistered(dummyAdvertisement, nonce, testDetails)
       _ = vortexClient.roundDetails = testState
 
       inputs = refs
@@ -84,7 +85,7 @@ class VortexClientTest extends VortexClientFixture {
                                 changeOutput = change,
                                 mixOutput = mix,
                                 tweaks = dummyTweaks)
-      testState = MixOutputRegistered(dummyAdvertisement, testDetails)
+      testState = MixOutputRegistered(dummyAdvertisement, nonce, testDetails)
       _ = vortexClient.roundDetails = testState
 
       inputs = refs
@@ -113,7 +114,7 @@ class VortexClientTest extends VortexClientFixture {
                                   changeOutput = change,
                                   mixOutput = mix,
                                   tweaks = dummyTweaks)
-        testState = MixOutputRegistered(dummyAdvertisement, testDetails)
+        testState = MixOutputRegistered(dummyAdvertisement, nonce, testDetails)
         _ = vortexClient.roundDetails = testState
 
         inputs = refs
@@ -142,7 +143,7 @@ class VortexClientTest extends VortexClientFixture {
                                 changeOutput = change,
                                 mixOutput = mix,
                                 tweaks = dummyTweaks)
-      testState = MixOutputRegistered(dummyAdvertisement, testDetails)
+      testState = MixOutputRegistered(dummyAdvertisement, nonce, testDetails)
       _ = vortexClient.roundDetails = testState
 
       inputs = refs
@@ -160,17 +161,14 @@ class VortexClientTest extends VortexClientFixture {
     for {
       utxos <- vortexClient.listCoins()
       outRefs <- vortexClient.getOutputReferences(utxos.map(_.outPointOpt.get))
-      proofFs = outRefs.map(
-        vortexClient.createInputProof(dummyAdvertisement.nonce, _))
+      proofFs = outRefs.map(vortexClient.createInputProof(nonce, _))
       proofs <- Future.sequence(proofFs)
     } yield {
       val inputRefs = outRefs.zip(proofs).map { case (outRef, proof) =>
         InputReference(outRef, proof)
       }
 
-      assert(
-        inputRefs.forall(
-          InputReference.verifyInputProof(_, dummyAdvertisement.nonce)))
+      assert(inputRefs.forall(InputReference.verifyInputProof(_, nonce)))
     }
   }
 }
