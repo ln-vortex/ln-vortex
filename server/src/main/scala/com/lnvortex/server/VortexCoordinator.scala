@@ -375,9 +375,10 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
               for {
                 tx <- Future.fromTry(signedT)
 
-                /// todo calculate profit
+                profit = Satoshis(signedFs.size) * roundDb.mixFee
                 updatedRoundDb = roundDb.copy(status = Signed,
-                                              transactionOpt = Some(tx))
+                                              transactionOpt = Some(tx),
+                                              profitOpt = Some(profit))
                 _ <- roundDAO.update(updatedRoundDb)
 
                 _ <- newRound()
