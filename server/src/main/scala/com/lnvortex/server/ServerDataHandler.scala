@@ -51,7 +51,7 @@ class ServerDataHandler(
         }
       case askNonce: AskNonce =>
         coordinator.getNonce(id, connectionHandler, askNonce).map { msg =>
-          connectionHandler ! msg
+          connectionHandler ! NonceMessage(msg.nonce)
         }
       case inputs: RegisterInputs =>
         coordinator.registerAlice(id, inputs).map { response =>

@@ -9,6 +9,7 @@ import org.bitcoins.testkit.rpc.CachedBitcoindV21
 import org.scalatest.FutureOutcome
 
 import java.nio.file.{Files, Path}
+import scala.reflect.io.Directory
 
 /** A trait that is useful if you need Lnd fixtures for your test suite */
 trait VortexCoordinatorFixture extends BitcoinSFixture with CachedBitcoindV21 {
@@ -46,7 +47,11 @@ trait VortexCoordinatorFixture extends BitcoinSFixture with CachedBitcoindV21 {
         for {
           _ <- coordinator.stop()
           _ <- coordinator.config.stop()
-        } yield ()
+        } yield {
+          val directory = new Directory(coordinator.config.baseDatadir.toFile)
+          directory.deleteRecursively()
+          ()
+        }
       }
     )(test)
   }

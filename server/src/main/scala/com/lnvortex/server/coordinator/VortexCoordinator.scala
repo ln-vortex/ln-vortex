@@ -149,11 +149,11 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
   def getNonce(
       peerId: Sha256Digest,
       connectionHandler: ActorRef,
-      askNonce: AskNonce): Future[NonceMessage] = {
+      askNonce: AskNonce): Future[AliceDb] = {
     require(askNonce.roundId == currentRoundId)
     aliceDAO.read(peerId).flatMap {
       case Some(alice) =>
-        Future.successful(NonceMessage(alice.nonce))
+        Future.successful(alice)
       case None =>
         val (nonce, path) = km.nextNonce()
 
@@ -161,7 +161,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
 
         connectionHandlerMap.put(peerId, connectionHandler)
 
-        aliceDAO.create(aliceDb).map(_ => NonceMessage(nonce))
+        aliceDAO.create(aliceDb)
     }
   }
 
@@ -309,28 +309,31 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
   private[coordinator] def constructUnsignedTransaction(
       mixAddr: BitcoinAddress): Future[Transaction] = {
     val dbsF = for {
+      aliceDbs <- aliceDAO.findRegisteredForRound(currentRoundId)
       inputDbs <- inputsDAO.findByRoundId(currentRoundId)
       outputDbs <- outputsDAO.findByRoundId(currentRoundId)
       roundDb <- roundDAO.read(currentRoundId).map(_.get)
-    } yield (inputDbs, outputDbs, roundDb)
+    } yield (aliceDbs, inputDbs, outputDbs, roundDb)
 
-    dbsF.flatMap { case (inputDbs, outputDbs, roundDb) =>
+    dbsF.flatMap { case (aliceDbs, inputDbs, outputDbs, roundDb) =>
       val txBuilder = RawTxBuilder().setFinalizer(
         FilterDustFinalizer.andThen(ShuffleFinalizer))
 
-      // add mix outputs
-      txBuilder ++= outputDbs.map(_.output)
-      // add inputs & change outputs
+      // add inputs
       txBuilder ++= inputDbs.map { inputDb =>
-        val input = TransactionInput(inputDb.outPoint,
-                                     EmptyScriptSignature,
-                                     TransactionConstants.sequence)
-        (input, inputDb.output)
+        TransactionInput(inputDb.outPoint,
+                         EmptyScriptSignature,
+                         TransactionConstants.sequence)
       }
 
-      // add mix fee output
-      val mixFee = Satoshis(inputDbs.size) * config.mixFee
-      txBuilder += TransactionOutput(mixFee, mixAddr.scriptPubKey)
+      // add Inputs
+      val mixFee = Satoshis(aliceDbs.size) * config.mixFee
+      val mixFeeOutput = TransactionOutput(mixFee, mixAddr.scriptPubKey)
+      val mixOutputs = outputDbs.map(_.output)
+      val changeOutputs = aliceDbs.map(_.changeOutputOpt.get)
+      val outputsToAdd = mixOutputs ++ changeOutputs :+ mixFeeOutput
+
+      txBuilder ++= outputsToAdd
 
       val transaction = txBuilder.buildTx()
 

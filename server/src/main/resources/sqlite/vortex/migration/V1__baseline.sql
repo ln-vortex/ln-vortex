@@ -22,17 +22,17 @@ CREATE TABLE `rounds`
 
 CREATE TABLE `alices`
 (
-    `peer_id`          VARCHAR(254) PRIMARY KEY NOT NULL,
-    `round_id`         VARCHAR(254)             NOT NULL,
-    `purpose`          INTEGER                  NOT NULL,
-    `coin`             INTEGER                  NOT NULL,
-    `account`          INTEGER                  NOT NULL,
-    `chain`            INTEGER                  NOT NULL,
-    `nonce_index`      VARCHAR(254)             NOT NULL,
-    `nonce`            INTEGER                  NOT NULL,
-    `blinded_output`   VARCHAR(254),
-    `change_output`    VARCHAR(254),
-    `blind_output_sig` VARCHAR(254),
+    `peer_id`        VARCHAR(254) PRIMARY KEY NOT NULL,
+    `round_id`       VARCHAR(254)             NOT NULL,
+    `purpose`        INTEGER                  NOT NULL,
+    `coin`           INTEGER                  NOT NULL,
+    `account`        INTEGER                  NOT NULL,
+    `chain`          INTEGER                  NOT NULL,
+    `nonce_index`    VARCHAR(254)             NOT NULL,
+    `nonce`          INTEGER                  NOT NULL,
+    `blinded_output` VARCHAR(254),
+    `change_output`  VARCHAR(254),
+    `blind_sig`      VARCHAR(254),
     constraint `fk_roundId` foreign key (`round_id`) references `rounds` (`round_id`) on update NO ACTION on delete NO ACTION
 );
 

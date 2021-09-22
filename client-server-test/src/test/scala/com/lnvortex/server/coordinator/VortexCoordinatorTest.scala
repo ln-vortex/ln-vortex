@@ -1,11 +1,12 @@
 package com.lnvortex.server.coordinator
 
 import akka.testkit.TestActorRef
+import com.lnvortex.core._
 import com.lnvortex.core.crypto.BlindSchnorrUtil
 import com.lnvortex.core.crypto.BlindingTweaks.freshBlindingTweaks
-import com.lnvortex.core._
 import com.lnvortex.core.gen.Generators
 import com.lnvortex.server.VortexCoordinatorFixture
+import com.lnvortex.server.models.{RegisteredInputDb, RegisteredOutputDb}
 import org.bitcoins.commons.jsonmodels.bitcoind.RpcOpts.AddressType
 import org.bitcoins.core.currency._
 import org.bitcoins.core.number.UInt32
@@ -15,6 +16,8 @@ import org.bitcoins.core.psbt.PSBT
 import org.bitcoins.crypto._
 import org.bitcoins.rpc.BitcoindException.InvalidAddressOrKey
 import org.bitcoins.testkitcore.Implicits.GeneratorOps
+
+import scala.concurrent.Future
 
 class VortexCoordinatorTest extends VortexCoordinatorFixture {
   behavior of "VortexCoordinator"
@@ -34,9 +37,9 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
   it must "register inputs" in { coordinator =>
     val bitcoind = coordinator.bitcoind
     for {
-      nonce <- coordinator.getNonce(Sha256Digest.empty,
-                                    TestActorRef("test"),
-                                    AskNonce(coordinator.currentRoundId))
+      aliceDb <- coordinator.getNonce(Sha256Digest.empty,
+                                      TestActorRef("test"),
+                                      AskNonce(coordinator.currentRoundId))
       _ <- coordinator.beginInputRegistration()
 
       utxo <- bitcoind.listUnspent.map(_.head)
@@ -45,7 +48,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
         val output = TransactionOutput(utxo.amount, utxo.scriptPubKey.get)
         OutputReference(outpoint, output)
       }
-      tx = InputReference.constructInputProofTx(outputRef, nonce.schnorrNonce)
+      tx = InputReference.constructInputProofTx(outputRef, aliceDb.nonce)
       signed <- bitcoind.walletProcessPSBT(PSBT.fromUnsignedTx(tx))
       proof =
         signed.psbt.inputMaps.head.finalizedScriptWitnessOpt.get.scriptWitness
@@ -64,9 +67,9 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
   it must "fail to register inputs if invalid peerId" in { coordinator =>
     val bitcoind = coordinator.bitcoind
     for {
-      nonce <- coordinator.getNonce(Sha256Digest.empty,
-                                    TestActorRef("test"),
-                                    AskNonce(coordinator.currentRoundId))
+      aliceDb <- coordinator.getNonce(Sha256Digest.empty,
+                                      TestActorRef("test"),
+                                      AskNonce(coordinator.currentRoundId))
       _ <- coordinator.beginInputRegistration()
 
       utxo <- bitcoind.listUnspent.map(_.head)
@@ -75,7 +78,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
         val output = TransactionOutput(utxo.amount, utxo.scriptPubKey.get)
         OutputReference(outpoint, output)
       }
-      tx = InputReference.constructInputProofTx(outputRef, nonce.schnorrNonce)
+      tx = InputReference.constructInputProofTx(outputRef, aliceDb.nonce)
       signed <- bitcoind.walletProcessPSBT(PSBT.fromUnsignedTx(tx))
       proof =
         signed.psbt.inputMaps.head.finalizedScriptWitnessOpt.get.scriptWitness
@@ -127,9 +130,9 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
     coordinator =>
       val bitcoind = coordinator.bitcoind
       for {
-        nonce <- coordinator.getNonce(Sha256Digest.empty,
-                                      TestActorRef("test"),
-                                      AskNonce(coordinator.currentRoundId))
+        aliceDb <- coordinator.getNonce(Sha256Digest.empty,
+                                        TestActorRef("test"),
+                                        AskNonce(coordinator.currentRoundId))
         _ <- coordinator.beginInputRegistration()
 
         utxo <- bitcoind.listUnspent.map(_.head)
@@ -138,7 +141,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
           val output = TransactionOutput(utxo.amount, utxo.scriptPubKey.get)
           OutputReference(outpoint, output)
         }
-        tx = InputReference.constructInputProofTx(outputRef, nonce.schnorrNonce)
+        tx = InputReference.constructInputProofTx(outputRef, aliceDb.nonce)
         signed <- bitcoind.walletProcessPSBT(PSBT.fromUnsignedTx(tx))
         proof =
           signed.psbt.inputMaps.head.finalizedScriptWitnessOpt.get.scriptWitness
@@ -159,9 +162,9 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
   it must "fail register inputs with a p2sh change address" in { coordinator =>
     val bitcoind = coordinator.bitcoind
     for {
-      nonce <- coordinator.getNonce(Sha256Digest.empty,
-                                    TestActorRef("test"),
-                                    AskNonce(coordinator.currentRoundId))
+      aliceDb <- coordinator.getNonce(Sha256Digest.empty,
+                                      TestActorRef("test"),
+                                      AskNonce(coordinator.currentRoundId))
       _ <- coordinator.beginInputRegistration()
 
       utxo <- bitcoind.listUnspent.map(_.head)
@@ -170,7 +173,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
         val output = TransactionOutput(utxo.amount, utxo.scriptPubKey.get)
         OutputReference(outpoint, output)
       }
-      tx = InputReference.constructInputProofTx(outputRef, nonce.schnorrNonce)
+      tx = InputReference.constructInputProofTx(outputRef, aliceDb.nonce)
       signed <- bitcoind.walletProcessPSBT(PSBT.fromUnsignedTx(tx))
       proof =
         signed.psbt.inputMaps.head.finalizedScriptWitnessOpt.get.scriptWitness
@@ -192,9 +195,9 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
     coordinator =>
       val bitcoind = coordinator.bitcoind
       for {
-        nonce <- coordinator.getNonce(Sha256Digest.empty,
-                                      TestActorRef("test"),
-                                      AskNonce(coordinator.currentRoundId))
+        aliceDb <- coordinator.getNonce(Sha256Digest.empty,
+                                        TestActorRef("test"),
+                                        AskNonce(coordinator.currentRoundId))
         _ <- coordinator.beginInputRegistration()
 
         utxo <- bitcoind.listUnspent.map(_.head)
@@ -203,7 +206,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
           val output = TransactionOutput(utxo.amount, utxo.scriptPubKey.get)
           OutputReference(outpoint, output)
         }
-        tx = InputReference.constructInputProofTx(outputRef, nonce.schnorrNonce)
+        tx = InputReference.constructInputProofTx(outputRef, aliceDb.nonce)
         signed <- bitcoind.walletProcessPSBT(PSBT.fromUnsignedTx(tx))
         proof =
           signed.psbt.inputMaps.head.finalizedScriptWitnessOpt.get.scriptWitness
@@ -221,45 +224,12 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
       } yield res
   }
 
-  it must "fail register inputs with a invalid blind proof" ignore {
-    coordinator =>
-      val bitcoind = coordinator.bitcoind
-      for {
-        nonce <- coordinator.getNonce(Sha256Digest.empty,
-                                      TestActorRef("test"),
-                                      AskNonce(coordinator.currentRoundId))
-        _ <- coordinator.beginInputRegistration()
-
-        utxo <- bitcoind.listUnspent.map(_.head)
-        outputRef = {
-          val outpoint = TransactionOutPoint(utxo.txid, UInt32(utxo.vout))
-          val output = TransactionOutput(utxo.amount, utxo.scriptPubKey.get)
-          OutputReference(outpoint, output)
-        }
-        tx = InputReference.constructInputProofTx(outputRef, nonce.schnorrNonce)
-        signed <- bitcoind.walletProcessPSBT(PSBT.fromUnsignedTx(tx))
-        proof =
-          signed.psbt.inputMaps.head.finalizedScriptWitnessOpt.get.scriptWitness
-
-        inputRef = InputReference(outputRef, proof)
-        addr <- bitcoind.getNewAddress
-        change = TransactionOutput(Satoshis(4998989765L), addr.scriptPubKey)
-
-        // wrong blind proof
-        blind = FieldElement.zero
-        registerInputs = RegisterInputs(Vector(inputRef), blind, change)
-
-        res <- recoverToSucceededIf[IllegalArgumentException](
-          coordinator.registerAlice(Sha256Digest.empty, registerInputs))
-      } yield res
-  }
-
-  it must "register an output" in { coordinator =>
+  it must "fail register inputs with a invalid blind proof" in { coordinator =>
     val bitcoind = coordinator.bitcoind
     for {
-      nonce <- coordinator.getNonce(Sha256Digest.empty,
-                                    TestActorRef("test"),
-                                    AskNonce(coordinator.currentRoundId))
+      aliceDb <- coordinator.getNonce(Sha256Digest.empty,
+                                      TestActorRef("test"),
+                                      AskNonce(coordinator.currentRoundId))
       _ <- coordinator.beginInputRegistration()
 
       utxo <- bitcoind.listUnspent.map(_.head)
@@ -268,7 +238,39 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
         val output = TransactionOutput(utxo.amount, utxo.scriptPubKey.get)
         OutputReference(outpoint, output)
       }
-      tx = InputReference.constructInputProofTx(outputRef, nonce.schnorrNonce)
+      tx = InputReference.constructInputProofTx(outputRef, aliceDb.nonce)
+      signed <- bitcoind.walletProcessPSBT(PSBT.fromUnsignedTx(tx))
+      proof =
+        signed.psbt.inputMaps.head.finalizedScriptWitnessOpt.get.scriptWitness
+
+      inputRef = InputReference(outputRef, proof)
+      addr <- bitcoind.getNewAddress
+      change = TransactionOutput(Satoshis(4998989765L), addr.scriptPubKey)
+
+      // wrong blind proof
+      blind = FieldElement.zero
+      registerInputs = RegisterInputs(Vector(inputRef), blind, change)
+
+      res <- recoverToSucceededIf[IllegalArgumentException](
+        coordinator.registerAlice(Sha256Digest.empty, registerInputs))
+    } yield res
+  }
+
+  it must "register an output" in { coordinator =>
+    val bitcoind = coordinator.bitcoind
+    for {
+      aliceDb <- coordinator.getNonce(Sha256Digest.empty,
+                                      TestActorRef("test"),
+                                      AskNonce(coordinator.currentRoundId))
+      _ <- coordinator.beginInputRegistration()
+
+      utxo <- bitcoind.listUnspent.map(_.head)
+      outputRef = {
+        val outpoint = TransactionOutPoint(utxo.txid, UInt32(utxo.vout))
+        val output = TransactionOutput(utxo.amount, utxo.scriptPubKey.get)
+        OutputReference(outpoint, output)
+      }
+      tx = InputReference.constructInputProofTx(outputRef, aliceDb.nonce)
       signed <- bitcoind.walletProcessPSBT(PSBT.fromUnsignedTx(tx))
       proof =
         signed.psbt.inputMaps.head.finalizedScriptWitnessOpt.get.scriptWitness
@@ -278,14 +280,14 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
       change = TransactionOutput(Satoshis(4998989765L), addr.scriptPubKey)
 
       tweaks = freshBlindingTweaks(signerPubKey = coordinator.publicKey,
-                                   signerNonce = nonce.schnorrNonce)
+                                   signerNonce = aliceDb.nonce)
 
       p2wsh = P2WSHWitnessSPKV0(EmptyScriptPubKey)
       mixOutput = TransactionOutput(coordinator.config.mixAmount, p2wsh)
       challenge = BobMessage.calculateChallenge(mixOutput,
                                                 coordinator.currentRoundId)
       blind = BlindSchnorrUtil.generateChallenge(coordinator.publicKey,
-                                                 nonce.schnorrNonce,
+                                                 aliceDb.nonce,
                                                  tweaks,
                                                  challenge)
 
@@ -293,7 +295,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
       blindSig <- coordinator.registerAlice(Sha256Digest.empty, registerInputs)
       sig = BlindSchnorrUtil.unblindSignature(blindSig.blindOutputSig,
                                               coordinator.publicKey,
-                                              nonce.schnorrNonce,
+                                              aliceDb.nonce,
                                               tweaks,
                                               challenge)
       _ <- coordinator.beginOutputRegistration()
@@ -316,9 +318,9 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
   it must "fail to register a non-p2wsh output" in { coordinator =>
     val bitcoind = coordinator.bitcoind
     for {
-      nonce <- coordinator.getNonce(Sha256Digest.empty,
-                                    TestActorRef("test"),
-                                    AskNonce(coordinator.currentRoundId))
+      aliceDb <- coordinator.getNonce(Sha256Digest.empty,
+                                      TestActorRef("test"),
+                                      AskNonce(coordinator.currentRoundId))
       _ <- coordinator.beginInputRegistration()
 
       utxo <- bitcoind.listUnspent.map(_.head)
@@ -327,7 +329,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
         val output = TransactionOutput(utxo.amount, utxo.scriptPubKey.get)
         OutputReference(outpoint, output)
       }
-      tx = InputReference.constructInputProofTx(outputRef, nonce.schnorrNonce)
+      tx = InputReference.constructInputProofTx(outputRef, aliceDb.nonce)
       signed <- bitcoind.walletProcessPSBT(PSBT.fromUnsignedTx(tx))
       proof =
         signed.psbt.inputMaps.head.finalizedScriptWitnessOpt.get.scriptWitness
@@ -337,7 +339,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
       change = TransactionOutput(Satoshis(4998989765L), addr.scriptPubKey)
 
       tweaks = freshBlindingTweaks(signerPubKey = coordinator.publicKey,
-                                   signerNonce = nonce.schnorrNonce)
+                                   signerNonce = aliceDb.nonce)
 
       // wrong spk
       mixOutput = TransactionOutput(coordinator.config.mixAmount,
@@ -345,7 +347,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
       challenge = BobMessage.calculateChallenge(mixOutput,
                                                 coordinator.currentRoundId)
       blind = BlindSchnorrUtil.generateChallenge(coordinator.publicKey,
-                                                 nonce.schnorrNonce,
+                                                 aliceDb.nonce,
                                                  tweaks,
                                                  challenge)
 
@@ -353,7 +355,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
       blindSig <- coordinator.registerAlice(Sha256Digest.empty, registerInputs)
       sig = BlindSchnorrUtil.unblindSignature(blindSig.blindOutputSig,
                                               coordinator.publicKey,
-                                              nonce.schnorrNonce,
+                                              aliceDb.nonce,
                                               tweaks,
                                               challenge)
       _ <- coordinator.beginOutputRegistration()
@@ -366,9 +368,9 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
     coordinator =>
       val bitcoind = coordinator.bitcoind
       for {
-        nonce <- coordinator.getNonce(Sha256Digest.empty,
-                                      TestActorRef("test"),
-                                      AskNonce(coordinator.currentRoundId))
+        aliceDb <- coordinator.getNonce(Sha256Digest.empty,
+                                        TestActorRef("test"),
+                                        AskNonce(coordinator.currentRoundId))
         _ <- coordinator.beginInputRegistration()
 
         utxo <- bitcoind.listUnspent.map(_.head)
@@ -377,7 +379,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
           val output = TransactionOutput(utxo.amount, utxo.scriptPubKey.get)
           OutputReference(outpoint, output)
         }
-        tx = InputReference.constructInputProofTx(outputRef, nonce.schnorrNonce)
+        tx = InputReference.constructInputProofTx(outputRef, aliceDb.nonce)
         signed <- bitcoind.walletProcessPSBT(PSBT.fromUnsignedTx(tx))
         proof =
           signed.psbt.inputMaps.head.finalizedScriptWitnessOpt.get.scriptWitness
@@ -387,7 +389,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
         change = TransactionOutput(Satoshis(4998989765L), addr.scriptPubKey)
 
         tweaks = freshBlindingTweaks(signerPubKey = coordinator.publicKey,
-                                     signerNonce = nonce.schnorrNonce)
+                                     signerNonce = aliceDb.nonce)
 
         p2wsh = P2WSHWitnessSPKV0(EmptyScriptPubKey)
         mixOutput = TransactionOutput(coordinator.config.mixAmount, p2wsh)
@@ -395,7 +397,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
         challenge = BobMessage.calculateChallenge(mixOutput,
                                                   DoubleSha256Digest.empty)
         blind = BlindSchnorrUtil.generateChallenge(coordinator.publicKey,
-                                                   nonce.schnorrNonce,
+                                                   aliceDb.nonce,
                                                    tweaks,
                                                    challenge)
 
@@ -404,12 +406,86 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
                                               registerInputs)
         sig = BlindSchnorrUtil.unblindSignature(blindSig.blindOutputSig,
                                                 coordinator.publicKey,
-                                                nonce.schnorrNonce,
+                                                aliceDb.nonce,
                                                 tweaks,
                                                 challenge)
         _ <- coordinator.beginOutputRegistration()
         res <- recoverToSucceededIf[IllegalArgumentException](
           coordinator.verifyAndRegisterBob(BobMessage(sig, mixOutput)))
       } yield res
+  }
+
+  it must "construct the unsigned coinjoin tx" in { coordinator =>
+    val peerIds =
+      0.to(5)
+        .map(_ => CryptoUtil.sha256(ECPrivateKey.freshPrivateKey.bytes))
+        .toVector
+
+    for {
+      _ <- coordinator.beginOutputRegistration()
+      aliceDbFs = peerIds.map(peerId =>
+        coordinator.getNonce(peerId,
+                             TestActorRef(peerId.hex),
+                             AskNonce(coordinator.currentRoundId)))
+      aliceDbs <- Future.sequence(aliceDbFs)
+      updatedAliceDbs = aliceDbs.map { db =>
+        val spk = P2WPKHWitnessSPKV0(ECPublicKey.freshPublicKey)
+        val output = TransactionOutput(Bitcoins(1), spk)
+        db.setOutputValues(ECPrivateKey.freshPrivateKey.fieldElement,
+                           output,
+                           ECPrivateKey.freshPrivateKey.fieldElement)
+      }
+      _ <- coordinator.aliceDAO.updateAll(updatedAliceDbs)
+
+      inputDbs = peerIds.map { id =>
+        val outPoint = TransactionOutPoint(
+          CryptoUtil.doubleSHA256(ECPrivateKey.freshPrivateKey.bytes),
+          UInt32.zero)
+        val output = TransactionOutput(Satoshis.zero, EmptyScriptPubKey)
+        RegisteredInputDb(outPoint = outPoint,
+                          output = output,
+                          inputProof = EmptyScriptWitness,
+                          indexOpt = None,
+                          roundId = coordinator.currentRoundId,
+                          peerId = id)
+      }
+      _ <- coordinator.inputsDAO.createAll(inputDbs)
+
+      outputDbs = peerIds.map { _ =>
+        val raw = P2PKHScriptPubKey(ECPublicKey.freshPublicKey)
+        val spk = P2WSHWitnessSPKV0(raw)
+        val output = TransactionOutput(coordinator.config.mixAmount, spk)
+        val sig = ECPrivateKey.freshPrivateKey.schnorrSign(
+          CryptoUtil.sha256(raw.bytes).bytes)
+
+        RegisteredOutputDb(output, sig, coordinator.currentRoundId)
+      }
+
+      _ <- coordinator.outputsDAO.createAll(outputDbs)
+
+      addr <- coordinator.bitcoind.getNewAddress
+      tx <- coordinator.constructUnsignedTransaction(addr)
+
+      inputDbs <- coordinator.inputsDAO.findByRoundId(
+        coordinator.currentRoundId)
+    } yield {
+      assert(inputDbs.forall(_.indexOpt.isDefined))
+      val correctOutpoints = inputDbs.forall { db =>
+        val index = db.indexOpt.get
+        tx.inputs(index).previousOutput == db.outPoint
+      }
+      assert(correctOutpoints)
+
+      assert(outputDbs.forall(d => tx.outputs.contains(d.output)))
+
+      val hasChangeOutputs = updatedAliceDbs.forall { db =>
+        tx.outputs.contains(db.changeOutputOpt.get)
+      }
+      assert(hasChangeOutputs)
+
+      val mixFee = coordinator.config.mixFee * peerIds.size
+      val mixOutput = TransactionOutput(mixFee, addr.scriptPubKey)
+      assert(tx.outputs.contains(mixOutput))
+    }
   }
 }

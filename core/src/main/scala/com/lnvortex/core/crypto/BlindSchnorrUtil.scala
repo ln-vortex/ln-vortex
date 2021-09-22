@@ -42,7 +42,7 @@ object BlindSchnorrUtil {
       privKey: ECPrivateKey,
       nonceKey: ECPrivateKey,
       challenge: FieldElement): FieldElement = {
-    // todo check challenge != zero
+    require(!challenge.isZero, "challenge cannot be 0")
     privKey.schnorrKey.fieldElement
       .multiply(challenge)
       .add(nonceKey.nonceKey.fieldElement)

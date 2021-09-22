@@ -45,9 +45,18 @@ case class AliceDAO()(implicit
     safeDatabase.runVec(query)
   }
 
+  def findRegisteredForRound(
+      roundId: DoubleSha256Digest): Future[Vector[AliceDb]] = {
+    val query = table
+      .filter(t => t.roundId === roundId && t.blindOutputSigOpt.isDefined)
+      .result
+
+    safeDatabase.runVec(query.transactionally)
+  }
+
   def numRegisteredForRound(roundId: DoubleSha256Digest): Future[Int] = {
     val query = table
-      .filter(t => t.roundId === roundId && t.blindedOutputOpt.isDefined)
+      .filter(t => t.roundId === roundId && t.blindOutputSigOpt.isDefined)
       .map(_.peerId)
       .distinct
       .size
@@ -87,8 +96,7 @@ case class AliceDAO()(implicit
     def changeOutputOpt: Rep[Option[TransactionOutput]] = column(
       "change_output")
 
-    def blindOutputSigOpt: Rep[Option[FieldElement]] = column(
-      "blind_output_sig")
+    def blindOutputSigOpt: Rep[Option[FieldElement]] = column("blind_sig")
 
     def * : ProvenShape[AliceDb] =
       (peerId,
@@ -101,6 +109,6 @@ case class AliceDAO()(implicit
        nonce,
        blindedOutputOpt,
        changeOutputOpt,
-       blindedOutputOpt).<>(AliceDb.tupled, AliceDb.unapply)
+       blindOutputSigOpt).<>(AliceDb.tupled, AliceDb.unapply)
   }
 }
