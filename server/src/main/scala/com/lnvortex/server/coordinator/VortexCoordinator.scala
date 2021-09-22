@@ -382,6 +382,9 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
               inputs.flatMap(_.indexOpt).forall(psbt.verifyFinalizedInput)
             if (sameTx && verify) {
 
+              // mark successful
+              signedPMap(peerId).success(psbt)
+
               val signedFs = signedPMap.values.map(_.future)
 
               val signedT = Try {

@@ -4,6 +4,7 @@ import akka.actor.ActorSystem
 import com.lnvortex.server.config.VortexCoordinatorAppConfig
 import com.lnvortex.server.coordinator.VortexCoordinator
 import com.typesafe.config.{Config, ConfigFactory}
+import org.bitcoins.rpc.util.RpcUtil
 import org.bitcoins.testkit.fixtures.BitcoinSFixture
 import org.bitcoins.testkit.rpc.CachedBitcoindV21
 import org.scalatest.FutureOutcome
@@ -18,12 +19,16 @@ trait VortexCoordinatorFixture extends BitcoinSFixture with CachedBitcoindV21 {
 
   def getTestConfig(config: Config*)(implicit
       system: ActorSystem): VortexCoordinatorAppConfig = {
+    val listenPort = RpcUtil.randomPort
     val overrideConf = ConfigFactory.parseString {
       s"""
          |bitcoin-s {
          |  proxy.enabled = true
          |  tor.enabled = true
          |  tor.use-random-ports = false
+         |}
+         |vortex {
+         |  listen = "0.0.0.0:$listenPort"
          |}
       """.stripMargin
     }

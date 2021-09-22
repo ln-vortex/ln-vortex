@@ -488,4 +488,59 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
       assert(tx.outputs.contains(mixOutput))
     }
   }
+
+  it must "register a psbt signature" in { coordinator =>
+    val peerId = Sha256Digest.empty
+    val bitcoind = coordinator.bitcoind
+
+    for {
+      _ <- coordinator.beginOutputRegistration()
+      aliceDb <- coordinator.getNonce(peerId,
+                                      TestActorRef(peerId.hex),
+                                      AskNonce(coordinator.currentRoundId))
+
+      addr <- bitcoind.getNewAddress
+      unspent <- bitcoind.listUnspent.map(_.head)
+
+      updatedAliceDbs = {
+        val output = TransactionOutput(Bitcoins(1), addr.scriptPubKey)
+        aliceDb.setOutputValues(ECPrivateKey.freshPrivateKey.fieldElement,
+                                output,
+                                ECPrivateKey.freshPrivateKey.fieldElement)
+      }
+      _ <- coordinator.aliceDAO.update(updatedAliceDbs)
+
+      inputDb = {
+        val spk = unspent.scriptPubKey.get
+        val outPoint = TransactionOutPoint(unspent.txid, UInt32(unspent.vout))
+        val output = TransactionOutput(unspent.amount, spk)
+        RegisteredInputDb(outPoint = outPoint,
+                          output = output,
+                          inputProof = EmptyScriptWitness,
+                          indexOpt = None,
+                          roundId = coordinator.currentRoundId,
+                          peerId = peerId)
+      }
+      _ <- coordinator.inputsDAO.create(inputDb)
+
+      outputDb = {
+        val raw = P2PKHScriptPubKey(ECPublicKey.freshPublicKey)
+        val spk = P2WSHWitnessSPKV0(raw)
+        val output = TransactionOutput(coordinator.config.mixAmount, spk)
+        val sig = ECPrivateKey.freshPrivateKey.schnorrSign(
+          CryptoUtil.sha256(raw.bytes).bytes)
+
+        RegisteredOutputDb(output, sig, coordinator.currentRoundId)
+      }
+      _ <- coordinator.outputsDAO.create(outputDb)
+
+      addr <- coordinator.bitcoind.getNewAddress
+      tx <- coordinator.constructUnsignedTransaction(addr)
+
+      signed <- bitcoind.walletProcessPSBT(PSBT.fromUnsignedTx(tx))
+
+      _ <- coordinator.registerPSBTSignature(peerId, signed.psbt)
+    } yield succeed
+  }
+
 }
