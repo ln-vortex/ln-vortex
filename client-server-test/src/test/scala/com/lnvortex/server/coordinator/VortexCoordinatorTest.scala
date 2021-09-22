@@ -89,6 +89,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
 
       res <- recoverToSucceededIf[IllegalArgumentException](
         coordinator.registerAlice(
+          // wrong peerId
           Sha256Digest(
             "ded8ab0e14ee02492b1008f72a0a3a5abac201c731b7e71a92d36dc2db160d53"),
           registerInputs))
@@ -143,6 +144,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
           signed.psbt.inputMaps.head.finalizedScriptWitnessOpt.get.scriptWitness
 
         inputRef = InputReference(outputRef, proof)
+        // wrong address type
         addr <- bitcoind.getNewAddress(AddressType.Legacy)
         change = TransactionOutput(Satoshis(4998989765L), addr.scriptPubKey)
 
@@ -174,6 +176,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
         signed.psbt.inputMaps.head.finalizedScriptWitnessOpt.get.scriptWitness
 
       inputRef = InputReference(outputRef, proof)
+      // wrong change addr
       addr <- bitcoind.getNewAddress(AddressType.P2SHSegwit)
       change = TransactionOutput(Satoshis(4998989765L), addr.scriptPubKey)
 
@@ -207,6 +210,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
 
         inputRef = InputReference(outputRef, proof)
         addr <- bitcoind.getNewAddress
+        // wrong amount
         change = TransactionOutput(Bitcoins(50), addr.scriptPubKey)
 
         blind = ECPrivateKey.freshPrivateKey.fieldElement
@@ -241,6 +245,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
         addr <- bitcoind.getNewAddress
         change = TransactionOutput(Satoshis(4998989765L), addr.scriptPubKey)
 
+        // wrong blind proof
         blind = FieldElement.zero
         registerInputs = RegisterInputs(Vector(inputRef), blind, change)
 
@@ -301,6 +306,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
       _ <- coordinator.beginOutputRegistration()
       p2wsh = P2WSHWitnessSPKV0(EmptyScriptPubKey)
       mixOutput = TransactionOutput(coordinator.config.mixAmount, p2wsh)
+      // random sig
       sig = ECPrivateKey.freshPrivateKey.schnorrSign(Sha256Digest.empty.bytes)
       res <- recoverToSucceededIf[IllegalArgumentException](
         coordinator.verifyAndRegisterBob(BobMessage(sig, mixOutput)))
@@ -333,6 +339,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
       tweaks = freshBlindingTweaks(signerPubKey = coordinator.publicKey,
                                    signerNonce = nonce.schnorrNonce)
 
+      // wrong spk
       mixOutput = TransactionOutput(coordinator.config.mixAmount,
                                     addr.scriptPubKey)
       challenge = BobMessage.calculateChallenge(mixOutput,
@@ -384,6 +391,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
 
         p2wsh = P2WSHWitnessSPKV0(EmptyScriptPubKey)
         mixOutput = TransactionOutput(coordinator.config.mixAmount, p2wsh)
+        // wrong roundId
         challenge = BobMessage.calculateChallenge(mixOutput,
                                                   DoubleSha256Digest.empty)
         blind = BlindSchnorrUtil.generateChallenge(coordinator.publicKey,
