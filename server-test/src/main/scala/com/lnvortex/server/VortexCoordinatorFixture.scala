@@ -12,7 +12,6 @@ import org.scalatest.FutureOutcome
 import java.nio.file.{Files, Path}
 import scala.reflect.io.Directory
 
-/** A trait that is useful if you need Lnd fixtures for your test suite */
 trait VortexCoordinatorFixture extends BitcoinSFixture with CachedBitcoindV21 {
 
   def tmpDir(): Path = Files.createTempDirectory("ln-vortex-")

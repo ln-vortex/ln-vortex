@@ -103,8 +103,13 @@ case class VortexCoordinatorAppConfig(
     Satoshis(long)
   }
 
-  lazy val interval: FiniteDuration = {
+  lazy val mixInterval: FiniteDuration = {
     val dur = config.getDuration(s"$moduleName.mixInterval")
+    FiniteDuration(dur.getSeconds, SECONDS)
+  }
+
+  lazy val inputRegistrationTime: FiniteDuration = {
+    val dur = config.getDuration(s"$moduleName.inputRegistrationTime")
     FiniteDuration(dur.getSeconds, SECONDS)
   }
 

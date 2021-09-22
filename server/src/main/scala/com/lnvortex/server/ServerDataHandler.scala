@@ -4,16 +4,19 @@ import akka.actor._
 import akka.event.LoggingReceive
 import com.lnvortex.core._
 import com.lnvortex.server.coordinator.VortexCoordinator
+import grizzled.slf4j.Logging
 import org.bitcoins.core.protocol.tlv._
-import org.bitcoins.crypto.{CryptoUtil, ECPrivateKey, Sha256Digest}
+import org.bitcoins.core.util.TimeUtil
+import org.bitcoins.crypto._
 
 import scala.concurrent._
+import scala.concurrent.duration._
 
 class ServerDataHandler(
     coordinator: VortexCoordinator,
     connectionHandler: ActorRef)
     extends Actor
-    with ActorLogging {
+    with Logging {
   implicit val ec: ExecutionContextExecutor = context.system.dispatcher
 
   private val id: Sha256Digest =
@@ -25,14 +28,14 @@ class ServerDataHandler(
 
   override def receive: Receive = LoggingReceive {
     case clientMessage: ClientVortexMessage =>
-      log.info(s"Received VortexMessage ${clientMessage.typeName}")
+      logger.info(s"Received VortexMessage ${clientMessage.typeName}")
       val f: Future[Unit] = handleVortexMessage(clientMessage)
       f.failed.foreach(err =>
-        log.error(s"Failed to process vortexMessage=$clientMessage", err))
+        logger.error(s"Failed to process vortexMessage=$clientMessage", err))
     case clientMessage: ServerVortexMessage =>
-      log.error(s"Received server message $clientMessage")
+      logger.error(s"Received server message $clientMessage")
     case ServerConnectionHandler.WriteFailed(_) =>
-      log.error("Write failed")
+      logger.error("Write failed")
     case Terminated(actor) if actor == connectionHandler =>
       context.stop(self)
   }
@@ -45,7 +48,7 @@ class ServerDataHandler(
           connectionHandler ! coordinator.mixDetails
           Future.unit
         } else {
-          log.warning(
+          logger.warn(
             s"Received AskMixAdvertisement for different network $network")
           Future.unit
         }
@@ -54,8 +57,23 @@ class ServerDataHandler(
           connectionHandler ! NonceMessage(msg.nonce)
         }
       case inputs: RegisterInputs =>
-        coordinator.registerAlice(id, inputs).map { response =>
-          connectionHandler ! response
+        for {
+          blindSig <- coordinator.registerAlice(id, inputs)
+        } yield {
+          val timeSinceInputReg =
+            TimeUtil.currentEpochSecond - coordinator.inputRegStartTime
+          val time =
+            coordinator.config.inputRegistrationTime.toSeconds - timeSinceInputReg
+          val timeAbs = Math.max(0, time)
+
+          // send message once output registration starts
+          context.system.scheduler.scheduleOnce(timeAbs.seconds) {
+            logger.debug(s"Sending blind sig to peer ${id.hex}")
+            coordinator.beginOutputRegistration().foreach { _ =>
+              connectionHandler ! BlindedSig(blindSig)
+            }
+          }
+          ()
         }
       case bob: BobMessage =>
         coordinator.verifyAndRegisterBob(bob).map(_ => ())

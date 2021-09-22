@@ -6,19 +6,24 @@ import org.bitcoins.crypto.SchnorrNonce
 sealed trait RoundDetails[T, N <: RoundDetails[_, _]] {
   def order: Int
   def nextStage(t: T): N
+
+  def nonceOpt: Option[SchnorrNonce]
 }
 
 case object NoDetails extends RoundDetails[MixDetails, KnownRound] {
   override val order: Int = 0
+  override val nonceOpt: Option[SchnorrNonce] = None
 
   override def nextStage(round: MixDetails): KnownRound = {
     KnownRound(round)
   }
+
 }
 
 case class KnownRound(round: MixDetails)
     extends RoundDetails[SchnorrNonce, ReceivedNonce] {
   override val order: Int = 1
+  override val nonceOpt: Option[SchnorrNonce] = None
 
   override def nextStage(nonce: SchnorrNonce): ReceivedNonce =
     ReceivedNonce(round, nonce)
@@ -27,6 +32,7 @@ case class KnownRound(round: MixDetails)
 case class ReceivedNonce(round: MixDetails, nonce: SchnorrNonce)
     extends RoundDetails[InitDetails, InputsRegistered] {
   override val order: Int = 2
+  override val nonceOpt: Option[SchnorrNonce] = Some(nonce)
 
   override def nextStage(initDetails: InitDetails): InputsRegistered =
     InputsRegistered(round, nonce, initDetails)
@@ -35,6 +41,11 @@ case class ReceivedNonce(round: MixDetails, nonce: SchnorrNonce)
 sealed trait InitializedRound[N <: RoundDetails[_, _]]
     extends RoundDetails[Unit, N] {
 
+  def round: MixDetails
+  def nonce: SchnorrNonce
+  def initDetails: InitDetails
+
+  override val nonceOpt: Option[SchnorrNonce] = Some(nonce)
   def nextStage(): N = nextStage(())
 }
 

@@ -5,11 +5,12 @@ import com.lnvortex.core._
 import com.lnvortex.core.crypto.BlindSchnorrUtil
 import com.lnvortex.core.crypto.BlindingTweaks.freshBlindingTweaks
 import grizzled.slf4j.Logging
+import org.bitcoins.asyncutil.AsyncUtil
 import org.bitcoins.commons.jsonmodels.lnd.UTXOResult
 import org.bitcoins.core.currency.Satoshis
 import org.bitcoins.core.number.UInt16
 import org.bitcoins.core.policy.Policy
-import org.bitcoins.core.protocol.script.ScriptWitness
+import org.bitcoins.core.protocol.script._
 import org.bitcoins.core.protocol.transaction._
 import org.bitcoins.core.psbt.PSBT
 import org.bitcoins.core.util.{FutureUtil, StartStopAsync}
@@ -20,14 +21,14 @@ import scala.concurrent.{Future, Promise}
 
 case class VortexClient(lndRpcClient: LndRpcClient)(implicit
     system: ActorSystem,
-    config: VortexAppConfig)
+    val config: VortexAppConfig)
     extends StartStopAsync[Unit]
     with Logging {
   import system.dispatcher
 
   private val handlerP = Promise[ActorRef]()
 
-  private[client] var roundDetails: RoundDetails[_, _] = NoDetails
+  private[lnvortex] var roundDetails: RoundDetails[_, _] = NoDetails
 
   private val knownVersions = Vector(UInt16.zero)
 
@@ -47,7 +48,7 @@ case class VortexClient(lndRpcClient: LndRpcClient)(implicit
     for {
       _ <- P2PClient.connect(peer, this, Some(handlerP))
       handler <- handlerP.future
-    } yield handler ! AskMixDetails
+    } yield handler ! AskMixDetails(config.network)
   }
 
   override def stop(): Future[Unit] = {
@@ -70,6 +71,19 @@ case class VortexClient(lndRpcClient: LndRpcClient)(implicit
     }
   }
 
+  def askNonce(): Future[SchnorrNonce] = {
+    roundDetails match {
+      case KnownRound(round) =>
+        for {
+          handler <- handlerP.future
+          _ = handler ! AskNonce(round.roundId)
+          _ <- AsyncUtil.awaitCondition(() => roundDetails.nonceOpt.isDefined)
+        } yield roundDetails.nonceOpt.get
+      case _: ReceivedNonce | NoDetails | _: InitializedRound[_] =>
+        Future.failed(new RuntimeException("In incorrect state"))
+    }
+  }
+
   /** Creates a proof of ownership for the input and then locks it
     * @param nonce Round Nonce for the peer
     * @param outputRef OutputReference for the input
@@ -86,7 +100,7 @@ case class VortexClient(lndRpcClient: LndRpcClient)(implicit
     } yield scriptWit
   }
 
-  def registerNonce(nonce: SchnorrNonce): Unit = {
+  private[client] def registerNonce(nonce: SchnorrNonce): Unit = {
     roundDetails match {
       case state @ (NoDetails | _: ReceivedNonce | _: InitializedRound[_]) =>
         throw new RuntimeException(s"Cannot register nonce at state $state")
@@ -124,9 +138,12 @@ case class VortexClient(lndRpcClient: LndRpcClient)(implicit
           changeAddr <- lndRpcClient.getNewAddress
           changeOutput = TransactionOutput(changeAmt, changeAddr.scriptPubKey)
 
-          // todo negotiate channel, get output, hash it
-          mixOutput = EmptyTransactionOutput
-          hashedOutput = CryptoUtil.sha256(mixOutput.bytes).bytes
+          // todo negotiate channel, get output
+          raw = P2PKHScriptPubKey(ECPublicKey.freshPublicKey)
+          spk = P2WSHWitnessSPKV0(raw)
+          mixOutput = TransactionOutput(receivedNonce.round.amount, spk)
+
+          hashedOutput = BobMessage.calculateChallenge(mixOutput, round.roundId)
 
           tweaks = freshBlindingTweaks(signerPubKey = round.publicKey,
                                        signerNonce = receivedNonce.nonce)
@@ -155,7 +172,8 @@ case class VortexClient(lndRpcClient: LndRpcClient)(implicit
         val nonce = details.nonce
         val tweaks = details.initDetails.tweaks
 
-        val challenge = CryptoUtil.sha256(mixOutput.bytes).bytes
+        val challenge =
+          BobMessage.calculateChallenge(mixOutput, details.round.roundId)
         val sig = BlindSchnorrUtil.unblindSignature(blindSig = blindOutputSig,
                                                     signerPubKey = publicKey,
                                                     signerNonce = nonce,

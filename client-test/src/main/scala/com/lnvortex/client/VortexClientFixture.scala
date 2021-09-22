@@ -12,7 +12,6 @@ import org.scalatest.FutureOutcome
 
 import java.nio.file.{Files, Path}
 
-/** A trait that is useful if you need Lnd fixtures for your test suite */
 trait VortexClientFixture extends BitcoinSFixture with CachedBitcoindV21 {
 
   def tmpDir(): Path = Files.createTempDirectory("ln-vortex-")
@@ -47,9 +46,10 @@ trait VortexClientFixture extends BitcoinSFixture with CachedBitcoindV21 {
           addrB <- lnd.getNewAddress
           addrC <- lnd.getNewAddress
 
-          _ <- bitcoind.sendToAddress(addrA, Bitcoins(1))
-          _ <- bitcoind.sendToAddress(addrB, Bitcoins(2))
-          _ <- bitcoind.sendToAddress(addrC, Bitcoins(3))
+          _ <- bitcoind.sendMany(
+            Map(addrA -> Bitcoins(1),
+                addrB -> Bitcoins(2),
+                addrC -> Bitcoins(3)))
           _ <- bitcoind.getNewAddress.flatMap(bitcoind.generateToAddress(6, _))
 
           height <- bitcoind.getBlockCount
