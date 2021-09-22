@@ -147,4 +147,13 @@ class BlindSchnorrUtilTest extends BitcoinSUnitTest {
 
     assert(signerPubKey.verify(message, sig))
   }
+
+  it must "fail to generate a blind sig when the challenge is zero" in {
+    val signerPrivKey = ECPrivateKey.freshPrivateKey
+    val signerNonceKey = ECPrivateKey.freshPrivateKey
+
+    assertThrows[IllegalArgumentException](
+      BlindSchnorrUtil
+        .generateBlindSig(signerPrivKey, signerNonceKey, FieldElement.zero))
+  }
 }
