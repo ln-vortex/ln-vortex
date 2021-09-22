@@ -42,18 +42,22 @@ lazy val root = project
   .in(file("."))
   .aggregate(
     core,
+    coreTest,
     client,
+    clientTest,
     clientServerTest,
     server,
-    coreTest,
+    serverTest,
     gui
   )
   .dependsOn(
     core,
+    coreTest,
     client,
+    clientTest,
     clientServerTest,
     server,
-    coreTest,
+    serverTest,
     gui
   )
   .settings(CommonSettings.settings: _*)
@@ -79,18 +83,32 @@ lazy val client = project
   .settings(name := "client", libraryDependencies ++= Deps.backend)
   .dependsOn(core)
 
-lazy val clientServerTest = project
-  .in(file("client-server-test"))
+lazy val clientTest = project
+  .in(file("client-test"))
   .settings(CommonSettings.testSettings: _*)
-  .settings(name := "client-server-test",
+  .settings(name := "client-test",
             libraryDependencies ++= Deps.clientServerTest)
-  .dependsOn(client, server, coreTest)
+  .dependsOn(client, coreTest)
 
 lazy val server = project
   .in(file("server"))
   .settings(CommonSettings.settings: _*)
   .settings(name := "server", libraryDependencies ++= Deps.server)
   .dependsOn(core)
+
+lazy val serverTest = project
+  .in(file("server-test"))
+  .settings(CommonSettings.testSettings: _*)
+  .settings(name := "server-test",
+            libraryDependencies ++= Deps.clientServerTest)
+  .dependsOn(server, coreTest)
+
+lazy val clientServerTest = project
+  .in(file("client-server-test"))
+  .settings(CommonSettings.testSettings: _*)
+  .settings(name := "client-server-test",
+            libraryDependencies ++= Deps.clientServerTest)
+  .dependsOn(client, server, coreTest)
 
 lazy val gui = project
   .in(file("gui"))
