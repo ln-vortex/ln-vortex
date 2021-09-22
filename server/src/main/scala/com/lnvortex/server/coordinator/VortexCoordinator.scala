@@ -46,6 +46,8 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
 
   private[this] val km = new CoordinatorKeyManager()
 
+  val publicKey: SchnorrPublicKey = km.publicKey
+
   private val feeProvider: MempoolSpaceProvider =
     MempoolSpaceProvider(FastestFeeTarget, config.network, None)
 
@@ -272,13 +274,17 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
     }
   }
 
-  def verifyAndRegisterBob(bob: BobMessage): Future[Boolean] = {
-    if (bob.verifySigAndOutput(km.publicKey)) {
+  def verifyAndRegisterBob(bob: BobMessage): Future[Unit] = {
+    if (bob.verifySigAndOutput(km.publicKey, currentRoundId)) {
       val db = RegisteredOutputDb(bob.output, bob.sig, currentRoundId)
       for {
         roundOpt <- roundDAO.read(currentRoundId)
         _ = roundOpt match {
-          case Some(round) => require(round.status == RegisterOutputs)
+          case Some(round) =>
+            require(round.status == RegisterOutputs,
+                    s"Round is in invalid state ${round.status}")
+            require(round.amount == bob.output.value,
+                    "Output given is incorrect amount")
           case None =>
             throw new RuntimeException(
               s"No round found for roundId ${currentRoundId.hex}")
@@ -287,13 +293,16 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
 
         registeredAlices <- aliceDAO.numRegisteredForRound(currentRoundId)
         outputs <- outputsDAO.findByRoundId(currentRoundId)
-        _ = if (outputs.size >= registeredAlices) {
+      } yield {
+        if (outputs.size >= registeredAlices) {
           outputsRegisteredP.success(())
-        } else ()
-      } yield true
+        }
+        ()
+      }
     } else {
-      logger.warn(s"Received invalid signature for output ${bob.output}")
-      Future.successful(false)
+      Future.failed(
+        new IllegalArgumentException(
+          s"Received invalid signature for output ${bob.output}"))
     }
   }
 

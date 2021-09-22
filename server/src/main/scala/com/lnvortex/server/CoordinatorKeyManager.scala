@@ -11,10 +11,8 @@ import org.bitcoins.crypto._
 import org.bitcoins.keymanager._
 
 import java.util.concurrent.atomic.AtomicInteger
-import scala.annotation.tailrec
 import scala.concurrent._
 import scala.concurrent.duration.DurationInt
-import scala.util._
 
 class CoordinatorKeyManager()(implicit
     ec: ExecutionContext,
@@ -38,7 +36,7 @@ class CoordinatorKeyManager()(implicit
     new AtomicInteger(startingIndex)
   }
 
-  private def nextNoncePath: BIP32Path = {
+  private def nextNoncePath(): BIP32Path = {
     val purpose = HDPurposes.Legacy
     val coin = HDCoin(purpose, HDCoinType.Bitcoin)
     val account = HDAccount(coin, 0)
@@ -51,15 +49,11 @@ class CoordinatorKeyManager()(implicit
     BIP32Path(hardened.toVector)
   }
 
-  @tailrec
   final private[server] def nextNonce(): (SchnorrNonce, BIP32Path) = {
-    val path = nextNoncePath
-    val nonceT = extPrivateKey.deriveChildPubKey(nextNoncePath)
+    val path = nextNoncePath()
+    val nonce = extPrivateKey.deriveChildPrivKey(path).key.schnorrNonce
 
-    nonceT match {
-      case Success(nonce) => (nonce.key.schnorrNonce, path)
-      case Failure(_)     => nextNonce()
-    }
+    (nonce, path)
   }
 
   private[this] lazy val privKey: ECPrivateKey =

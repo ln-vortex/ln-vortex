@@ -10,6 +10,9 @@ import org.bitcoins.testkitcore.util.BitcoinSUnitTest
 
 class VortexMessageTest extends BitcoinSUnitTest {
 
+  val roundId: DoubleSha256Digest =
+    CryptoUtil.doubleSHA256(ECPrivateKey.freshPrivateKey.bytes)
+
   val privKey: ECPrivateKey = ECPrivateKey.freshPrivateKey
   val pubKey: SchnorrPublicKey = privKey.schnorrPublicKey
   val kVal: ECPrivateKey = ECPrivateKey.freshPrivateKey
@@ -22,7 +25,7 @@ class VortexMessageTest extends BitcoinSUnitTest {
   it must "correctly verify a Bob message" in {
     forAll(ScriptGenerators.p2wshSPKV0.map(_._1)) { spk =>
       val output = TransactionOutput(amount, spk)
-      val hash = CryptoUtil.sha256(output.bytes).bytes
+      val hash = BobMessage.calculateChallenge(output, roundId)
 
       val challenge =
         BlindSchnorrUtil.generateChallenge(pubKey, nonce, tweaks, hash)
@@ -34,7 +37,7 @@ class VortexMessageTest extends BitcoinSUnitTest {
 
       val bobMsg = BobMessage(sig, output)
 
-      val verify = bobMsg.verifySigAndOutput(pubKey)
+      val verify = bobMsg.verifySigAndOutput(pubKey, roundId)
 
       assert(verify)
     }
@@ -46,7 +49,7 @@ class VortexMessageTest extends BitcoinSUnitTest {
         .map(_._1)
         .suchThat(!_.isInstanceOf[P2WSHWitnessSPKV0])) { spk =>
       val output = TransactionOutput(amount, spk)
-      val hash = CryptoUtil.sha256(output.bytes).bytes
+      val hash = BobMessage.calculateChallenge(output, roundId)
 
       val challenge =
         BlindSchnorrUtil.generateChallenge(pubKey, nonce, tweaks, hash)
@@ -58,7 +61,7 @@ class VortexMessageTest extends BitcoinSUnitTest {
 
       val bobMsg = BobMessage(sig, output)
 
-      val verify = bobMsg.verifySigAndOutput(pubKey)
+      val verify = bobMsg.verifySigAndOutput(pubKey, roundId)
 
       assert(!verify)
     }
@@ -88,7 +91,7 @@ class VortexMessageTest extends BitcoinSUnitTest {
   it must "fail to verify a Bob message with wrong keys" in {
     forAll(ScriptGenerators.p2wshSPKV0.map(_._1)) { spk =>
       val output = TransactionOutput(amount, spk)
-      val hash = CryptoUtil.sha256(output.bytes).bytes
+      val hash = BobMessage.calculateChallenge(output, roundId)
 
       val challenge =
         BlindSchnorrUtil.generateChallenge(pubKey, nonce, tweaks, hash)
@@ -100,7 +103,7 @@ class VortexMessageTest extends BitcoinSUnitTest {
 
       val bobMsg = BobMessage(sig, output)
 
-      val verify = bobMsg.verifySigAndOutput(kVal.schnorrPublicKey)
+      val verify = bobMsg.verifySigAndOutput(kVal.schnorrPublicKey, roundId)
 
       assert(!verify)
     }

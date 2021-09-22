@@ -144,9 +144,8 @@ case class VortexClient(lndRpcClient: LndRpcClient)(implicit
     }
   }
 
-  def processAliceInitResponse(blindOutputSig: FieldElement): Future[Unit] = {
+  def processBlindOutputSig(blindOutputSig: FieldElement): Future[Unit] = {
     roundDetails match {
-
       case state @ (NoDetails | _: KnownRound | _: ReceivedNonce |
           _: MixOutputRegistered | _: PSBTSigned) =>
         sys.error(s"At invalid state $state, cannot processAliceInitResponse")

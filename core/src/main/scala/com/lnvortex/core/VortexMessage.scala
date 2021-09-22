@@ -288,10 +288,12 @@ case class BobMessage(sig: SchnorrDigitalSignature, output: TransactionOutput)
 
   override val value: ByteVector = sig.bytes ++ u16Prefix(output.bytes)
 
-  def verifySigAndOutput(publicKey: SchnorrPublicKey): Boolean = {
+  def verifySigAndOutput(
+      publicKey: SchnorrPublicKey,
+      roundId: DoubleSha256Digest): Boolean = {
     output.scriptPubKey match {
       case _: P2WSHWitnessSPKV0 =>
-        val challenge = CryptoUtil.sha256(output.bytes).bytes
+        val challenge = BobMessage.calculateChallenge(output, roundId)
         publicKey.verify(challenge, sig)
       case _: P2WPKHWitnessSPKV0 | _: WitnessCommitment |
           _: UnassignedWitnessScriptPubKey | EmptyScriptPubKey |
@@ -314,6 +316,12 @@ object BobMessage extends VortexMessageFactory[BobMessage] {
       TransactionOutput(iter.take(len)))
 
     BobMessage(sig, output)
+  }
+
+  def calculateChallenge(
+      output: TransactionOutput,
+      roundId: DoubleSha256Digest): ByteVector = {
+    CryptoUtil.sha256(output.bytes ++ roundId.bytes).bytes
   }
 }
 

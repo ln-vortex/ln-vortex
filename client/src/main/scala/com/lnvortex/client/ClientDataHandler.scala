@@ -41,7 +41,7 @@ class ClientDataHandler(vortexClient: VortexClient, connectionHandler: ActorRef)
         Future.unit
       case BlindedSig(blindOutputSig) =>
         for {
-          _ <- vortexClient.processAliceInitResponse(blindOutputSig)
+          _ <- vortexClient.processBlindOutputSig(blindOutputSig)
         } yield ()
       case UnsignedPsbtMessage(psbt) =>
         for {
