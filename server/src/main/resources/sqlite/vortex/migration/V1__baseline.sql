@@ -48,7 +48,7 @@ CREATE TABLE `registered_inputs`
     constraint `fk_peerId` foreign key (`peer_id`) references `alices` (`peer_id`) on update NO ACTION on delete NO ACTION
 );
 
-CREATE TABLE `registered_inputs`
+CREATE TABLE `registered_outputs`
 (
     `output`   VARCHAR(254) PRIMARY KEY NOT NULL,
     `sig`      VARCHAR(254)             NOT NULL,

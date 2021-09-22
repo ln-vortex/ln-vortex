@@ -1,18 +1,22 @@
 package com.lnvortex.server.config
 
 import akka.actor.ActorSystem
+import com.lnvortex.server.models._
 import com.typesafe.config.Config
 import grizzled.slf4j.Logging
 import org.bitcoins.commons.config._
 import org.bitcoins.core.currency.Satoshis
-import org.bitcoins.core.util.FutureUtil
+import org.bitcoins.core.hd.HDPurposes
+import org.bitcoins.core.wallet.keymanagement.KeyManagerParams
 import org.bitcoins.crypto._
 import org.bitcoins.db._
+import org.bitcoins.keymanager.bip39.BIP39KeyManager
+import org.bitcoins.keymanager.config.KeyManagerAppConfig
 import org.bitcoins.tor.config.TorAppConfig
 import org.bitcoins.tor.{Socks5ProxyParams, TorParams}
 
 import java.net.{InetSocketAddress, URI}
-import java.nio.file.{Path, Paths}
+import java.nio.file.{Files, Path, Paths}
 import scala.concurrent._
 import scala.concurrent.duration._
 import scala.util.Properties
@@ -45,12 +49,28 @@ case class VortexCoordinatorAppConfig(
 
   override val baseDatadir: Path = directory
 
-  override def start(): Future[Unit] = FutureUtil.unit
+  override def start(): Future[Unit] = {
+    logger.info(s"Initializing setup")
+
+    if (Files.notExists(baseDatadir)) {
+      Files.createDirectories(baseDatadir)
+    }
+
+    val numMigrations = migrate()
+    logger.info(s"Applied $numMigrations")
+
+    initialize()
+
+    Future.unit
+  }
 
   override def stop(): Future[Unit] = Future.unit
 
   lazy val torConf: TorAppConfig =
     TorAppConfig(directory, conf: _*)
+
+  lazy val kmConf: KeyManagerAppConfig =
+    KeyManagerAppConfig(directory, conf: _*)
 
   lazy val socks5ProxyParams: Option[Socks5ProxyParams] =
     torConf.socks5ProxyParams
@@ -62,6 +82,12 @@ case class VortexCoordinatorAppConfig(
     val uri = new URI("tcp://" + str)
     new InetSocketAddress(uri.getHost, uri.getPort)
   }
+
+  lazy val kmParams: KeyManagerParams =
+    KeyManagerParams(kmConf.seedPath, HDPurposes.SegWit, network)
+
+  lazy val aesPasswordOpt: Option[AesPassword] = kmConf.aesPasswordOpt
+  lazy val bip39PasswordOpt: Option[String] = kmConf.bip39PasswordOpt
 
   lazy val maxPeers: Int = {
     config.getInt(s"$moduleName.maxPeers")
@@ -82,18 +108,27 @@ case class VortexCoordinatorAppConfig(
     FiniteDuration(dur.getSeconds, SECONDS)
   }
 
-  lazy val seedPath: Path = directory.resolve("seed.json")
-
-  lazy val aesPasswordOpt: Option[AesPassword] = {
-    val passOpt = config.getStringOrNone(s"bitcoin-s.keymanager.aesPassword")
-    passOpt.flatMap(AesPassword.fromStringOpt)
+  def initialize(): Unit = {
+    if (!kmConf.seedExists()) {
+      BIP39KeyManager.initialize(aesPasswordOpt = aesPasswordOpt,
+                                 kmParams = kmParams,
+                                 bip39PasswordOpt = bip39PasswordOpt) match {
+        case Left(err) => sys.error(err.toString)
+        case Right(_) =>
+          logger.info("Successfully generated a seed and key manager")
+      }
+    }
   }
 
-  lazy val bip39PasswordOpt: Option[String] = {
-    config.getStringOrNone(s"bitcoin-s.keymanager.bip39password")
+  override lazy val allTables: List[TableQuery[Table[_]]] = {
+    List(
+      BannedUtxoDAO()(dispatcher, this).table,
+      RoundDAO()(dispatcher, this).table,
+      AliceDAO()(dispatcher, this).table,
+      RegisteredInputDAO()(dispatcher, this).table,
+      RegisteredOutputDAO()(dispatcher, this).table
+    )
   }
-
-  override lazy val allTables: List[TableQuery[Table[_]]] = List.empty
 }
 
 object VortexCoordinatorAppConfig

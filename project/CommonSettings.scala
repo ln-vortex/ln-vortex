@@ -37,14 +37,14 @@ object CommonSettings {
         //for 2.13 -- they use different compiler opts
         || s == "-Xlint:unused")),
     //we don't want -Xfatal-warnings for publishing with publish/publishLocal either
-    Compile / doc / scalacOptions ~= (_ filterNot (s =>
-      s == "-Xfatal-warnings")),
+//    Compile / doc / scalacOptions ~= (_ filterNot (s =>
+//      s == "-Xfatal-warnings")),
     //silence all scaladoc warnings generated from invalid syntax
     //see: https://github.com/bitcoin-s/bitcoin-s/issues/3232
-    Compile / doc / scalacOptions ++= Vector(s"-Wconf:any:ws"),
+//    Compile / doc / scalacOptions ++= Vector(s"-Wconf:any:ws"),
     Test / console / scalacOptions ++= (Compile / console / scalacOptions).value,
     Test / scalacOptions ++= testCompilerOpts(scalaVersion.value),
-    licenses += ("MIT", url("http://opensource.org/licenses/MIT")),
+    licenses += ("MIT", url("https://opensource.org/licenses/MIT")),
     //you need to build protoc manually to get it working on the new
     //mac m1 chip. For instructions on how to do so see
     //see: https://github.com/scalapb/ScalaPB/issues/1024

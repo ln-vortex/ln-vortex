@@ -4,6 +4,7 @@ import akka.actor._
 import akka.event.LoggingReceive
 import akka.io.{IO, Tcp}
 import com.lnvortex.server
+import com.lnvortex.server.coordinator.VortexCoordinator
 import org.bitcoins.tor._
 
 import java.io.IOException

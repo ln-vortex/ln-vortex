@@ -23,7 +23,18 @@ case class AliceDb(
     val account = HDAccount(coin, accountIdx)
     val chain = HDChain(this.chain, account)
     val path = HDAddress(chain, nonceIndex).path
-    BIP32Path(path)
+    // We need to make sure this is hardened for security
+    val hardened = path.map(_.copy(hardened = true))
+    BIP32Path(hardened)
+  }
+
+  def setOutputValues(
+      blindedOutput: FieldElement,
+      changeOutput: TransactionOutput,
+      blindOutputSig: FieldElement): AliceDb = {
+    copy(blindedOutputOpt = Some(blindedOutput),
+         changeOutputOpt = Some(changeOutput),
+         blindOutputSigOpt = Some(blindOutputSig))
   }
 }
 

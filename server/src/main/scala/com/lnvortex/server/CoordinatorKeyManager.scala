@@ -24,8 +24,8 @@ class CoordinatorKeyManager()(implicit
   private[server] val aliceDAO = AliceDAO()
 
   /** The root private key for this coordinator */
-  private[this] val extPrivateKey: ExtPrivateKeyHardened =
-    WalletStorage.getPrivateKeyFromDisk(config.seedPath,
+  private[this] lazy val extPrivateKey: ExtPrivateKeyHardened =
+    WalletStorage.getPrivateKeyFromDisk(config.kmConf.seedPath,
                                         SegWitMainNetPriv,
                                         config.aesPasswordOpt,
                                         config.bip39PasswordOpt)
@@ -39,7 +39,7 @@ class CoordinatorKeyManager()(implicit
   }
 
   private def nextNoncePath: BIP32Path = {
-    val purpose = CoordinatorKeyManager.PURPOSE
+    val purpose = HDPurposes.Legacy
     val coin = HDCoin(purpose, HDCoinType.Bitcoin)
     val account = HDAccount(coin, 0)
     val hdChain = HDChain(HDChainType.External, account)
@@ -62,10 +62,10 @@ class CoordinatorKeyManager()(implicit
     }
   }
 
-  private[this] val privKey: ECPrivateKey =
+  private[this] lazy val privKey: ECPrivateKey =
     extPrivateKey.deriveChildPrivKey(pubKeyPath).key
 
-  val publicKey: SchnorrPublicKey = privKey.schnorrPublicKey
+  lazy val publicKey: SchnorrPublicKey = privKey.schnorrPublicKey
 
   def createBlindSig(
       blindedOutput: FieldElement,

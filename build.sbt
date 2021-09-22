@@ -84,7 +84,7 @@ lazy val clientServerTest = project
   .settings(CommonSettings.testSettings: _*)
   .settings(name := "client-server-test",
             libraryDependencies ++= Deps.clientServerTest)
-  .dependsOn(client, server)
+  .dependsOn(client, server, coreTest)
 
 lazy val server = project
   .in(file("server"))

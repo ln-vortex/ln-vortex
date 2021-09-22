@@ -3,6 +3,7 @@ package com.lnvortex.server
 import akka.actor._
 import akka.event.LoggingReceive
 import com.lnvortex.core._
+import com.lnvortex.server.coordinator.VortexCoordinator
 import org.bitcoins.core.protocol.tlv._
 import org.bitcoins.crypto.{CryptoUtil, ECPrivateKey, Sha256Digest}
 

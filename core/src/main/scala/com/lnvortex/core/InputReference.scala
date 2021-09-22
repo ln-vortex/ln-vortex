@@ -25,6 +25,14 @@ case class InputReference(
 
 object InputReference extends Factory[InputReference] {
 
+  def apply(
+      outPoint: TransactionOutPoint,
+      output: TransactionOutput,
+      inputProof: ScriptWitness): InputReference = {
+    val outputRef = OutputReference(outPoint, output)
+    InputReference(outputRef, inputProof)
+  }
+
   override def fromBytes(bytes: ByteVector): InputReference = {
     val iter = ValueIterator(bytes)
     val outputRef =

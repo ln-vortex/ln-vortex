@@ -6,6 +6,7 @@ import akka.io.Tcp
 import akka.util.ByteString
 import com.lnvortex.core.{VortexMessage, VortexMessageParser}
 import com.lnvortex.server
+import com.lnvortex.server.coordinator.VortexCoordinator
 import grizzled.slf4j.Logging
 import scodec.bits.ByteVector
 

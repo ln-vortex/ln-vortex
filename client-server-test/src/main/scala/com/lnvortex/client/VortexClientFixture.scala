@@ -1,16 +1,16 @@
 package com.lnvortex.client
 
 import akka.actor.ActorSystem
-import com.lnvortex.core._
-import com.typesafe.config._
-import org.bitcoins.core.currency._
+import com.lnvortex.core.VortexAppConfig
+import com.typesafe.config.{Config, ConfigFactory}
+import org.bitcoins.core.currency.Bitcoins
 import org.bitcoins.testkit.async.TestAsyncUtil
 import org.bitcoins.testkit.fixtures.BitcoinSFixture
 import org.bitcoins.testkit.lnd.LndRpcTestClient
 import org.bitcoins.testkit.rpc.CachedBitcoindV21
 import org.scalatest.FutureOutcome
 
-import java.nio.file._
+import java.nio.file.{Files, Path}
 
 /** A trait that is useful if you need Lnd fixtures for your test suite */
 trait VortexClientFixture extends BitcoinSFixture with CachedBitcoindV21 {

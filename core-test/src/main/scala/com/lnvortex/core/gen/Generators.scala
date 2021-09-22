@@ -1,6 +1,7 @@
 package com.lnvortex.core.gen
 
 import com.lnvortex.core._
+import org.bitcoins.core.protocol.transaction.OutputReference
 import org.bitcoins.testkitcore.gen._
 import org.scalacheck.Gen
 
@@ -43,9 +44,11 @@ object Generators {
 
   def inputReference: Gen[InputReference] = {
     for {
-      outputRef <- TransactionGenerators.outputReference
+      outpoint <- TransactionGenerators.outPoint
+      spk <- ScriptGenerators.p2wpkhSPKV0.map(_._1)
+      output <- TransactionGenerators.outputTo(spk)
       scriptWit <- WitnessGenerators.scriptWitness
-    } yield InputReference(outputRef, scriptWit)
+    } yield InputReference(OutputReference(outpoint, output), scriptWit)
   }
 
   def registerInputs: Gen[RegisterInputs] = {
