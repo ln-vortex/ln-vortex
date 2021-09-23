@@ -1,9 +1,8 @@
-package com.lnvortex.server
+package com.lnvortex.server.networking
 
 import akka.actor._
 import akka.event.LoggingReceive
 import akka.io.{IO, Tcp}
-import com.lnvortex.server
 import com.lnvortex.server.coordinator.VortexCoordinator
 import org.bitcoins.tor._
 
@@ -72,7 +71,7 @@ object VortexServer {
       vortexCoordinator: VortexCoordinator,
       bindAddress: InetSocketAddress,
       boundAddress: Option[Promise[InetSocketAddress]] = None,
-      dataHandlerFactory: server.ServerDataHandler.Factory): Props = Props(
+      dataHandlerFactory: ServerDataHandler.Factory): Props = Props(
     new VortexServer(vortexCoordinator,
                      bindAddress,
                      boundAddress,

@@ -1,8 +1,9 @@
-package com.lnvortex.client
+package com.lnvortex.client.networking
 
 import akka.actor._
 import akka.event.LoggingReceive
 import akka.io.{IO, Tcp}
+import com.lnvortex.client.VortexClient
 import org.bitcoins.tor.Socks5Connection.{Socks5Connect, Socks5Connected}
 import org.bitcoins.tor.{Socks5Connection, Socks5ProxyParams}
 

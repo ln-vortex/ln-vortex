@@ -5,7 +5,7 @@ import com.lnvortex.core.RoundStatus._
 import com.lnvortex.core._
 import com.lnvortex.server.config.VortexCoordinatorAppConfig
 import com.lnvortex.server.models._
-import com.lnvortex.server._
+import com.lnvortex.server.networking.VortexServer
 import grizzled.slf4j.Logging
 import org.bitcoins.commons.jsonmodels.bitcoind.RpcOpts.AddressType
 import org.bitcoins.core.currency._

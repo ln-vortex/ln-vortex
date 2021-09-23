@@ -1,4 +1,4 @@
-package com.lnvortex.server
+package com.lnvortex.server.coordinator
 
 import com.lnvortex.core.crypto.BlindSchnorrUtil
 import com.lnvortex.server.config.VortexCoordinatorAppConfig

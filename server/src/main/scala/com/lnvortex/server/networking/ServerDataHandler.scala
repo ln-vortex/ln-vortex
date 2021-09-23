@@ -1,4 +1,4 @@
-package com.lnvortex.server
+package com.lnvortex.server.networking
 
 import akka.actor._
 import akka.event.LoggingReceive

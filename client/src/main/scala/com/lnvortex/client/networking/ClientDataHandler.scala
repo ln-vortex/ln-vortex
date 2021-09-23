@@ -1,7 +1,8 @@
-package com.lnvortex.client
+package com.lnvortex.client.networking
 
 import akka.actor._
 import akka.event.LoggingReceive
+import com.lnvortex.client.VortexClient
 import com.lnvortex.core._
 import org.bitcoins.core.protocol.tlv._
 

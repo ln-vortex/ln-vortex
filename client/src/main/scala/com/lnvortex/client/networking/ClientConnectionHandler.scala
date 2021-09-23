@@ -1,23 +1,22 @@
-package com.lnvortex.server
+package com.lnvortex.client.networking
 
 import akka.actor._
 import akka.event.LoggingReceive
 import akka.io.Tcp
 import akka.util.ByteString
+import com.lnvortex.client.VortexClient
 import com.lnvortex.core.{VortexMessage, VortexMessageParser}
-import com.lnvortex.server
-import com.lnvortex.server.coordinator.VortexCoordinator
 import grizzled.slf4j.Logging
 import scodec.bits.ByteVector
 
-class ServerConnectionHandler(
-    coordinator: VortexCoordinator,
+class ClientConnectionHandler(
+    vortexClient: VortexClient,
     connection: ActorRef,
-    dataHandlerFactory: ServerDataHandler.Factory)
+    dataHandlerFactory: ClientDataHandler.Factory)
     extends Actor
     with ActorLogging {
 
-  private val handler = dataHandlerFactory(coordinator, context, self)
+  private val handler = dataHandlerFactory(vortexClient, context, self)
 
   override def preStart(): Unit = {
     context.watch(connection)
@@ -82,8 +81,8 @@ class ServerConnectionHandler(
         case None     => log.error(errorMessage)
       }
 
-      handler ! ServerConnectionHandler.WriteFailed(c.cause)
-    case ServerConnectionHandler.CloseConnection =>
+      handler ! ClientConnectionHandler.WriteFailed(c.cause)
+    case ClientConnectionHandler.CloseConnection =>
       connection ! Tcp.Close
     case _: Tcp.ConnectionClosed =>
       context.stop(self)
@@ -92,17 +91,17 @@ class ServerConnectionHandler(
   }
 }
 
-object ServerConnectionHandler extends Logging {
+object ClientConnectionHandler extends Logging {
 
   case object CloseConnection
   case class WriteFailed(cause: Option[Throwable])
   case object Ack extends Tcp.Event
 
   def props(
-      coordinator: VortexCoordinator,
+      vortexClient: VortexClient,
       connection: ActorRef,
-      dataHandlerFactory: server.ServerDataHandler.Factory): Props = {
+      dataHandlerFactory: ClientDataHandler.Factory): Props = {
     Props(
-      new ServerConnectionHandler(coordinator, connection, dataHandlerFactory))
+      new ClientConnectionHandler(vortexClient, connection, dataHandlerFactory))
   }
 }
