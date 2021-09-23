@@ -1,7 +1,7 @@
 package com.lnvortex.client
 
 import akka.actor.ActorSystem
-import com.lnvortex.core.VortexAppConfig
+import com.lnvortex.client.config.VortexAppConfig
 import com.typesafe.config.{Config, ConfigFactory}
 import org.bitcoins.core.currency.Bitcoins
 import org.bitcoins.testkit.async.TestAsyncUtil

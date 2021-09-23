@@ -30,8 +30,9 @@ class ServerDataHandler(
     case clientMessage: ClientVortexMessage =>
       logger.info(s"Received VortexMessage ${clientMessage.typeName}")
       val f: Future[Unit] = handleVortexMessage(clientMessage)
-      f.failed.foreach(err =>
-        logger.error(s"Failed to process vortexMessage=$clientMessage", err))
+      f.failed.foreach { err =>
+        logger.error(s"Failed to process vortexMessage=$clientMessage", err)
+      }
     case clientMessage: ServerVortexMessage =>
       logger.error(s"Received server message $clientMessage")
     case ServerConnectionHandler.WriteFailed(_) =>

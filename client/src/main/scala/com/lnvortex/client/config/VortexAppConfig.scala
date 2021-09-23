@@ -1,4 +1,4 @@
-package com.lnvortex.core
+package com.lnvortex.client.config
 
 import akka.actor.ActorSystem
 import com.typesafe.config.Config

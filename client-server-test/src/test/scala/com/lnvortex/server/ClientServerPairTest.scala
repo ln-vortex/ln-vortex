@@ -69,4 +69,27 @@ class ClientServerPairTest extends ClientServerPairFixture {
       assert(outputDbs.head.output == expectedOutput)
     }
   }
+
+  it must "sign the psbt" in { case (client, coordinator) =>
+    for {
+      _ <- client.askNonce()
+      _ <- coordinator.beginInputRegistration()
+      utxos <- client.listCoins()
+      _ <- client.registerCoins(utxos.map(_.outPointOpt.get))
+      _ <- TestAsyncUtil.awaitConditionF(() =>
+        coordinator.inputsDAO.findAll().map(_.size == utxos.size))
+      // wait until outputs are registered
+      _ <- TestAsyncUtil.awaitConditionF(
+        () => coordinator.outputsDAO.findAll().map(_.nonEmpty),
+        maxTries = 500)
+      // wait until we construct the unsigned tx
+      _ <- TestAsyncUtil.awaitConditionF(
+        () => coordinator.currentRound().map(_.psbtOpt.isDefined),
+        maxTries = 500)
+      // wait until the tx is signed
+      _ <- TestAsyncUtil.awaitConditionF(
+        () => coordinator.currentRound().map(_.transactionOpt.isDefined),
+        maxTries = 500)
+    } yield succeed
+  }
 }

@@ -2,7 +2,7 @@ package com.lnvortex.tests
 
 import akka.actor.ActorSystem
 import com.lnvortex.client.VortexClient
-import com.lnvortex.core.VortexAppConfig
+import com.lnvortex.client.config.VortexAppConfig
 import com.lnvortex.server.config.VortexCoordinatorAppConfig
 import com.lnvortex.server.coordinator.VortexCoordinator
 import com.typesafe.config.{Config, ConfigFactory}

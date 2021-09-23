@@ -293,7 +293,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
 
       registerInputs = RegisterInputs(Vector(inputRef), blind, change)
       blindSig <- coordinator.registerAlice(Sha256Digest.empty, registerInputs)
-      sig = BlindSchnorrUtil.unblindSignature(blindSig.blindOutputSig,
+      sig = BlindSchnorrUtil.unblindSignature(blindSig,
                                               coordinator.publicKey,
                                               aliceDb.nonce,
                                               tweaks,
@@ -353,7 +353,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
 
       registerInputs = RegisterInputs(Vector(inputRef), blind, change)
       blindSig <- coordinator.registerAlice(Sha256Digest.empty, registerInputs)
-      sig = BlindSchnorrUtil.unblindSignature(blindSig.blindOutputSig,
+      sig = BlindSchnorrUtil.unblindSignature(blindSig,
                                               coordinator.publicKey,
                                               aliceDb.nonce,
                                               tweaks,
@@ -404,7 +404,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
         registerInputs = RegisterInputs(Vector(inputRef), blind, change)
         blindSig <- coordinator.registerAlice(Sha256Digest.empty,
                                               registerInputs)
-        sig = BlindSchnorrUtil.unblindSignature(blindSig.blindOutputSig,
+        sig = BlindSchnorrUtil.unblindSignature(blindSig,
                                                 coordinator.publicKey,
                                                 aliceDb.nonce,
                                                 tweaks,

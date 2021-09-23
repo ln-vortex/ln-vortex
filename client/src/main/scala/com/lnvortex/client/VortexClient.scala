@@ -1,6 +1,7 @@
 package com.lnvortex.client
 
 import akka.actor.{ActorRef, ActorSystem}
+import com.lnvortex.client.config.VortexAppConfig
 import com.lnvortex.core._
 import com.lnvortex.core.crypto.BlindSchnorrUtil
 import com.lnvortex.core.crypto.BlindingTweaks.freshBlindingTweaks
