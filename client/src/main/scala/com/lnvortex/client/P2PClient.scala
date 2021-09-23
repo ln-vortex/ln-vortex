@@ -3,7 +3,6 @@ package com.lnvortex.client
 import akka.actor._
 import akka.event.LoggingReceive
 import akka.io.{IO, Tcp}
-import com.lnvortex.core.Peer
 import org.bitcoins.tor.Socks5Connection.{Socks5Connect, Socks5Connected}
 import org.bitcoins.tor.{Socks5Connection, Socks5ProxyParams}
 

@@ -1,4 +1,4 @@
-package com.lnvortex.core
+package com.lnvortex.client
 
 import org.bitcoins.tor.Socks5ProxyParams
 

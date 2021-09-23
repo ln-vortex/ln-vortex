@@ -48,6 +48,9 @@ object Deps {
     val grizzledSlf4j =
       "org.clapper" %% "grizzled-slf4j" % V.grizzledSlf4jV withSources () withJavadoc ()
 
+    val bitcoinsCore =
+      "org.bitcoin-s" %% "bitcoin-s-core" % V.bitcoinsV withSources () withJavadoc ()
+
     val bitcoinsKeyManager =
       "org.bitcoin-s" %% "bitcoin-s-key-manager" % V.bitcoinsV withSources () withJavadoc ()
 
@@ -102,6 +105,11 @@ object Deps {
                                javaFxWeb)
   }
 
+  val core: List[ModuleID] = List(
+    Compile.bitcoinsCore,
+    Compile.grizzledSlf4j
+  )
+
   val backend: List[ModuleID] = List(
     Compile.bitcoinsTor,
     Compile.bitcoinsLnd,
@@ -116,7 +124,7 @@ object Deps {
   val server: List[ModuleID] =
     List(Compile.bitcoinsKeyManager, Compile.bitcoinsFeeProvider) ++ backend
 
-  val coreTest: List[ModuleID] = List(Compile.bitcoinsTestkitCore) ++ backend
+  val coreTest: List[ModuleID] = List(Compile.bitcoinsTestkitCore) ++ core
 
   val clientServerTest: List[ModuleID] =
     List(Compile.bitcoinsTestkit) ++ backend

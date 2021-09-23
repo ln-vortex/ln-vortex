@@ -69,7 +69,7 @@ lazy val root = project
 lazy val core = project
   .in(file("core"))
   .settings(CommonSettings.settings: _*)
-  .settings(name := "core", libraryDependencies ++= Deps.backend)
+  .settings(name := "core", libraryDependencies ++= Deps.core)
 
 lazy val coreTest = project
   .in(file("core-test"))
