@@ -12,6 +12,7 @@ import org.bitcoins.commons.jsonmodels.lnd.UTXOResult
 import org.bitcoins.core.currency.Satoshis
 import org.bitcoins.core.number.UInt16
 import org.bitcoins.core.policy.Policy
+import org.bitcoins.core.protocol.ln.node.NodeId
 import org.bitcoins.core.protocol.script._
 import org.bitcoins.core.protocol.transaction._
 import org.bitcoins.core.psbt.PSBT
@@ -19,6 +20,7 @@ import org.bitcoins.core.util.{FutureUtil, StartStopAsync}
 import org.bitcoins.crypto._
 import org.bitcoins.lnd.rpc.LndRpcClient
 
+import java.net.InetSocketAddress
 import scala.concurrent.{Future, Promise}
 
 case class VortexClient(lndRpcClient: LndRpcClient)(implicit
@@ -33,6 +35,8 @@ case class VortexClient(lndRpcClient: LndRpcClient)(implicit
   private[lnvortex] var roundDetails: RoundDetails[_, _] = NoDetails
 
   private val knownVersions = Vector(UInt16.zero)
+
+  private val channelOpener = LndChannelOpener(lndRpcClient)
 
   private[client] def setRound(adv: MixDetails): Unit = {
     if (knownVersions.contains(adv.version)) {
@@ -111,7 +115,18 @@ case class VortexClient(lndRpcClient: LndRpcClient)(implicit
     }
   }
 
-  def registerCoins(outpoints: Vector[TransactionOutPoint]): Future[Unit] = {
+  def registerCoins(
+      outpoints: Vector[TransactionOutPoint],
+      nodeUri: NodeUri): Future[Unit] = {
+    val socketAddress =
+      InetSocketAddress.createUnresolved(nodeUri.host, nodeUri.port)
+    registerCoins(outpoints, nodeUri.nodeId, Some(socketAddress))
+  }
+
+  def registerCoins(
+      outpoints: Vector[TransactionOutPoint],
+      nodeId: NodeId,
+      peerAddrOpt: Option[InetSocketAddress]): Future[Unit] = {
     roundDetails match {
       case state @ (NoDetails | _: KnownRound | _: InitializedRound[_]) =>
         sys.error(s"At invalid state $state, cannot register coins")
@@ -140,10 +155,12 @@ case class VortexClient(lndRpcClient: LndRpcClient)(implicit
           changeAddr <- lndRpcClient.getNewAddress
           changeOutput = TransactionOutput(changeAmt, changeAddr.scriptPubKey)
 
-          // todo negotiate channel, get output
-          raw = P2PKHScriptPubKey(ECPublicKey.freshPublicKey)
-          spk = P2WSHWitnessSPKV0(raw)
-          mixOutput = TransactionOutput(receivedNonce.round.amount, spk)
+          channelDetails <- channelOpener.initPSBTChannelOpen(
+            nodeId = nodeId,
+            peerAddrOpt = peerAddrOpt,
+            fundingAmount = receivedNonce.round.amount,
+            privateChannel = false)
+          mixOutput = channelDetails.output
 
           hashedOutput = BobMessage.calculateChallenge(mixOutput, round.roundId)
 
@@ -155,7 +172,11 @@ case class VortexClient(lndRpcClient: LndRpcClient)(implicit
             blindingTweaks = tweaks,
             message = hashedOutput)
         } yield {
-          val details = InitDetails(outputRefs, changeOutput, mixOutput, tweaks)
+          val details = InitDetails(inputs = outputRefs,
+                                    changeOutput = changeOutput,
+                                    chanId = channelDetails.chanId,
+                                    mixOutput = mixOutput,
+                                    tweaks = tweaks)
           roundDetails = receivedNonce.nextStage(details)
 
           handler ! RegisterInputs(inputRefs, challenge, changeOutput)
@@ -222,17 +243,26 @@ case class VortexClient(lndRpcClient: LndRpcClient)(implicit
               }
           }
 
-          val withInputInfo = inputs.foldLeft(unsigned) { case (psbt, outRef) =>
-            val idx = txOutpoints.indexOf(outRef.outPoint)
-            psbt.addWitnessUTXOToInput(outRef.output, idx)
+          val psbtWithInputInfo = inputs.foldLeft(unsigned) {
+            case (psbt, outRef) =>
+              val idx = txOutpoints.indexOf(outRef.outPoint)
+              psbt.addWitnessUTXOToInput(outRef.output, idx)
           }
 
-          Future.sequence(sigFs).map { sigs =>
-            sigs.foldLeft(withInputInfo) {
-              case (psbt, (scriptSig, witness, idx)) =>
-                psbt.addFinalizedScriptWitnessToInput(scriptSig, witness, idx)
+          // tell peer about funding psbt
+          channelOpener
+            .fundPendingChannel(state.initDetails.chanId, psbtWithInputInfo)
+            .flatMap { _ =>
+              // sign psbt
+              Future.sequence(sigFs).map { sigs =>
+                sigs.foldLeft(psbtWithInputInfo) {
+                  case (psbt, (scriptSig, witness, idx)) =>
+                    psbt.addFinalizedScriptWitnessToInput(scriptSig,
+                                                          witness,
+                                                          idx)
+                }
+              }
             }
-          }
         } else {
           Future.failed(
             new RuntimeException(
@@ -246,13 +276,15 @@ case class VortexClient(lndRpcClient: LndRpcClient)(implicit
     roundDetails match {
       case state @ (NoDetails | _: KnownRound | _: ReceivedNonce |
           _: InputsRegistered | _: MixOutputRegistered) =>
-        sys.error(s"At invalid state $state, cannot processAliceInitResponse")
+        sys.error(s"At invalid state $state, cannot completeRound")
       case state: PSBTSigned =>
-        roundDetails = state.nextStage()
-        println(signedTx)
-        // todo publish tx to peer
-
-        handlerP.future.map(_ ! AskMixDetails)
+        for {
+          _ <- lndRpcClient.publishTransaction(signedTx)
+          handler <- handlerP.future
+        } yield {
+          roundDetails = state.nextStage()
+          handler ! AskMixDetails(config.network)
+        }
     }
   }
 }

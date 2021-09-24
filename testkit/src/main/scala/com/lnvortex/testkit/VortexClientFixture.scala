@@ -1,6 +1,7 @@
-package com.lnvortex.client
+package com.lnvortex.testkit
 
 import akka.actor.ActorSystem
+import com.lnvortex.client.VortexClient
 import com.lnvortex.client.config.VortexAppConfig
 import com.typesafe.config.{Config, ConfigFactory}
 import org.bitcoins.core.currency.Bitcoins
@@ -8,13 +9,16 @@ import org.bitcoins.testkit.async.TestAsyncUtil
 import org.bitcoins.testkit.fixtures.BitcoinSFixture
 import org.bitcoins.testkit.lnd.LndRpcTestClient
 import org.bitcoins.testkit.rpc.CachedBitcoindV21
+import org.bitcoins.testkit.util.FileUtil
 import org.scalatest.FutureOutcome
 
-import java.nio.file.{Files, Path}
+import java.io.File
+import java.nio.file.Path
 
 trait VortexClientFixture extends BitcoinSFixture with CachedBitcoindV21 {
 
-  def tmpDir(): Path = Files.createTempDirectory("ln-vortex-")
+  def tmpDir(): Path = new File(
+    s"/tmp/ln-vortex-test/${FileUtil.randomDirName}/").toPath
 
   def getTestConfig(config: Config*)(implicit
       system: ActorSystem): VortexAppConfig = {

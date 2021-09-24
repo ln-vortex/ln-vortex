@@ -57,8 +57,9 @@ object Deps {
     val bitcoinsTor =
       "org.bitcoin-s" %% "bitcoin-s-tor" % V.bitcoinsV withSources () withJavadoc ()
 
+    // todo update when lnd v0.14.0-beta is in bitcoin-s
     val bitcoinsLnd =
-      "org.bitcoin-s" %% "bitcoin-s-lnd-rpc" % V.bitcoinsV withSources () withJavadoc ()
+      "org.bitcoin-s" %% "bitcoin-s-lnd-rpc" % "1.7.0-177-5494c869-SNAPSHOT" withSources () withJavadoc ()
 
     val bitcoinsTestkitCore =
       "org.bitcoin-s" %% "bitcoin-s-testkit-core" % V.bitcoinsV withSources () withJavadoc ()

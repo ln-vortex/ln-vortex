@@ -1,4 +1,4 @@
-package com.lnvortex.tests
+package com.lnvortex.testkit
 
 import akka.actor.ActorSystem
 import com.lnvortex.client.VortexClient
@@ -6,21 +6,23 @@ import com.lnvortex.client.config.VortexAppConfig
 import com.lnvortex.server.config.VortexCoordinatorAppConfig
 import com.lnvortex.server.coordinator.VortexCoordinator
 import com.typesafe.config.{Config, ConfigFactory}
-import org.bitcoins.core.currency._
+import org.bitcoins.lnd.rpc.LndRpcClient
 import org.bitcoins.rpc.util.RpcUtil
 import org.bitcoins.testkit.async.TestAsyncUtil
 import org.bitcoins.testkit.fixtures.BitcoinSFixture
-import org.bitcoins.testkit.lnd.LndRpcTestClient
+import org.bitcoins.testkit.lnd.LndRpcTestUtil
 import org.bitcoins.testkit.rpc.CachedBitcoindV21
-import org.scalatest._
+import org.bitcoins.testkit.util.FileUtil
+import org.scalatest.FutureOutcome
 
-import java.nio.file.{Files, Path}
-import scala.concurrent.duration.DurationInt
+import java.io.File
+import java.nio.file.Path
 import scala.reflect.io.Directory
 
 trait ClientServerPairFixture extends BitcoinSFixture with CachedBitcoindV21 {
 
-  def tmpDir(): Path = Files.createTempDirectory("ln-vortex-")
+  def tmpDir(): Path = new File(
+    s"/tmp/ln-vortex-test/${FileUtil.randomDirName}/").toPath
 
   def getTestConfig(config: Config*)(implicit
       system: ActorSystem): (VortexAppConfig, VortexCoordinatorAppConfig) = {
@@ -47,54 +49,32 @@ trait ClientServerPairFixture extends BitcoinSFixture with CachedBitcoindV21 {
     (clientConf, serverConf)
   }
 
-  override type FixtureParam = (VortexClient, VortexCoordinator)
+  override type FixtureParam = (VortexClient, VortexCoordinator, LndRpcClient)
 
   override def withFixture(test: OneArgAsyncTest): FutureOutcome = {
-    makeDependentFixture[(VortexClient, VortexCoordinator)](
+    makeDependentFixture[(VortexClient, VortexCoordinator, LndRpcClient)](
       () => {
         implicit val (clientConf, serverConf) = getTestConfig()
+
         for {
           _ <- serverConf.start()
           bitcoind <- cachedBitcoindWithFundsF
           coordinator = VortexCoordinator(bitcoind)
           _ <- coordinator.start()
 
-          lndClient = LndRpcTestClient.fromSbtDownload(Some(bitcoind))
-          _ <- clientConf.start()
-          lnd <- lndClient.start()
-
-          addrA <- lnd.getNewAddress
-          addrB <- lnd.getNewAddress
-          addrC <- lnd.getNewAddress
-
-          _ <- bitcoind.sendMany(
-            Map(addrA -> Bitcoins(1),
-                addrB -> Bitcoins(2),
-                addrC -> Bitcoins(3)))
-          _ <- bitcoind.getNewAddress.flatMap(bitcoind.generateToAddress(6, _))
-
-          height <- bitcoind.getBlockCount
-
-          // Await synced
-          _ <- TestAsyncUtil.awaitConditionF(() =>
-            lnd.getInfo.map(_.syncedToChain))
-          _ <- TestAsyncUtil.awaitConditionF(() =>
-            lnd.getInfo.map(_.blockHeight == height))
-          // Await funded
-          _ <- TestAsyncUtil.awaitConditionF(() =>
-            lnd.walletBalance().map(_.balance == Bitcoins(6)))
-
-          // Await utxos
-          _ <- TestAsyncUtil.awaitConditionF(() =>
-            lnd.listUnspent.map(_.nonEmpty))
-
+          (lnd, peerLnd) <- LndTestUtils.createNodePair(bitcoind)
           client = VortexClient(lnd)
           _ <- client.start()
-          _ <- TestAsyncUtil.nonBlockingSleep(100.milliseconds)
-        } yield (client, coordinator)
+
+          _ <- LndRpcTestUtil.connectLNNodes(lnd, peerLnd)
+
+          // wait for it to receive mix advertisement
+          _ <- TestAsyncUtil.awaitCondition(() => client.roundDetails.order > 0)
+        } yield (client, coordinator, peerLnd)
       },
-      { case (client, coordinator) =>
+      { case (client, coordinator, peerLnd) =>
         for {
+          _ <- peerLnd.stop()
           _ <- client.lndRpcClient.stop()
           _ <- client.stop()
           _ <- client.config.stop()

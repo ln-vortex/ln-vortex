@@ -88,7 +88,7 @@ lazy val clientTest = project
   .settings(CommonSettings.testSettings: _*)
   .settings(name := "client-test",
             libraryDependencies ++= Deps.clientServerTest)
-  .dependsOn(client, coreTest)
+  .dependsOn(client, testkit)
 
 lazy val server = project
   .in(file("server"))
@@ -101,14 +101,20 @@ lazy val serverTest = project
   .settings(CommonSettings.testSettings: _*)
   .settings(name := "server-test",
             libraryDependencies ++= Deps.clientServerTest)
-  .dependsOn(server, coreTest)
+  .dependsOn(server, testkit)
 
 lazy val clientServerTest = project
   .in(file("client-server-test"))
   .settings(CommonSettings.testSettings: _*)
   .settings(name := "client-server-test",
             libraryDependencies ++= Deps.clientServerTest)
-  .dependsOn(client, server, coreTest)
+  .dependsOn(client, server, testkit)
+
+lazy val testkit = project
+  .in(file("testkit"))
+  .settings(CommonSettings.testSettings: _*)
+  .settings(name := "testkit", libraryDependencies ++= Deps.clientServerTest)
+  .dependsOn(core, client, server, coreTest)
 
 lazy val gui = project
   .in(file("gui"))

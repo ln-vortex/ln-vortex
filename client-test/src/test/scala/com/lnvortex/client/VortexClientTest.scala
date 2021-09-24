@@ -2,6 +2,7 @@ package com.lnvortex.client
 
 import com.lnvortex.core._
 import com.lnvortex.core.crypto.BlindingTweaks
+import com.lnvortex.testkit.VortexClientFixture
 import org.bitcoins.core.currency._
 import org.bitcoins.core.number._
 import org.bitcoins.core.protocol.script._
@@ -49,6 +50,7 @@ class VortexClientTest extends VortexClientFixture {
 
       testDetails = InitDetails(inputs = refs,
                                 changeOutput = change,
+                                chanId = Sha256Digest.empty.bytes,
                                 mixOutput = mix,
                                 tweaks = dummyTweaks)
       testState = MixOutputRegistered(dummyAdvertisement, nonce, testDetails)
@@ -83,6 +85,7 @@ class VortexClientTest extends VortexClientFixture {
 
       testDetails = InitDetails(inputs = refs,
                                 changeOutput = change,
+                                chanId = Sha256Digest.empty.bytes,
                                 mixOutput = mix,
                                 tweaks = dummyTweaks)
       testState = MixOutputRegistered(dummyAdvertisement, nonce, testDetails)
@@ -112,6 +115,7 @@ class VortexClientTest extends VortexClientFixture {
 
         testDetails = InitDetails(inputs = refs,
                                   changeOutput = change,
+                                  chanId = Sha256Digest.empty.bytes,
                                   mixOutput = mix,
                                   tweaks = dummyTweaks)
         testState = MixOutputRegistered(dummyAdvertisement, nonce, testDetails)
@@ -141,6 +145,7 @@ class VortexClientTest extends VortexClientFixture {
 
       testDetails = InitDetails(inputs = refs,
                                 changeOutput = change,
+                                chanId = Sha256Digest.empty.bytes,
                                 mixOutput = mix,
                                 tweaks = dummyTweaks)
       testState = MixOutputRegistered(dummyAdvertisement, nonce, testDetails)

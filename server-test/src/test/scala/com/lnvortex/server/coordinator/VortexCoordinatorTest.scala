@@ -5,8 +5,8 @@ import com.lnvortex.core._
 import com.lnvortex.core.crypto.BlindSchnorrUtil
 import com.lnvortex.core.crypto.BlindingTweaks.freshBlindingTweaks
 import com.lnvortex.core.gen.Generators
-import com.lnvortex.server.VortexCoordinatorFixture
 import com.lnvortex.server.models.{RegisteredInputDb, RegisteredOutputDb}
+import com.lnvortex.testkit.VortexCoordinatorFixture
 import org.bitcoins.commons.jsonmodels.bitcoind.RpcOpts.AddressType
 import org.bitcoins.core.currency._
 import org.bitcoins.core.number.UInt32

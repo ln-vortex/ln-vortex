@@ -100,6 +100,9 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
     Promise[PSBT]] =
     mutable.Map.empty
 
+  private[coordinator] var completedTxP: Promise[(Transaction, Int)] =
+    Promise[(Transaction, Int)]()
+
   def newRound(): Future[RoundDb] = {
     val feeRateF = updateFeeRate()
 
@@ -124,19 +127,45 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       )
       created <- roundDAO.create(roundDb)
     } yield {
+      // switch to input registration at correct time
       beginInputRegistrationCancellable = Some(
         system.scheduler.scheduleOnce(config.mixInterval) {
           beginInputRegistration()
           ()
         })
+
       // todo make timeout for alices not registering
+      // handle sending psbt when all outputs registered
       outputsRegisteredP.future.flatMap(_ => sendUnsignedPSBT())
+
+      // todo handle if alices don't sign
+      // handle making new round
+      completedTxP.future.flatMap { case (tx, numAlices) =>
+        for {
+          roundDb <- currentRound()
+          profit = Satoshis(numAlices) * roundDb.mixFee
+          updatedRoundDb = roundDb.copy(status = RoundStatus.Signed,
+                                        transactionOpt = Some(tx),
+                                        profitOpt = Some(profit))
+
+          _ <- roundDAO.update(updatedRoundDb)
+          _ <- bitcoind.sendRawTransaction(tx)
+
+          _ <- newRound()
+        } yield ()
+      }
+
+      // return round
       created
     }
   }
 
   def currentRound(): Future[RoundDb] = {
-    roundDAO.read(currentRoundId).map {
+    getRound(currentRoundId)
+  }
+
+  def getRound(roundId: DoubleSha256Digest): Future[RoundDb] = {
+    roundDAO.read(roundId).map {
       case Some(db) => db
       case None =>
         throw new RuntimeException(
@@ -410,7 +439,6 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
 
               // mark successful
               signedPMap(peerId).success(psbt)
-
               val signedFs = signedPMap.values.map(_.future)
 
               val signedT = Try {
@@ -422,18 +450,10 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
                 combined.extractTransactionAndValidate
               }.flatten
 
-              for {
-                tx <- Future.fromTry(signedT)
+              // make promise complete
+              completedTxP.tryComplete(signedT.map((_, signedFs.size)))
 
-                profit = Satoshis(signedFs.size) * roundDb.mixFee
-                updatedRoundDb = roundDb.copy(status = RoundStatus.Signed,
-                                              transactionOpt = Some(tx),
-                                              profitOpt = Some(profit))
-                _ <- roundDAO.update(updatedRoundDb)
-
-                // todo only one instance should call this
-                _ <- newRound()
-              } yield tx
+              Future.fromTry(signedT)
             } else {
               val bannedUntil = TimeUtil.now.plusSeconds(86400) // 1 day
 
