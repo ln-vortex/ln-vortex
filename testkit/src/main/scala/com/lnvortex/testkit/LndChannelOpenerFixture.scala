@@ -12,9 +12,6 @@ import java.nio.file.Path
 
 trait LndChannelOpenerFixture extends BitcoinSFixture with CachedBitcoindV21 {
 
-  def tmpDir(): Path = new File(
-    s"/tmp/ln-vortex-test/${FileUtil.randomDirName}/").toPath
-
   override type FixtureParam =
     (BitcoindV21RpcClient, LndRpcClient, LndRpcClient)
 

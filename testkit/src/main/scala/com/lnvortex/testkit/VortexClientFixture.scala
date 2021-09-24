@@ -1,45 +1,23 @@
 package com.lnvortex.testkit
 
-import akka.actor.ActorSystem
 import com.lnvortex.client.VortexClient
 import com.lnvortex.client.config.VortexAppConfig
-import com.typesafe.config.{Config, ConfigFactory}
+import com.lnvortex.testkit.LnVortexTestUtils.getTestConfigs
 import org.bitcoins.core.currency.Bitcoins
 import org.bitcoins.testkit.async.TestAsyncUtil
 import org.bitcoins.testkit.fixtures.BitcoinSFixture
 import org.bitcoins.testkit.lnd.LndRpcTestClient
 import org.bitcoins.testkit.rpc.CachedBitcoindV21
-import org.bitcoins.testkit.util.FileUtil
 import org.scalatest.FutureOutcome
 
-import java.io.File
-import java.nio.file.Path
-
 trait VortexClientFixture extends BitcoinSFixture with CachedBitcoindV21 {
-
-  def tmpDir(): Path = new File(
-    s"/tmp/ln-vortex-test/${FileUtil.randomDirName}/").toPath
-
-  def getTestConfig(config: Config*)(implicit
-      system: ActorSystem): VortexAppConfig = {
-    val overrideConf = ConfigFactory.parseString {
-      s"""
-         |bitcoin-s {
-         |  proxy.enabled = true
-         |  tor.enabled = true
-         |  tor.use-random-ports = false
-         |}
-      """.stripMargin
-    }
-    VortexAppConfig(tmpDir(), overrideConf +: config: _*)
-  }
 
   override type FixtureParam = VortexClient
 
   override def withFixture(test: OneArgAsyncTest): FutureOutcome = {
     makeDependentFixture[VortexClient](
       () => {
-        implicit val conf: VortexAppConfig = getTestConfig()
+        implicit val conf: VortexAppConfig = getTestConfigs()._1
         for {
           bitcoind <- cachedBitcoindWithFundsF
 
