@@ -104,7 +104,11 @@ case class VortexClient(lndRpcClient: LndRpcClient)(implicit
           _ = handler ! AskNonce(round.roundId)
           _ <- AsyncUtil.awaitCondition(() =>
             getNonceOpt(roundDetails).isDefined)
-        } yield getNonceOpt(roundDetails).get
+        } yield {
+          val nonce = getNonceOpt(roundDetails).get
+          logger.info(s"Got nonce from coordinator $nonce")
+          nonce
+        }
       case _: ReceivedNonce | NoDetails | _: InitializedRound =>
         Future.failed(new RuntimeException("In incorrect state"))
     }
