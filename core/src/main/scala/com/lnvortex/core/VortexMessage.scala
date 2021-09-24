@@ -59,7 +59,7 @@ object VortexMessage extends Factory[VortexMessage] with Logging {
     allFactories.find(_.tpe == tpe) match {
       case Some(fac) => fac.fromTLVValue(value)
       case None =>
-        logger.info(
+        logger.warn(
           s"Unknown $typeName type got $tpe (${TLV.getTypeName(tpe)})")
 
         UnknownVortexMessage(tpe, value)

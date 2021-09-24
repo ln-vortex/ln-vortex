@@ -13,6 +13,7 @@ case class AliceDb(
     chain: HDChainType,
     nonceIndex: Int,
     nonce: SchnorrNonce,
+    numInputs: Int,
     blindedOutputOpt: Option[FieldElement],
     changeOutputOpt: Option[TransactionOutput],
     blindOutputSigOpt: Option[FieldElement]
@@ -29,10 +30,12 @@ case class AliceDb(
   }
 
   def setOutputValues(
+      numInputs: Int,
       blindedOutput: FieldElement,
       changeOutput: TransactionOutput,
       blindOutputSig: FieldElement): AliceDb = {
-    copy(blindedOutputOpt = Some(blindedOutput),
+    copy(numInputs = numInputs,
+         blindedOutputOpt = Some(blindedOutput),
          changeOutputOpt = Some(changeOutput),
          blindOutputSigOpt = Some(blindOutputSig))
   }
@@ -59,6 +62,7 @@ object AliceDbs {
       chain = HDChainType.fromInt(chain.index),
       nonceIndex = address.index,
       nonce = nonce,
+      numInputs = 0,
       blindedOutputOpt = None,
       changeOutputOpt = None,
       blindOutputSigOpt = None

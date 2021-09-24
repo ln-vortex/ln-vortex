@@ -91,6 +91,8 @@ case class AliceDAO()(implicit
 
     def nonce: Rep[SchnorrNonce] = column("nonce")
 
+    def numInputs: Rep[Int] = column("num_inputs")
+
     def blindedOutputOpt: Rep[Option[FieldElement]] = column("blinded_output")
 
     def changeOutputOpt: Rep[Option[TransactionOutput]] = column(
@@ -107,6 +109,7 @@ case class AliceDAO()(implicit
        chain,
        nonceIndex,
        nonce,
+       numInputs,
        blindedOutputOpt,
        changeOutputOpt,
        blindOutputSigOpt).<>(AliceDb.tupled, AliceDb.unapply)

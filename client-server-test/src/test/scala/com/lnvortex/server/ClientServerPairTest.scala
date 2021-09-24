@@ -1,5 +1,6 @@
 package com.lnvortex.server
 
+import com.lnvortex.client.RoundDetails.getInitDetailsOpt
 import com.lnvortex.client._
 import com.lnvortex.testkit.ClientServerPairFixture
 import org.bitcoins.core.number.UInt64
@@ -9,8 +10,8 @@ class ClientServerPairTest extends ClientServerPairFixture {
 
   it must "get the correct round details" in { case (client, coordinator, _) =>
     coordinator.currentRound().map { roundDb =>
-      client.roundDetails match {
-        case NoDetails | _: ReceivedNonce | _: InitializedRound[_] =>
+      client.getCurrentRoundDetails match {
+        case NoDetails | _: ReceivedNonce | _: InitializedRound =>
           fail("Invalid client round state")
         case KnownRound(round) =>
           assert(round.roundId == roundDb.roundId)
@@ -67,10 +68,8 @@ class ClientServerPairTest extends ClientServerPairFixture {
         outputDbs <- coordinator.outputsDAO.findAll()
       } yield {
         val expectedOutput =
-          client.roundDetails
-            .asInstanceOf[MixOutputRegistered]
-            .initDetails
-            .mixOutput
+          getInitDetailsOpt(client.getCurrentRoundDetails).get.mixOutput
+
         assert(outputDbs.size == 1)
         assert(outputDbs.head.output == expectedOutput)
       }
@@ -80,7 +79,8 @@ class ClientServerPairTest extends ClientServerPairFixture {
     for {
       nodeId <- peerLnd.nodeId
       _ <- client.askNonce()
-      roundId <- coordinator.currentRound().map(_.roundId)
+      roundId = coordinator.getCurrentRoundId
+
       _ <- coordinator.beginInputRegistration()
       // don't select all coins
       utxos <- client.listCoins().map(_.tail)
@@ -108,7 +108,8 @@ class ClientServerPairTest extends ClientServerPairFixture {
     for {
       nodeId <- peerLnd.nodeId
       _ <- client.askNonce()
-      roundId <- coordinator.currentRound().map(_.roundId)
+      roundId = coordinator.getCurrentRoundId
+
       _ <- coordinator.beginInputRegistration()
       // don't select all coins
       utxos <- client.listCoins().map(_.tail)
@@ -124,10 +125,11 @@ class ClientServerPairTest extends ClientServerPairFixture {
       _ <- TestAsyncUtil.awaitConditionF(
         () => coordinator.getRound(roundId).map(_.psbtOpt.isDefined),
         maxTries = 500)
-
-      txId <- coordinator
-        .getRound(roundId)
-        .map(_.psbtOpt.get.transaction.txIdBE)
+      // wait until the tx is signed
+      // use getRound because we could start the new round
+      _ <- TestAsyncUtil.awaitConditionF(
+        () => coordinator.getRound(roundId).map(_.transactionOpt.isDefined),
+        maxTries = 500)
 
       // Mine some blocks
       _ <- coordinator.bitcoind.getNewAddress.flatMap(
@@ -137,6 +139,8 @@ class ClientServerPairTest extends ClientServerPairFixture {
       _ <- TestAsyncUtil.awaitConditionF(
         () => peerLnd.listChannels().map(_.nonEmpty),
         maxTries = 500)
-    } yield succeed
+
+      roundDbs <- coordinator.roundDAO.findAll()
+    } yield assert(roundDbs.size == 2)
   }
 }

@@ -5,7 +5,6 @@ import akka.event.LoggingReceive
 import com.lnvortex.core._
 import com.lnvortex.server.coordinator.VortexCoordinator
 import grizzled.slf4j.Logging
-import org.bitcoins.core.protocol.tlv._
 import org.bitcoins.core.util.TimeUtil
 import org.bitcoins.crypto._
 
@@ -28,7 +27,7 @@ class ServerDataHandler(
 
   override def receive: Receive = LoggingReceive {
     case clientMessage: ClientVortexMessage =>
-      logger.info(s"Received VortexMessage ${clientMessage.typeName}")
+      logger.debug(s"Received VortexMessage ${clientMessage.typeName}")
       val f: Future[Unit] = handleVortexMessage(clientMessage)
       f.failed.foreach { err =>
         logger.error(s"Failed to process vortexMessage=$clientMessage", err)
@@ -62,7 +61,7 @@ class ServerDataHandler(
           blindSig <- coordinator.registerAlice(id, inputs)
         } yield {
           val timeSinceInputReg =
-            TimeUtil.currentEpochSecond - coordinator.inputRegStartTime
+            TimeUtil.currentEpochSecond - coordinator.getInputRegStartTime
           val time =
             coordinator.config.inputRegistrationTime.toSeconds - timeSinceInputReg
           val timeAbs = Math.max(0, time)
@@ -79,7 +78,7 @@ class ServerDataHandler(
       case bob: BobMessage =>
         coordinator.verifyAndRegisterBob(bob).map(_ => ())
       case SignedPsbtMessage(psbt) =>
-        coordinator.registerPSBTSignature(id, psbt).map { signedTx =>
+        coordinator.registerPSBTSignatures(id, psbt).map { signedTx =>
           connectionHandler ! SignedTxMessage(signedTx)
         }
     }
@@ -89,10 +88,6 @@ class ServerDataHandler(
 object ServerDataHandler {
 
   type Factory = (VortexCoordinator, ActorContext, ActorRef) => ActorRef
-
-  sealed trait Command
-  case class Received(tlv: TLV) extends Command
-  case class Send(tlv: TLV) extends Command
 
   def defaultFactory(
       vortexClient: VortexCoordinator,

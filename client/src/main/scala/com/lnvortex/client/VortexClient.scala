@@ -1,6 +1,7 @@
 package com.lnvortex.client
 
 import akka.actor.{ActorRef, ActorSystem}
+import com.lnvortex.client.RoundDetails.getNonceOpt
 import com.lnvortex.client.config.VortexAppConfig
 import com.lnvortex.client.networking.{P2PClient, Peer}
 import com.lnvortex.core._
@@ -30,9 +31,16 @@ case class VortexClient(lndRpcClient: LndRpcClient)(implicit
     with Logging {
   import system.dispatcher
 
-  private val handlerP = Promise[ActorRef]()
+  private var handlerP = Promise[ActorRef]()
 
-  private[lnvortex] var roundDetails: RoundDetails[_, _] = NoDetails
+  private var roundDetails: RoundDetails = NoDetails
+
+  private[client] def setRoundDetails(details: RoundDetails): Unit = {
+    roundDetails = details
+  }
+
+  private[lnvortex] def getCurrentRoundDetails: RoundDetails =
+    roundDetails
 
   private val knownVersions = Vector(UInt16.zero)
 
@@ -50,17 +58,23 @@ case class VortexClient(lndRpcClient: LndRpcClient)(implicit
   lazy val peer: Peer = Peer(socket = config.coordinatorAddress,
                              socks5ProxyParams = config.socks5ProxyParams)
 
-  override def start(): Future[Unit] = {
-    for {
-      _ <- P2PClient.connect(peer, this, Some(handlerP))
-      handler <- handlerP.future
-    } yield handler ! AskMixDetails(config.network)
-  }
+  override def start(): Future[Unit] = getNewRound
 
   override def stop(): Future[Unit] = {
     handlerP.future.map { handler =>
       system.stop(handler)
     }
+  }
+
+  private def getNewRound: Future[Unit] = {
+    logger.info("Getting new round from coordinator")
+
+    roundDetails = NoDetails
+    handlerP = Promise[ActorRef]()
+    for {
+      _ <- P2PClient.connect(peer, this, Some(handlerP))
+      handler <- handlerP.future
+    } yield handler ! AskMixDetails(config.network)
   }
 
   def listCoins(): Future[Vector[UTXOResult]] = {
@@ -70,22 +84,28 @@ case class VortexClient(lndRpcClient: LndRpcClient)(implicit
   def getOutputReferences(outpoints: Vector[TransactionOutPoint]): Future[
     Vector[OutputReference]] = {
     lndRpcClient.listUnspent.map { all =>
-      all.filter(t => outpoints.contains(t.outPointOpt.get)).map { utxoRes =>
-        val output = TransactionOutput(utxoRes.amount, utxoRes.spk)
-        OutputReference(utxoRes.outPointOpt.get, output)
-      }
+      val outRefs =
+        all.filter(t => outpoints.contains(t.outPointOpt.get)).map { utxoRes =>
+          val output = TransactionOutput(utxoRes.amount, utxoRes.spk)
+          OutputReference(utxoRes.outPointOpt.get, output)
+        }
+      require(outRefs.size == outpoints.size,
+              "Did not find all output references")
+      outRefs
     }
   }
 
   def askNonce(): Future[SchnorrNonce] = {
+    logger.info("Asking nonce from coordinator")
     roundDetails match {
       case KnownRound(round) =>
         for {
           handler <- handlerP.future
           _ = handler ! AskNonce(round.roundId)
-          _ <- AsyncUtil.awaitCondition(() => roundDetails.nonceOpt.isDefined)
-        } yield roundDetails.nonceOpt.get
-      case _: ReceivedNonce | NoDetails | _: InitializedRound[_] =>
+          _ <- AsyncUtil.awaitCondition(() =>
+            getNonceOpt(roundDetails).isDefined)
+        } yield getNonceOpt(roundDetails).get
+      case _: ReceivedNonce | NoDetails | _: InitializedRound =>
         Future.failed(new RuntimeException("In incorrect state"))
     }
   }
@@ -106,10 +126,10 @@ case class VortexClient(lndRpcClient: LndRpcClient)(implicit
     } yield scriptWit
   }
 
-  private[client] def registerNonce(nonce: SchnorrNonce): Unit = {
+  private[client] def storeNonce(nonce: SchnorrNonce): Unit = {
     roundDetails match {
-      case state @ (NoDetails | _: ReceivedNonce | _: InitializedRound[_]) =>
-        throw new RuntimeException(s"Cannot register nonce at state $state")
+      case state @ (NoDetails | _: ReceivedNonce | _: InitializedRound) =>
+        throw new IllegalStateException(s"Cannot store nonce at state $state")
       case details: KnownRound =>
         roundDetails = details.nextStage(nonce)
     }
@@ -127,9 +147,13 @@ case class VortexClient(lndRpcClient: LndRpcClient)(implicit
       outpoints: Vector[TransactionOutPoint],
       nodeId: NodeId,
       peerAddrOpt: Option[InetSocketAddress]): Future[Unit] = {
+    logger.info(
+      s"Registering ${outpoints.size} coins to open a channel to $nodeId")
     roundDetails match {
-      case state @ (NoDetails | _: KnownRound | _: InitializedRound[_]) =>
-        sys.error(s"At invalid state $state, cannot register coins")
+      case state @ (NoDetails | _: KnownRound | _: InitializedRound) =>
+        Future.failed(
+          new IllegalStateException(
+            s"At invalid state $state, cannot register coins"))
       case receivedNonce: ReceivedNonce =>
         val round = receivedNonce.round
         for {
@@ -144,7 +168,7 @@ case class VortexClient(lndRpcClient: LndRpcClient)(implicit
 
           _ = require(
             changeAmt > Policy.dustThreshold,
-            s"Not enough coins selected, need ${changeAmt - Policy.dustThreshold} more")
+            s"Not enough coins selected, need ${changeAmt - Policy.dustThreshold} more, total selected $selectedAmt")
 
           inputProofs <- FutureUtil.sequentially(outputRefs)(
             createInputProof(receivedNonce.nonce, _))
@@ -185,10 +209,13 @@ case class VortexClient(lndRpcClient: LndRpcClient)(implicit
   }
 
   def processBlindOutputSig(blindOutputSig: FieldElement): Future[Unit] = {
+    logger.info("Got blind sig from coordinator, processing..")
     roundDetails match {
       case state @ (NoDetails | _: KnownRound | _: ReceivedNonce |
           _: MixOutputRegistered | _: PSBTSigned) =>
-        sys.error(s"At invalid state $state, cannot processAliceInitResponse")
+        Future.failed(
+          new IllegalStateException(
+            s"At invalid state $state, cannot processBlindOutputSig"))
       case details: InputsRegistered =>
         val mixOutput = details.initDetails.mixOutput
         val publicKey = details.round.publicKey
@@ -205,24 +232,47 @@ case class VortexClient(lndRpcClient: LndRpcClient)(implicit
 
         val bobHandlerP = Promise[ActorRef]()
 
+        logger.info("Send channel output as Bob")
         for {
           _ <- P2PClient.connect(peer, this, Some(bobHandlerP))
           bobHandler <- bobHandlerP.future
         } yield {
-          roundDetails = details.nextStage()
+          roundDetails = details.nextStage
           bobHandler ! BobMessage(sig, mixOutput)
         }
     }
   }
 
+  private[client] def signPSBT(
+      unsigned: PSBT,
+      inputs: Vector[OutputReference]): Future[PSBT] = {
+    val txOutpoints = unsigned.transaction.inputs.map(_.previousOutput)
+
+    val sigFs = inputs.map { input =>
+      val idx = txOutpoints.indexOf(input.outPoint)
+      lndRpcClient
+        .computeInputScript(unsigned.transaction, idx, input.output)
+        .map { case (scriptSig, witness) => (scriptSig, witness, idx) }
+    }
+
+    Future.sequence(sigFs).map { sigs =>
+      sigs.foldLeft(unsigned) { case (psbt, (scriptSig, witness, idx)) =>
+        psbt.addFinalizedScriptWitnessToInput(scriptSig, witness, idx)
+      }
+    }
+  }
+
   def validateAndSignPsbt(unsigned: PSBT): Future[PSBT] = {
+    logger.info("Received unsigned psbt from coordinator, verifying...")
     roundDetails match {
       case state @ (NoDetails | _: KnownRound | _: ReceivedNonce |
           _: InputsRegistered | _: PSBTSigned) =>
-        sys.error(s"At invalid state $state, cannot validateAndSignPsbt")
+        Future.failed(
+          new IllegalStateException(
+            s"At invalid state $state, cannot validateAndSignPsbt"))
       case state: MixOutputRegistered =>
-        roundDetails = state.nextStage()
-        val inputs = state.initDetails.inputs
+        roundDetails = state.nextStage
+        val inputs: Vector[OutputReference] = state.initDetails.inputs
         lazy val myOutpoints = inputs.map(_.outPoint)
         lazy val txOutpoints = unsigned.transaction.inputs.map(_.previousOutput)
         // should we care if they don't have our inputs?
@@ -234,35 +284,15 @@ case class VortexClient(lndRpcClient: LndRpcClient)(implicit
           unsigned.transaction.outputs.contains(state.initDetails.mixOutput)
 
         if (hasMixOutput && hasChangeOutput && hasInputs) {
-          val sigFs = inputs.map { input =>
-            val idx = txOutpoints.indexOf(input.outPoint)
-            lndRpcClient
-              .computeInputScript(unsigned.transaction, idx, input.output)
-              .map { case (scriptSig, witness) =>
-                (scriptSig, witness, idx)
-              }
-          }
-
-          val psbtWithInputInfo = inputs.foldLeft(unsigned) {
-            case (psbt, outRef) =>
-              val idx = txOutpoints.indexOf(outRef.outPoint)
-              psbt.addWitnessUTXOToInput(outRef.output, idx)
-          }
-
-          // tell peer about funding psbt
-          channelOpener
-            .fundPendingChannel(state.initDetails.chanId, psbtWithInputInfo)
-            .flatMap { _ =>
-              // sign psbt
-              Future.sequence(sigFs).map { sigs =>
-                sigs.foldLeft(psbtWithInputInfo) {
-                  case (psbt, (scriptSig, witness, idx)) =>
-                    psbt.addFinalizedScriptWitnessToInput(scriptSig,
-                                                          witness,
-                                                          idx)
-                }
-              }
-            }
+          logger.info("PSBT is valid, giving channel peer")
+          for {
+            // tell peer about funding psbt
+            _ <- channelOpener.fundPendingChannel(state.initDetails.chanId,
+                                                  unsigned)
+            _ = logger.info("Valid with channel peer, signing")
+            // sign to be sent to coordinator
+            signed <- signPSBT(unsigned, inputs)
+          } yield signed
         } else {
           Future.failed(
             new RuntimeException(
@@ -276,15 +306,16 @@ case class VortexClient(lndRpcClient: LndRpcClient)(implicit
     roundDetails match {
       case state @ (NoDetails | _: KnownRound | _: ReceivedNonce |
           _: InputsRegistered | _: MixOutputRegistered) =>
-        sys.error(s"At invalid state $state, cannot completeRound")
-      case state: PSBTSigned =>
+        Future.failed(
+          new IllegalStateException(
+            s"At invalid state $state, cannot completeRound"))
+      case _: PSBTSigned =>
+        logger.info("Coinjoin complete!!")
         for {
           _ <- lndRpcClient.publishTransaction(signedTx)
-          handler <- handlerP.future
-        } yield {
-          roundDetails = state.nextStage()
-          handler ! AskMixDetails(config.network)
-        }
+          _ <- stop()
+          _ <- getNewRound
+        } yield ()
     }
   }
 }

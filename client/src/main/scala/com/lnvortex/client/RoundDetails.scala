@@ -3,60 +3,48 @@ package com.lnvortex.client
 import com.lnvortex.core.MixDetails
 import org.bitcoins.crypto.SchnorrNonce
 
-sealed trait RoundDetails[T, N <: RoundDetails[_, _]] {
+sealed trait RoundDetails {
   def order: Int
-  def nextStage(t: T): N
-
-  def nonceOpt: Option[SchnorrNonce]
 }
 
-case object NoDetails extends RoundDetails[MixDetails, KnownRound] {
+case object NoDetails extends RoundDetails {
   override val order: Int = 0
-  override val nonceOpt: Option[SchnorrNonce] = None
 
-  override def nextStage(round: MixDetails): KnownRound = {
+  def nextStage(round: MixDetails): KnownRound = {
     KnownRound(round)
   }
-
 }
 
-case class KnownRound(round: MixDetails)
-    extends RoundDetails[SchnorrNonce, ReceivedNonce] {
+case class KnownRound(round: MixDetails) extends RoundDetails {
   override val order: Int = 1
-  override val nonceOpt: Option[SchnorrNonce] = None
 
-  override def nextStage(nonce: SchnorrNonce): ReceivedNonce =
+  def nextStage(nonce: SchnorrNonce): ReceivedNonce =
     ReceivedNonce(round, nonce)
 }
 
 case class ReceivedNonce(round: MixDetails, nonce: SchnorrNonce)
-    extends RoundDetails[InitDetails, InputsRegistered] {
+    extends RoundDetails {
   override val order: Int = 2
-  override val nonceOpt: Option[SchnorrNonce] = Some(nonce)
 
-  override def nextStage(initDetails: InitDetails): InputsRegistered =
+  def nextStage(initDetails: InitDetails): InputsRegistered =
     InputsRegistered(round, nonce, initDetails)
 }
 
-sealed trait InitializedRound[N <: RoundDetails[_, _]]
-    extends RoundDetails[Unit, N] {
+sealed trait InitializedRound extends RoundDetails {
 
   def round: MixDetails
   def nonce: SchnorrNonce
   def initDetails: InitDetails
-
-  override val nonceOpt: Option[SchnorrNonce] = Some(nonce)
-  def nextStage(): N = nextStage(())
 }
 
 case class InputsRegistered(
     round: MixDetails,
     nonce: SchnorrNonce,
     initDetails: InitDetails)
-    extends InitializedRound[MixOutputRegistered] {
+    extends InitializedRound {
   override val order: Int = 3
 
-  override def nextStage(t: Unit): MixOutputRegistered =
+  def nextStage: MixOutputRegistered =
     MixOutputRegistered(round, nonce, initDetails)
 }
 
@@ -64,10 +52,10 @@ case class MixOutputRegistered(
     round: MixDetails,
     nonce: SchnorrNonce,
     initDetails: InitDetails)
-    extends InitializedRound[PSBTSigned] {
+    extends InitializedRound {
   override val order: Int = 4
 
-  override def nextStage(t: Unit): PSBTSigned =
+  def nextStage: PSBTSigned =
     PSBTSigned(round, nonce, initDetails)
 }
 
@@ -75,9 +63,27 @@ case class PSBTSigned(
     round: MixDetails,
     nonce: SchnorrNonce,
     initDetails: InitDetails)
-    extends InitializedRound[NoDetails.type] {
+    extends InitializedRound {
   override val order: Int = 5
 
-  override def nextStage(t: Unit): NoDetails.type = NoDetails
+  def nextStage: NoDetails.type = NoDetails
+}
 
+object RoundDetails {
+
+  def getNonceOpt(details: RoundDetails): Option[SchnorrNonce] = {
+    details match {
+      case NoDetails | _: KnownRound => None
+      case ReceivedNonce(_, nonce)   => Some(nonce)
+      case round: InitializedRound   => Some(round.nonce)
+    }
+  }
+
+  def getInitDetailsOpt(details: RoundDetails): Option[InitDetails] = {
+    details match {
+      case NoDetails | _: KnownRound | _: ReceivedNonce => None
+      case round: InitializedRound =>
+        Some(round.initDetails)
+    }
+  }
 }

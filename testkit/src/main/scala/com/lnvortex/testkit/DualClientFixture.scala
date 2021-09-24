@@ -3,7 +3,6 @@ package com.lnvortex.testkit
 import com.lnvortex.client.VortexClient
 import com.lnvortex.server.coordinator.VortexCoordinator
 import com.lnvortex.testkit.LnVortexTestUtils.getTestConfigs
-import org.bitcoins.lnd.rpc.LndRpcClient
 import org.bitcoins.testkit.async.TestAsyncUtil
 import org.bitcoins.testkit.fixtures.BitcoinSFixture
 import org.bitcoins.testkit.lnd.LndRpcTestUtil
@@ -12,12 +11,12 @@ import org.scalatest.FutureOutcome
 
 import scala.reflect.io.Directory
 
-trait ClientServerPairFixture extends BitcoinSFixture with CachedBitcoindV21 {
+trait DualClientFixture extends BitcoinSFixture with CachedBitcoindV21 {
 
-  override type FixtureParam = (VortexClient, VortexCoordinator, LndRpcClient)
+  override type FixtureParam = (VortexClient, VortexClient, VortexCoordinator)
 
   override def withFixture(test: OneArgAsyncTest): FutureOutcome = {
-    makeDependentFixture[(VortexClient, VortexCoordinator, LndRpcClient)](
+    makeDependentFixture[(VortexClient, VortexClient, VortexCoordinator)](
       () => {
         implicit val (clientConf, serverConf) = getTestConfigs()
 
@@ -27,23 +26,30 @@ trait ClientServerPairFixture extends BitcoinSFixture with CachedBitcoindV21 {
           coordinator = VortexCoordinator(bitcoind)
           _ <- coordinator.start()
 
-          (lnd, peerLnd) <- LndTestUtils.createNodePair(bitcoind)
-          client = VortexClient(lnd)
-          _ <- client.start()
+          (lndA, lndB) <- LndTestUtils.createNodePair(bitcoind)
+          clientA = VortexClient(lndA)
+          _ <- clientA.start()
+          clientB = VortexClient(lndB)
+          _ <- clientB.start()
 
-          _ <- LndRpcTestUtil.connectLNNodes(lnd, peerLnd)
+          _ <- LndRpcTestUtil.connectLNNodes(lndA, lndB)
 
-          // wait for it to receive mix advertisement
+          // wait for clients to receive mix details
           _ <- TestAsyncUtil.awaitCondition(() =>
-            client.getCurrentRoundDetails.order > 0)
-        } yield (client, coordinator, peerLnd)
+            clientA.getCurrentRoundDetails.order > 0)
+          _ <- TestAsyncUtil.awaitCondition(() =>
+            clientB.getCurrentRoundDetails.order > 0)
+        } yield (clientA, clientB, coordinator)
       },
-      { case (client, coordinator, peerLnd) =>
+      { case (clientA, clientB, coordinator) =>
         for {
-          _ <- peerLnd.stop()
-          _ <- client.lndRpcClient.stop()
-          _ <- client.stop()
-          _ <- client.config.stop()
+          _ <- clientA.lndRpcClient.stop()
+          _ <- clientA.stop()
+          _ <- clientA.config.stop()
+
+          _ <- clientB.lndRpcClient.stop()
+          _ <- clientB.stop()
+          _ <- clientB.config.stop()
 
           _ <- coordinator.stop()
           _ <- coordinator.config.stop()

@@ -4,7 +4,6 @@ import akka.actor._
 import akka.event.LoggingReceive
 import com.lnvortex.client.VortexClient
 import com.lnvortex.core._
-import org.bitcoins.core.protocol.tlv._
 
 import scala.concurrent._
 
@@ -21,8 +20,9 @@ class ClientDataHandler(vortexClient: VortexClient, connectionHandler: ActorRef)
     case serverMessage: ServerVortexMessage =>
       log.info(s"Received VortexMessage ${serverMessage.typeName}")
       val f: Future[Unit] = handleVortexMessage(serverMessage)
-      f.failed.foreach(err =>
-        log.error(s"Failed to process vortexMessage=$serverMessage", err))
+      f.failed.foreach { err =>
+        log.error(s"Failed to process vortexMessage=$serverMessage", err)
+      }
     case clientMessage: ClientVortexMessage =>
       log.error(s"Received client message $clientMessage")
     case ClientConnectionHandler.WriteFailed(_) =>
@@ -38,7 +38,7 @@ class ClientDataHandler(vortexClient: VortexClient, connectionHandler: ActorRef)
         vortexClient.setRound(adv)
         Future.unit
       case NonceMessage(schnorrNonce) =>
-        vortexClient.registerNonce(schnorrNonce)
+        vortexClient.storeNonce(schnorrNonce)
         Future.unit
       case BlindedSig(blindOutputSig) =>
         for {
@@ -62,8 +62,6 @@ object ClientDataHandler {
   type Factory = (VortexClient, ActorContext, ActorRef) => ActorRef
 
   sealed trait Command
-  case class Received(tlv: TLV) extends Command
-  case class Send(tlv: TLV) extends Command
 
   def defaultFactory(
       vortexClient: VortexClient,

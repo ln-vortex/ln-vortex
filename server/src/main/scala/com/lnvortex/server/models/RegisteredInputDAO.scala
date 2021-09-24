@@ -66,8 +66,11 @@ case class RegisteredInputDAO()(implicit
     safeDatabase.runVec(query)
   }
 
-  def findByPeerId(peerId: Sha256Digest): Future[Vector[RegisteredInputDb]] = {
-    val query = table.filter(_.peerId === peerId).result
+  def findByPeerId(
+      peerId: Sha256Digest,
+      roundId: DoubleSha256Digest): Future[Vector[RegisteredInputDb]] = {
+    val query =
+      table.filter(t => t.peerId === peerId && t.roundId === roundId).result
 
     safeDatabase.runVec(query)
   }

@@ -3,6 +3,7 @@ package com.lnvortex.client
 import com.lnvortex.core._
 import com.lnvortex.core.crypto.BlindingTweaks
 import com.lnvortex.testkit.VortexClientFixture
+import io.grpc.StatusRuntimeException
 import org.bitcoins.core.currency._
 import org.bitcoins.core.number._
 import org.bitcoins.core.protocol.script._
@@ -11,7 +12,6 @@ import org.bitcoins.core.psbt.PSBT
 import org.bitcoins.crypto._
 
 import scala.concurrent.Future
-import scala.util.{Failure, Success}
 
 class VortexClientTest extends VortexClientFixture {
   behavior of "VortexClient"
@@ -38,7 +38,39 @@ class VortexClientTest extends VortexClientFixture {
         vortexClient.setRound(dummyAdvertisement.copy(version = UInt16.max)))
   }
 
+  it must "fail to find all output references" in { vortexClient =>
+    recoverToSucceededIf[IllegalArgumentException](
+      vortexClient.getOutputReferences(Vector(EmptyTransactionOutPoint)))
+  }
+
   it must "correctly sign a psbt" in { vortexClient =>
+    val lnd = vortexClient.lndRpcClient
+
+    for {
+      utxos <- vortexClient.listCoins()
+      refs <- vortexClient.getOutputReferences(utxos.flatMap(_.outPointOpt))
+      addr <- lnd.getNewAddress
+
+      inputs = utxos
+        .map(_.outPointOpt.get)
+        .map(TransactionInput(_, EmptyScriptSignature, UInt32.max))
+
+      output = {
+        val amt = utxos.map(_.amount).sum - Satoshis(300)
+        TransactionOutput(amt, addr.scriptPubKey)
+      }
+
+      tx = BaseTransaction(Int32.two, inputs, Vector(output), UInt32.zero)
+      unsigned = PSBT.fromUnsignedTx(tx)
+      psbt = refs.zipWithIndex.foldLeft(unsigned) { case (psbt, (utxo, idx)) =>
+        psbt.addWitnessUTXOToInput(utxo.output, idx)
+      }
+
+      signed <- vortexClient.signPSBT(psbt, refs)
+    } yield assert(signed.extractTransactionAndValidate.isSuccess)
+  }
+
+  it must "fail to sign a psbt with no channel" in { vortexClient =>
     val lnd = vortexClient.lndRpcClient
     for {
       utxos <- lnd.listUnspent
@@ -54,20 +86,16 @@ class VortexClientTest extends VortexClientFixture {
                                 mixOutput = mix,
                                 tweaks = dummyTweaks)
       testState = MixOutputRegistered(dummyAdvertisement, nonce, testDetails)
-      _ = vortexClient.roundDetails = testState
+      _ = vortexClient.setRoundDetails(testState)
 
       inputs = refs
         .map(_.outPoint)
         .map(TransactionInput(_, EmptyScriptSignature, UInt32.max))
       outputs = Vector(change, mix)
       tx = BaseTransaction(Int32.two, inputs, outputs, UInt32.zero)
-      signed <- vortexClient.validateAndSignPsbt(PSBT.fromUnsignedTx(tx))
-
-      extractT = signed.extractTransactionAndValidate
-    } yield extractT match {
-      case Failure(exception) => fail(exception)
-      case Success(_)         => succeed
-    }
+      res <- recoverToSucceededIf[StatusRuntimeException](
+        vortexClient.validateAndSignPsbt(PSBT.fromUnsignedTx(tx)))
+    } yield res
   }
 
   it must "fail to sign a psbt with a missing mix output" in { vortexClient =>
@@ -89,7 +117,7 @@ class VortexClientTest extends VortexClientFixture {
                                 mixOutput = mix,
                                 tweaks = dummyTweaks)
       testState = MixOutputRegistered(dummyAdvertisement, nonce, testDetails)
-      _ = vortexClient.roundDetails = testState
+      _ = vortexClient.setRoundDetails(testState)
 
       inputs = refs
         .map(_.outPoint)
@@ -119,7 +147,7 @@ class VortexClientTest extends VortexClientFixture {
                                   mixOutput = mix,
                                   tweaks = dummyTweaks)
         testState = MixOutputRegistered(dummyAdvertisement, nonce, testDetails)
-        _ = vortexClient.roundDetails = testState
+        _ = vortexClient.setRoundDetails(testState)
 
         inputs = refs
           .map(_.outPoint)
@@ -149,7 +177,7 @@ class VortexClientTest extends VortexClientFixture {
                                 mixOutput = mix,
                                 tweaks = dummyTweaks)
       testState = MixOutputRegistered(dummyAdvertisement, nonce, testDetails)
-      _ = vortexClient.roundDetails = testState
+      _ = vortexClient.setRoundDetails(testState)
 
       inputs = refs
         .map(_.outPoint)

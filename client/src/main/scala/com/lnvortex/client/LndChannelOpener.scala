@@ -94,9 +94,12 @@ case class LndChannelOpener(lndRpcClient: LndRpcClient)(implicit
                         skipFinalize = true)
     val verifyMsg = FundingTransitionMsg(PsbtVerify(verify))
 
-    for {
-      _ <- lnd.fundingStateStep(verifyMsg)
-    } yield ()
+    val fundF = lnd.fundingStateStep(verifyMsg).map(_ => ())
+
+    fundF.failed.foreach { err =>
+      logger.error("Failed to fundPendingChannel", err)
+    }
+    fundF
   }
 
   def cancelPendingChannel(chanId: ByteVector): Future[Unit] = {

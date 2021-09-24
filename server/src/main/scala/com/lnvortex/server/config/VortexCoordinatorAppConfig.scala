@@ -50,14 +50,14 @@ case class VortexCoordinatorAppConfig(
   override val baseDatadir: Path = directory
 
   override def start(): Future[Unit] = {
-    logger.info(s"Initializing setup")
+    logger.info(s"Initializing coordinator")
 
     if (Files.notExists(baseDatadir)) {
       Files.createDirectories(baseDatadir)
     }
 
     val numMigrations = migrate()
-    logger.info(s"Applied $numMigrations")
+    logger.debug(s"Applied $numMigrations")
 
     initialize()
 
@@ -110,6 +110,11 @@ case class VortexCoordinatorAppConfig(
 
   lazy val inputRegistrationTime: FiniteDuration = {
     val dur = config.getDuration(s"$moduleName.inputRegistrationTime")
+    FiniteDuration(dur.getSeconds, SECONDS)
+  }
+
+  lazy val signingTime: FiniteDuration = {
+    val dur = config.getDuration(s"$moduleName.signingTime")
     FiniteDuration(dur.getSeconds, SECONDS)
   }
 

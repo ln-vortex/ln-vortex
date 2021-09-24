@@ -4,11 +4,7 @@ import org.bitcoins.lnd.rpc.LndRpcClient
 import org.bitcoins.rpc.client.v21.BitcoindV21RpcClient
 import org.bitcoins.testkit.fixtures.BitcoinSFixture
 import org.bitcoins.testkit.rpc.CachedBitcoindV21
-import org.bitcoins.testkit.util.FileUtil
 import org.scalatest.FutureOutcome
-
-import java.io.File
-import java.nio.file.Path
 
 trait LndChannelOpenerFixture extends BitcoinSFixture with CachedBitcoindV21 {
 

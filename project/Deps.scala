@@ -26,7 +26,8 @@ object Deps {
 
     val scalaFxV = "16.0.0-R25"
     val javaFxV = "17-ea+8"
-    val bitcoinsV = "1.7.0-166-b6f28456-SNAPSHOT"
+    // todo update when lnd v0.14.0-beta is in bitcoin-s
+    val bitcoinsV = "1.7.0-177-5259354b-SNAPSHOT"
 
     val grizzledSlf4jV = "1.3.4"
   }
@@ -57,9 +58,8 @@ object Deps {
     val bitcoinsTor =
       "org.bitcoin-s" %% "bitcoin-s-tor" % V.bitcoinsV withSources () withJavadoc ()
 
-    // todo update when lnd v0.14.0-beta is in bitcoin-s
     val bitcoinsLnd =
-      "org.bitcoin-s" %% "bitcoin-s-lnd-rpc" % "1.7.0-177-5494c869-SNAPSHOT" withSources () withJavadoc ()
+      "org.bitcoin-s" %% "bitcoin-s-lnd-rpc" % V.bitcoinsV withSources () withJavadoc ()
 
     val bitcoinsTestkitCore =
       "org.bitcoin-s" %% "bitcoin-s-testkit-core" % V.bitcoinsV withSources () withJavadoc ()

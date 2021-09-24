@@ -3,7 +3,7 @@ import sbt.Resolver
 
 name := "LnVortex"
 
-version := "0.1"
+version := "1.0"
 
 scalaVersion := "2.13.6"
 
@@ -88,6 +88,7 @@ lazy val clientTest = project
   .settings(CommonSettings.testSettings: _*)
   .settings(name := "client-test",
             libraryDependencies ++= Deps.clientServerTest)
+  .settings(parallelExecution := false)
   .dependsOn(client, testkit)
 
 lazy val server = project
@@ -101,6 +102,7 @@ lazy val serverTest = project
   .settings(CommonSettings.testSettings: _*)
   .settings(name := "server-test",
             libraryDependencies ++= Deps.clientServerTest)
+  .settings(parallelExecution := false)
   .dependsOn(server, testkit)
 
 lazy val clientServerTest = project
@@ -108,6 +110,7 @@ lazy val clientServerTest = project
   .settings(CommonSettings.testSettings: _*)
   .settings(name := "client-server-test",
             libraryDependencies ++= Deps.clientServerTest)
+  .settings(parallelExecution := false)
   .dependsOn(client, server, testkit)
 
 lazy val testkit = project
