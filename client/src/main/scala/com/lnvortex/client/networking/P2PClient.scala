@@ -86,9 +86,8 @@ class P2PClient(
       throw ex
     case Socks5Connected(_) =>
       log.info(s"connected to $remoteAddress via SOCKS5 proxy $proxyAddress")
-      val handler =
-        new ClientConnectionHandler(vortex, proxy, dataHandlerFactory)
-      val actorRef = context.actorOf(Props(handler))
+      val actorRef = context.actorOf(
+        Props(new ClientConnectionHandler(vortex, proxy, dataHandlerFactory)))
       handlerP.foreach(_.success(actorRef))
       connectedAddress.foreach(_.success(remoteAddress))
     case Terminated(actor) if actor == proxy =>

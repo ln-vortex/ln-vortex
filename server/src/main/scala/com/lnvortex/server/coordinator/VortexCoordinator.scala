@@ -529,14 +529,14 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
   private val hostAddressP: Promise[InetSocketAddress] =
     Promise[InetSocketAddress]()
 
-  private[coordinator] lazy val serverBindF: Future[
+  private[lnvortex] lazy val serverBindF: Future[
     (InetSocketAddress, ActorRef)] = {
     logger.info(
       s"Binding coordinator to ${config.listenAddress}, with tor hidden service: ${config.torParams.isDefined}")
 
     val bindF = VortexServer.bind(vortexCoordinator = this,
                                   bindAddress = config.listenAddress,
-                                  torParams = None)
+                                  torParams = config.torParams)
 
     bindF.map { case (addr, actor) =>
       hostAddressP.success(addr)

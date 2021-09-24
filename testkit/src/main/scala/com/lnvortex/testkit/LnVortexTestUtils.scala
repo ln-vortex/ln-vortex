@@ -9,22 +9,26 @@ import org.bitcoins.testkit.util.FileUtil
 
 import java.io.File
 import java.nio.file.Path
+import scala.util.Properties
 
 trait LnVortexTestUtils {
 
   def tmpDir(): Path = new File(
     s"/tmp/ln-vortex-test/${FileUtil.randomDirName}/").toPath
 
+  val torEnabled: Boolean = Properties
+    .envOrNone("TOR")
+    .isDefined
+
   def getTestConfigs(config: Config*)(implicit
       system: ActorSystem): (VortexAppConfig, VortexCoordinatorAppConfig) = {
     val listenPort = RpcUtil.randomPort
     val dir = tmpDir()
-    // todo fix tor
     val overrideConf = ConfigFactory.parseString {
       s"""
          |bitcoin-s {
-         |  proxy.enabled = false
-         |  tor.enabled = false
+         |  proxy.enabled = $torEnabled
+         |  tor.enabled = $torEnabled
          |  tor.use-random-ports = false
          |}
          |vortex {

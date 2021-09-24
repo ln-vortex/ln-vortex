@@ -1,10 +1,15 @@
 package com.lnvortex.server
 
 import com.lnvortex.client.RoundDetails.getInitDetailsOpt
-import com.lnvortex.testkit.DualClientFixture
+import com.lnvortex.testkit.{DualClientFixture, LnVortexTestUtils}
 import org.bitcoins.testkit.async.TestAsyncUtil
 
+import scala.concurrent.duration.{DurationInt, FiniteDuration}
+
 class DualClientTest extends DualClientFixture {
+
+  val interval: FiniteDuration =
+    if (LnVortexTestUtils.torEnabled) 500.milliseconds else 100.milliseconds
 
   it must "get nonces from the coordinator" in {
     case (clientA, clientB, coordinator) =>
@@ -32,10 +37,13 @@ class DualClientTest extends DualClientFixture {
       utxosB <- clientB.listCoins().map(_.tail)
       _ <- clientB.registerCoins(utxosB.map(_.outPointOpt.get), nodeIdA, None)
       // give time for messages to send
-      _ <- TestAsyncUtil.awaitConditionF(() =>
-        coordinator.inputsDAO
-          .findAll()
-          .map(_.size == utxosA.size + utxosB.size))
+      _ <- TestAsyncUtil.awaitConditionF(
+        () =>
+          coordinator.inputsDAO
+            .findAll()
+            .map(_.size == utxosA.size + utxosB.size),
+        interval = interval,
+        maxTries = 500)
     } yield succeed
   }
 
@@ -53,12 +61,16 @@ class DualClientTest extends DualClientFixture {
         utxosB <- clientB.listCoins().map(_.tail)
         _ <- clientB.registerCoins(utxosB.map(_.outPointOpt.get), nodeIdA, None)
         // wait until outputs are registered
-        _ <- TestAsyncUtil.awaitConditionF(() =>
-          coordinator.inputsDAO
-            .findAll()
-            .map(_.size == utxosA.size + utxosB.size))
+        _ <- TestAsyncUtil.awaitConditionF(
+          () =>
+            coordinator.inputsDAO
+              .findAll()
+              .map(_.size == utxosA.size + utxosB.size),
+          interval = interval,
+          maxTries = 500)
         _ <- TestAsyncUtil.awaitConditionF(
           () => coordinator.outputsDAO.findAll().map(_.size == 2),
+          interval = interval,
           maxTries = 500)
         outputDbs <- coordinator.outputsDAO.findAll()
       } yield {
@@ -88,22 +100,28 @@ class DualClientTest extends DualClientFixture {
       utxosB <- clientB.listCoins().map(_.tail)
       _ <- clientB.registerCoins(utxosB.map(_.outPointOpt.get), nodeIdA, None)
       // wait until outputs are registered
-      _ <- TestAsyncUtil.awaitConditionF(() =>
-        coordinator.inputsDAO
-          .findAll()
-          .map(_.size == utxosA.size + utxosB.size))
+      _ <- TestAsyncUtil.awaitConditionF(
+        () =>
+          coordinator.inputsDAO
+            .findAll()
+            .map(_.size == utxosA.size + utxosB.size),
+        interval = interval,
+        maxTries = 500)
       _ <- TestAsyncUtil.awaitConditionF(
         () => coordinator.outputsDAO.findAll().map(_.size == 2),
+        interval,
         maxTries = 500)
       // wait until we construct the unsigned tx
       _ <- TestAsyncUtil.awaitConditionF(
         () => coordinator.getRound(roundId).map(_.psbtOpt.isDefined),
+        interval = interval,
         maxTries = 500)
 
       // wait until the tx is signed
       // use getRound because we could start the new round
       _ <- TestAsyncUtil.awaitConditionF(
         () => coordinator.getRound(roundId).map(_.transactionOpt.isDefined),
+        interval = interval,
         maxTries = 500)
     } yield succeed
   }
@@ -123,22 +141,28 @@ class DualClientTest extends DualClientFixture {
       utxosB <- clientB.listCoins().map(_.tail)
       _ <- clientB.registerCoins(utxosB.map(_.outPointOpt.get), nodeIdA, None)
       // wait until outputs are registered
-      _ <- TestAsyncUtil.awaitConditionF(() =>
-        coordinator.inputsDAO
-          .findAll()
-          .map(_.size == utxosA.size + utxosB.size))
+      _ <- TestAsyncUtil.awaitConditionF(
+        () =>
+          coordinator.inputsDAO
+            .findAll()
+            .map(_.size == utxosA.size + utxosB.size),
+        interval = interval,
+        maxTries = 500)
       _ <- TestAsyncUtil.awaitConditionF(
         () => coordinator.outputsDAO.findAll().map(_.size == 2),
+        interval = interval,
         maxTries = 500)
       // wait until we construct the unsigned tx
       _ <- TestAsyncUtil.awaitConditionF(
         () => coordinator.getRound(roundId).map(_.psbtOpt.isDefined),
+        interval = interval,
         maxTries = 500)
 
       // wait until the tx is signed
       // use getRound because we could start the new round
       _ <- TestAsyncUtil.awaitConditionF(
         () => coordinator.getRound(roundId).map(_.transactionOpt.isDefined),
+        interval = interval,
         maxTries = 500)
 
       // Mine some blocks
@@ -148,11 +172,13 @@ class DualClientTest extends DualClientFixture {
       // wait until clientA sees new channels
       _ <- TestAsyncUtil.awaitConditionF(
         () => clientA.lndRpcClient.listChannels().map(_.size == 2),
+        interval = interval,
         maxTries = 500)
 
       // wait until clientB sees new channels
       _ <- TestAsyncUtil.awaitConditionF(
         () => clientB.lndRpcClient.listChannels().map(_.size == 2),
+        interval = interval,
         maxTries = 500)
     } yield succeed
   }

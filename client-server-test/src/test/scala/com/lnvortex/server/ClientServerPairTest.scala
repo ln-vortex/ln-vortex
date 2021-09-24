@@ -2,11 +2,16 @@ package com.lnvortex.server
 
 import com.lnvortex.client.RoundDetails.getInitDetailsOpt
 import com.lnvortex.client._
-import com.lnvortex.testkit.ClientServerPairFixture
+import com.lnvortex.testkit.{ClientServerPairFixture, LnVortexTestUtils}
 import org.bitcoins.core.number.UInt64
 import org.bitcoins.testkit.async.TestAsyncUtil
 
+import scala.concurrent.duration.{DurationInt, FiniteDuration}
+
 class ClientServerPairTest extends ClientServerPairFixture {
+
+  val interval: FiniteDuration =
+    if (LnVortexTestUtils.torEnabled) 500.milliseconds else 100.milliseconds
 
   it must "get the correct round details" in { case (client, coordinator, _) =>
     coordinator.currentRound().map { roundDb =>
@@ -45,8 +50,10 @@ class ClientServerPairTest extends ClientServerPairFixture {
       utxos <- client.listCoins().map(_.tail)
       _ <- client.registerCoins(utxos.map(_.outPointOpt.get), nodeId, None)
       // give time for messages to send
-      _ <- TestAsyncUtil.awaitConditionF(() =>
-        coordinator.inputsDAO.findAll().map(_.size == utxos.size))
+      _ <- TestAsyncUtil.awaitConditionF(
+        () => coordinator.inputsDAO.findAll().map(_.size == utxos.size),
+        interval = interval,
+        maxTries = 500)
     } yield succeed
   }
 
@@ -60,10 +67,13 @@ class ClientServerPairTest extends ClientServerPairFixture {
         utxos <- client.listCoins().map(_.tail)
         _ <- client.registerCoins(utxos.map(_.outPointOpt.get), nodeId, None)
         // wait until outputs are registered
-        _ <- TestAsyncUtil.awaitConditionF(() =>
-          coordinator.inputsDAO.findAll().map(_.size == utxos.size))
+        _ <- TestAsyncUtil.awaitConditionF(
+          () => coordinator.inputsDAO.findAll().map(_.size == utxos.size),
+          interval = interval,
+          maxTries = 500)
         _ <- TestAsyncUtil.awaitConditionF(
           () => coordinator.outputsDAO.findAll().map(_.nonEmpty),
+          interval = interval,
           maxTries = 500)
         outputDbs <- coordinator.outputsDAO.findAll()
       } yield {
@@ -85,21 +95,26 @@ class ClientServerPairTest extends ClientServerPairFixture {
       // don't select all coins
       utxos <- client.listCoins().map(_.tail)
       _ <- client.registerCoins(utxos.map(_.outPointOpt.get), nodeId, None)
-      _ <- TestAsyncUtil.awaitConditionF(() =>
-        coordinator.inputsDAO.findAll().map(_.size == utxos.size))
+      _ <- TestAsyncUtil.awaitConditionF(
+        () => coordinator.inputsDAO.findAll().map(_.size == utxos.size),
+        interval = interval,
+        maxTries = 500)
       // wait until outputs are registered
       _ <- TestAsyncUtil.awaitConditionF(
         () => coordinator.outputsDAO.findAll().map(_.nonEmpty),
+        interval = interval,
         maxTries = 500)
       // wait until we construct the unsigned tx
       _ <- TestAsyncUtil.awaitConditionF(
         () => coordinator.getRound(roundId).map(_.psbtOpt.isDefined),
+        interval = interval,
         maxTries = 500)
 
       // wait until the tx is signed
       // use getRound because we could start the new round
       _ <- TestAsyncUtil.awaitConditionF(
         () => coordinator.getRound(roundId).map(_.transactionOpt.isDefined),
+        interval = interval,
         maxTries = 500)
     } yield succeed
   }
@@ -114,21 +129,26 @@ class ClientServerPairTest extends ClientServerPairFixture {
       // don't select all coins
       utxos <- client.listCoins().map(_.tail)
       _ <- client.registerCoins(utxos.map(_.outPointOpt.get), nodeId, None)
-      _ <- TestAsyncUtil.awaitConditionF(() =>
-        coordinator.inputsDAO.findAll().map(_.size == utxos.size))
+      _ <- TestAsyncUtil.awaitConditionF(
+        () => coordinator.inputsDAO.findAll().map(_.size == utxos.size),
+        interval = interval,
+        maxTries = 500)
       // wait until outputs are registered
       _ <- TestAsyncUtil.awaitConditionF(
         () => coordinator.outputsDAO.findAll().map(_.nonEmpty),
+        interval = interval,
         maxTries = 500)
       // wait until we construct the unsigned tx
       // use getRound because we could start the new round
       _ <- TestAsyncUtil.awaitConditionF(
         () => coordinator.getRound(roundId).map(_.psbtOpt.isDefined),
+        interval = interval,
         maxTries = 500)
       // wait until the tx is signed
       // use getRound because we could start the new round
       _ <- TestAsyncUtil.awaitConditionF(
         () => coordinator.getRound(roundId).map(_.transactionOpt.isDefined),
+        interval = interval,
         maxTries = 500)
 
       // Mine some blocks
@@ -138,6 +158,7 @@ class ClientServerPairTest extends ClientServerPairFixture {
       // wait until peerLnd sees new channel
       _ <- TestAsyncUtil.awaitConditionF(
         () => peerLnd.listChannels().map(_.nonEmpty),
+        interval = interval,
         maxTries = 500)
 
       roundDbs <- coordinator.roundDAO.findAll()

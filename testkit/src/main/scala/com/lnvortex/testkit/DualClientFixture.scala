@@ -3,6 +3,7 @@ package com.lnvortex.testkit
 import com.lnvortex.client.VortexClient
 import com.lnvortex.server.coordinator.VortexCoordinator
 import com.lnvortex.testkit.LnVortexTestUtils.getTestConfigs
+import com.typesafe.config.ConfigFactory
 import org.bitcoins.testkit.async.TestAsyncUtil
 import org.bitcoins.testkit.fixtures.BitcoinSFixture
 import org.bitcoins.testkit.lnd.LndRpcTestUtil
@@ -18,18 +19,27 @@ trait DualClientFixture extends BitcoinSFixture with CachedBitcoindV21 {
   override def withFixture(test: OneArgAsyncTest): FutureOutcome = {
     makeDependentFixture[(VortexClient, VortexClient, VortexCoordinator)](
       () => {
-        implicit val (clientConf, serverConf) = getTestConfigs()
+        implicit val (_, serverConf) = getTestConfigs()
 
         for {
           _ <- serverConf.start()
           bitcoind <- cachedBitcoindWithFundsF
           coordinator = VortexCoordinator(bitcoind)
           _ <- coordinator.start()
+          (addr, _) <- coordinator.serverBindF
+
+          host =
+            if (addr.getHostString == "0:0:0:0:0:0:0:0") "127.0.0.1"
+            else addr.getHostString
+
+          config = ConfigFactory.parseString(
+            s"""vortex.coordinator = "$host:${addr.getPort}" """)
+          clientConfig = getTestConfigs(config)._1
 
           (lndA, lndB) <- LndTestUtils.createNodePair(bitcoind)
-          clientA = VortexClient(lndA)
+          clientA = VortexClient(lndA)(system, clientConfig)
           _ <- clientA.start()
-          clientB = VortexClient(lndB)
+          clientB = VortexClient(lndB)(system, clientConfig)
           _ <- clientB.start()
 
           _ <- LndRpcTestUtil.connectLNNodes(lndA, lndB)
