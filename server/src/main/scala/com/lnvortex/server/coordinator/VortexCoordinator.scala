@@ -55,7 +55,9 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
   private var feeRate: SatoshisPerVirtualByte =
     SatoshisPerVirtualByte.fromLong(0)
 
-  private var currentRoundId: DoubleSha256Digest =
+  private var currentRoundId: DoubleSha256Digest = genRoundId
+
+  private def genRoundId: DoubleSha256Digest =
     CryptoUtil.doubleSHA256(ECPrivateKey.freshPrivateKey.bytes)
 
   def getCurrentRoundId: DoubleSha256Digest = currentRoundId
@@ -105,7 +107,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
 
   def newRound(): Future[RoundDb] = {
     // generate new round id
-    currentRoundId = CryptoUtil.doubleSHA256(ECPrivateKey.freshPrivateKey.bytes)
+    currentRoundId = genRoundId
 
     logger.info(s"Creating new Round! ${currentRoundId.hex}")
     val feeRateF = updateFeeRate()
@@ -400,13 +402,9 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
         FilterDustFinalizer.andThen(ShuffleFinalizer))
 
       // add inputs
-      txBuilder ++= inputDbs.map { inputDb =>
-        TransactionInput(inputDb.outPoint,
-                         EmptyScriptSignature,
-                         TransactionConstants.sequence)
-      }
+      txBuilder ++= inputDbs.map(_.transactionInput)
 
-      // add Inputs
+      // add outputs
       val mixFee = Satoshis(aliceDbs.size) * config.mixFee
       val mixFeeOutput = TransactionOutput(mixFee, mixAddr.scriptPubKey)
       val mixOutputs = outputDbs.map(_.output)
@@ -458,6 +456,8 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
 
     dbsF.flatMap {
       case (None, _, _) =>
+        signedPMap(peerId).failure(
+          new RuntimeException(s"No round found with id ${currentRoundId.hex}"))
         Future.failed(
           new RuntimeException(s"No round found with id ${currentRoundId.hex}"))
       case (_, None, _) =>
@@ -467,13 +467,12 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
         require(roundDb.status == SigningPhase)
         roundDb.psbtOpt match {
           case Some(unsignedPsbt) =>
-            require(inputs.size == aliceDb.numInputs,
-                    "Did not get all of alice's inputs")
+            val correctNumInputs = inputs.size == aliceDb.numInputs
             val sameTx = unsignedPsbt.transaction == psbt.transaction
             lazy val verify =
               inputs.map(_.indexOpt.get).forall(psbt.verifyFinalizedInput)
 
-            if (sameTx && verify) {
+            if (correctNumInputs && sameTx && verify) {
               // mark successful
               signedPMap(peerId).success(psbt)
               val signedFs = signedPMap.values.map(_.future)

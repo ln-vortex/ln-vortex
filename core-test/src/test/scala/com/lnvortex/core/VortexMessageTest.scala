@@ -70,7 +70,7 @@ class VortexMessageTest extends BitcoinSUnitTest {
   it must "fail to verify a Bob message with different tweaks sig" in {
     forAll(ScriptGenerators.p2wshSPKV0.map(_._1)) { spk =>
       val output = TransactionOutput(amount, spk)
-      val hash = CryptoUtil.sha256(output.bytes).bytes
+      val hash = BobMessage.calculateChallenge(output, roundId)
 
       val challenge =
         BlindSchnorrUtil.generateChallenge(pubKey, nonce, tweaks, hash)
