@@ -12,6 +12,7 @@ import lnrpc._
 import org.bitcoins.core.currency._
 import org.bitcoins.core.protocol.BitcoinAddress
 import org.bitcoins.core.protocol.ln.node.NodeId
+import org.bitcoins.core.protocol.transaction.TransactionOutPoint
 import org.bitcoins.core.psbt.PSBT
 import org.bitcoins.crypto._
 import org.bitcoins.lnd.rpc.LndRpcClient
@@ -100,6 +101,11 @@ case class LndChannelOpener(lndRpcClient: LndRpcClient)(implicit
     fundF
   }
 
+  /** This should be called to cancel the channel if fundPendingChannel
+    * has not been called
+    * @param chanId Temporary id given to the channel
+    * @return
+    */
   def cancelPendingChannel(chanId: ByteVector): Future[Unit] = {
     logger.trace("lnd calling fundingStateStep")
 
@@ -112,5 +118,14 @@ case class LndChannelOpener(lndRpcClient: LndRpcClient)(implicit
       logger.error("Failed to cancelPendingChannel", err)
     }
     fundF
+  }
+
+  /** This should be called to cancel the channel if fundPendingChannel
+    * has been called
+    * @param chanOutPoint TransactionOutPoint of the resulting channel
+    * @return
+    */
+  def cancelChannel(chanOutPoint: TransactionOutPoint): Future[Unit] = {
+    lndRpcClient.abandonChannel(chanOutPoint, pendingFundingShimOnly = true)
   }
 }

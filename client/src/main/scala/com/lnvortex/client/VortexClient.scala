@@ -216,7 +216,6 @@ case class VortexClient[+T <: CoinJoinWalletApi](coinjoinWallet: T)(implicit
           new IllegalStateException(
             s"At invalid state $state, cannot validateAndSignPsbt"))
       case state: MixOutputRegistered =>
-        roundDetails = state.nextStage
         val inputs: Vector[OutputReference] = state.initDetails.inputs
         lazy val myOutpoints = inputs.map(_.outPoint)
         lazy val txOutpoints = unsigned.transaction.inputs.map(_.previousOutput)
@@ -237,7 +236,10 @@ case class VortexClient[+T <: CoinJoinWalletApi](coinjoinWallet: T)(implicit
             _ = logger.info("Valid with channel peer, signing")
             // sign to be sent to coordinator
             signed <- coinjoinWallet.signPSBT(unsigned, inputs)
-          } yield signed
+          } yield {
+            roundDetails = state.nextStage(signed)
+            signed
+          }
         } else {
           Future.failed(
             new RuntimeException(

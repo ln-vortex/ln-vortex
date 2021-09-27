@@ -1,6 +1,9 @@
 package com.lnvortex.client
 
 import com.lnvortex.core.MixDetails
+import org.bitcoins.core.number.UInt32
+import org.bitcoins.core.protocol.transaction.TransactionOutPoint
+import org.bitcoins.core.psbt.PSBT
 import org.bitcoins.crypto.SchnorrNonce
 
 sealed trait RoundDetails {
@@ -55,16 +58,26 @@ case class MixOutputRegistered(
     extends InitializedRound {
   override val order: Int = 4
 
-  def nextStage: PSBTSigned =
-    PSBTSigned(round, nonce, initDetails)
+  def nextStage(psbt: PSBT): PSBTSigned =
+    PSBTSigned(round, nonce, initDetails, psbt)
 }
 
 case class PSBTSigned(
     round: MixDetails,
     nonce: SchnorrNonce,
-    initDetails: InitDetails)
+    initDetails: InitDetails,
+    psbt: PSBT)
     extends InitializedRound {
   override val order: Int = 5
+
+  val channelOutpoint: TransactionOutPoint = {
+    val txId = psbt.transaction.txId
+    val vout = UInt32(
+      psbt.transaction.outputs.indexWhere(
+        _.scriptPubKey == initDetails.mixOutput.scriptPubKey))
+
+    TransactionOutPoint(txId, vout)
+  }
 
   def nextStage: NoDetails.type = NoDetails
 }
