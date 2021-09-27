@@ -34,6 +34,13 @@ trait LnVortexTestUtils {
          |vortex {
          |  listen = "0.0.0.0:$listenPort"
          |  coordinator = "127.0.0.1:$listenPort"
+         |  maxPeers = 2
+         |  mixFee = 10000
+         |  mixInterval = 60m
+         |  mixAmount = 1000000
+         |  inputRegistrationTime = 20s
+         |  outputRegistrationTime = 20s
+         |  signingTime = 20s
          |}
       """.stripMargin
     }

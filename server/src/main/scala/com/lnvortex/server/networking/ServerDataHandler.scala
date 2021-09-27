@@ -5,11 +5,9 @@ import akka.event.LoggingReceive
 import com.lnvortex.core._
 import com.lnvortex.server.coordinator.VortexCoordinator
 import grizzled.slf4j.Logging
-import org.bitcoins.core.util.TimeUtil
 import org.bitcoins.crypto._
 
 import scala.concurrent._
-import scala.concurrent.duration._
 
 class ServerDataHandler(
     coordinator: VortexCoordinator,
@@ -58,23 +56,8 @@ class ServerDataHandler(
         }
       case inputs: RegisterInputs =>
         for {
-          blindSig <- coordinator.registerAlice(id, inputs)
-        } yield {
-          val timeSinceInputReg =
-            TimeUtil.currentEpochSecond - coordinator.getInputRegStartTime
-          val time =
-            coordinator.config.inputRegistrationTime.toSeconds - timeSinceInputReg
-          val timeAbs = Math.max(0, time)
-
-          // send message once output registration starts
-          context.system.scheduler.scheduleOnce(timeAbs.seconds) {
-            logger.debug(s"Sending blind sig to peer ${id.hex}")
-            coordinator.beginOutputRegistration().foreach { _ =>
-              connectionHandler ! BlindedSig(blindSig)
-            }
-          }
-          ()
-        }
+          _ <- coordinator.registerAlice(id, inputs)
+        } yield ()
       case bob: BobMessage =>
         coordinator.verifyAndRegisterBob(bob).map(_ => ())
       case SignedPsbtMessage(psbt) =>

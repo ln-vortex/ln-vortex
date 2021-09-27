@@ -70,11 +70,14 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
   private var beginInputRegistrationCancellable: Option[Cancellable] =
     None
 
+  private var beginOutputRegistrationCancellable: Option[Cancellable] =
+    None
+
   // On startup consider a round just happened so
   // next round occurs at the interval time
   private var lastRoundTime: Long = TimeUtil.currentEpochSecond
 
-  private def roundStartTime: Long = {
+  private def roundStartTime(): Long = {
     lastRoundTime + config.mixInterval.toSeconds
   }
 
@@ -87,16 +90,17 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       inputFee = inputFee,
       outputFee = outputFee,
       publicKey = km.publicKey,
-      time = UInt64(roundStartTime)
+      time = UInt64(roundStartTime())
     )
 
-  private var inputRegStartTime = roundStartTime
+  private var inputRegStartTime = roundStartTime()
 
   def getInputRegStartTime: Long = inputRegStartTime
 
   private val connectionHandlerMap: mutable.Map[Sha256Digest, ActorRef] =
     mutable.Map.empty
 
+  private var inputsRegisteredP: Promise[Unit] = Promise[Unit]()
   private var outputsRegisteredP: Promise[Unit] = Promise[Unit]()
 
   private val signedPMap: mutable.Map[Sha256Digest, Promise[PSBT]] =
@@ -113,6 +117,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
     val feeRateF = updateFeeRate()
 
     // reset promises
+    inputsRegisteredP = Promise[Unit]()
     outputsRegisteredP = Promise[Unit]()
     completedTxP = Promise[(Transaction, Int)]()
 
@@ -123,7 +128,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
     signedPMap.clear()
 
     lastRoundTime = TimeUtil.currentEpochSecond
-    inputRegStartTime = roundStartTime
+    inputRegStartTime = roundStartTime()
     for {
       feeRate <- feeRateF
       roundDb = RoundDbs.newRound(
@@ -144,7 +149,9 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
           ()
         })
 
-      // todo make timeout for alices not registering
+      // handling sending blinded sig to alices
+      inputsRegisteredP.future.flatMap(_ => beginOutputRegistration())
+
       // handle sending psbt when all outputs registered
       outputsRegisteredP.future.flatMap(_ => sendUnsignedPSBT())
 
@@ -193,23 +200,49 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
 
   private[server] def beginInputRegistration(): Future[Unit] = {
     logger.info("Starting input registration")
+
     beginInputRegistrationCancellable.foreach(_.cancel())
     beginInputRegistrationCancellable = None
     inputRegStartTime = TimeUtil.currentEpochSecond
+
     for {
       roundDb <- roundDAO.read(currentRoundId).map(_.get)
       updated = roundDb.copy(status = RegisterAlices)
       _ <- roundDAO.update(updated)
-    } yield connectionHandlerMap.values.foreach(_ ! AskInputs(currentRoundId))
+    } yield {
+      beginOutputRegistrationCancellable = Some(
+        system.scheduler.scheduleOnce(config.inputRegistrationTime) {
+          inputsRegisteredP.success(())
+          ()
+        }
+      )
+      connectionHandlerMap.values.foreach(_ ! AskInputs(currentRoundId))
+    }
   }
 
   private[server] def beginOutputRegistration(): Future[Unit] = {
     logger.info("Starting output registration")
+
+    beginOutputRegistrationCancellable.foreach(_.cancel())
+    beginOutputRegistrationCancellable = None
+
     for {
       roundDb <- roundDAO.read(currentRoundId).map(_.get)
       updated = roundDb.copy(status = RegisterOutputs)
       _ <- roundDAO.update(updated)
-    } yield ()
+
+      peerSigMap <- aliceDAO.getPeerIdSigMap(currentRoundId)
+    } yield {
+      system.scheduler.scheduleOnce(config.outputRegistrationTime) {
+        outputsRegisteredP.success(())
+        ()
+      }
+
+      logger.info(s"Sending blinded sigs to ${peerSigMap.size} peers")
+      peerSigMap.foreach { case (peerId, sig) =>
+        connectionHandlerMap(peerId) ! BlindedSig(sig)
+      }
+    }
   }
 
   private[server] def sendUnsignedPSBT(): Future[Unit] = {
@@ -332,13 +365,14 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
           for {
             _ <- aliceDAO.update(updated)
             _ <- inputsDAO.createAll(inputDbs)
-            registered <- aliceDAO.numRegisteredForRound(currentRoundId)
 
-            // check if we need to stop waiting for peers
-            _ <-
-              if (registered >= config.maxPeers) {
-                beginOutputRegistration()
-              } else Future.unit
+            _ = logger.info(s"Alice ${peerId.hex} inputs registered")
+
+            registered <- aliceDAO.numRegisteredForRound(currentRoundId)
+            // check if we can to stop waiting for peers
+            _ = if (registered >= config.maxPeers) {
+              inputsRegisteredP.success(())
+            }
           } yield sig
         }
       } else {
@@ -556,6 +590,8 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
   }
 
   override def stop(): Future[Unit] = {
+    beginInputRegistrationCancellable.foreach(_.cancel())
+    beginOutputRegistrationCancellable.foreach(_.cancel())
     serverBindF.map { case (_, actorRef) =>
       system.stop(actorRef)
     }

@@ -113,6 +113,11 @@ case class VortexCoordinatorAppConfig(
     FiniteDuration(dur.getSeconds, SECONDS)
   }
 
+  lazy val outputRegistrationTime: FiniteDuration = {
+    val dur = config.getDuration(s"$moduleName.outputRegistrationTime")
+    FiniteDuration(dur.getSeconds, SECONDS)
+  }
+
   lazy val signingTime: FiniteDuration = {
     val dur = config.getDuration(s"$moduleName.signingTime")
     FiniteDuration(dur.getSeconds, SECONDS)

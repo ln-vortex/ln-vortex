@@ -64,6 +64,15 @@ case class AliceDAO()(implicit
     safeDatabase.run(query.result.transactionally)
   }
 
+  def getPeerIdSigMap(roundId: DoubleSha256Digest): Future[
+    Vector[(Sha256Digest, FieldElement)]] = {
+    val query = table
+      .filter(t => t.roundId === roundId && t.blindOutputSigOpt.isDefined)
+      .map(t => (t.peerId, t.blindOutputSigOpt.get))
+
+    safeDatabase.runVec(query.result.transactionally)
+  }
+
   def nextNonceIndex(): Future[Int] = {
     val query = table.map(_.nonceIndex).max
 
