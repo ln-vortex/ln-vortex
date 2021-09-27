@@ -3,11 +3,14 @@ package com.lnvortex.client.networking
 import akka.actor._
 import akka.event.LoggingReceive
 import com.lnvortex.client.VortexClient
+import com.lnvortex.client.api.CoinJoinWalletApi
 import com.lnvortex.core._
 
 import scala.concurrent._
 
-class ClientDataHandler(vortexClient: VortexClient, connectionHandler: ActorRef)
+class ClientDataHandler(
+    vortexClient: VortexClient[CoinJoinWalletApi],
+    connectionHandler: ActorRef)
     extends Actor
     with ActorLogging {
   implicit val ec: ExecutionContextExecutor = context.system.dispatcher
@@ -59,17 +62,20 @@ class ClientDataHandler(vortexClient: VortexClient, connectionHandler: ActorRef)
 
 object ClientDataHandler {
 
-  type Factory = (VortexClient, ActorContext, ActorRef) => ActorRef
+  type Factory =
+    (VortexClient[CoinJoinWalletApi], ActorContext, ActorRef) => ActorRef
 
   sealed trait Command
 
   def defaultFactory(
-      vortexClient: VortexClient,
+      vortexClient: VortexClient[CoinJoinWalletApi],
       context: ActorContext,
       connectionHandler: ActorRef): ActorRef = {
     context.actorOf(props(vortexClient, connectionHandler))
   }
 
-  def props(vortexClient: VortexClient, connectionHandler: ActorRef): Props =
+  def props(
+      vortexClient: VortexClient[CoinJoinWalletApi],
+      connectionHandler: ActorRef): Props =
     Props(new ClientDataHandler(vortexClient, connectionHandler))
 }

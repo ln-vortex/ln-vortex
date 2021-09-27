@@ -1,5 +1,6 @@
 package com.lnvortex.client
 
+import com.lnvortex.client.VortexClient.knownVersions
 import com.lnvortex.core._
 import com.lnvortex.core.crypto.BlindingTweaks
 import com.lnvortex.testkit.VortexClientFixture
@@ -10,8 +11,7 @@ import org.bitcoins.core.protocol.script._
 import org.bitcoins.core.protocol.transaction._
 import org.bitcoins.core.psbt.PSBT
 import org.bitcoins.crypto._
-
-import scala.concurrent.Future
+import org.bitcoins.testkitcore.gen.NumberGenerator
 
 class VortexClientTest extends VortexClientFixture {
   behavior of "VortexClient"
@@ -34,47 +34,19 @@ class VortexClientTest extends VortexClientFixture {
 
   it must "fail to process an unknown version MixAdvertisement" in {
     vortexClient =>
-      assertThrows[RuntimeException](
-        vortexClient.setRound(dummyAdvertisement.copy(version = UInt16.max)))
-  }
-
-  it must "fail to find all output references" in { vortexClient =>
-    recoverToSucceededIf[IllegalArgumentException](
-      vortexClient.getOutputReferences(Vector(EmptyTransactionOutPoint)))
-  }
-
-  it must "correctly sign a psbt" in { vortexClient =>
-    val lnd = vortexClient.lndRpcClient
-
-    for {
-      utxos <- vortexClient.listCoins()
-      refs <- vortexClient.getOutputReferences(utxos.flatMap(_.outPointOpt))
-      addr <- lnd.getNewAddress
-
-      inputs = utxos
-        .map(_.outPointOpt.get)
-        .map(TransactionInput(_, EmptyScriptSignature, UInt32.max))
-
-      output = {
-        val amt = utxos.map(_.amount).sum - Satoshis(300)
-        TransactionOutput(amt, addr.scriptPubKey)
+      forAll(NumberGenerator.uInt16.suchThat(!knownVersions.contains(_))) {
+        version =>
+          assertThrows[RuntimeException](
+            vortexClient.setRound(dummyAdvertisement.copy(version = version)))
       }
-
-      tx = BaseTransaction(Int32.two, inputs, Vector(output), UInt32.zero)
-      unsigned = PSBT.fromUnsignedTx(tx)
-      psbt = refs.zipWithIndex.foldLeft(unsigned) { case (psbt, (utxo, idx)) =>
-        psbt.addWitnessUTXOToInput(utxo.output, idx)
-      }
-
-      signed <- vortexClient.signPSBT(psbt, refs)
-    } yield assert(signed.extractTransactionAndValidate.isSuccess)
   }
 
   it must "fail to sign a psbt with no channel" in { vortexClient =>
-    val lnd = vortexClient.lndRpcClient
+    val lnd = vortexClient.coinjoinWallet
+
     for {
-      utxos <- lnd.listUnspent
-      refs <- vortexClient.getOutputReferences(utxos.flatMap(_.outPointOpt))
+      utxos <- vortexClient.listCoins
+      refs = utxos.map(_.outputReference)
       addrA <- lnd.getNewAddress
       addrB <- lnd.getNewAddress
       change = TransactionOutput(Satoshis(100000), addrA.scriptPubKey)
@@ -99,13 +71,12 @@ class VortexClientTest extends VortexClientFixture {
   }
 
   it must "fail to sign a psbt with a missing mix output" in { vortexClient =>
-    val lnd = vortexClient.lndRpcClient
+    val lnd = vortexClient.coinjoinWallet
+
     for {
-      utxos <- lnd.listUnspent
-      refs = utxos.map { utxoRes =>
-        val output = TransactionOutput(utxoRes.amount, utxoRes.spk)
-        OutputReference(utxoRes.outPointOpt.get, output)
-      }
+      utxos <- lnd.listCoins
+      refs = utxos.map(_.outputReference)
+
       addrA <- lnd.getNewAddress
       addrB <- lnd.getNewAddress
       change = TransactionOutput(Satoshis(100000), addrA.scriptPubKey)
@@ -132,10 +103,11 @@ class VortexClientTest extends VortexClientFixture {
 
   it must "fail to sign a psbt with a missing change output" in {
     vortexClient =>
-      val lnd = vortexClient.lndRpcClient
+      val lnd = vortexClient.coinjoinWallet
+
       for {
-        utxos <- lnd.listUnspent
-        refs <- vortexClient.getOutputReferences(utxos.flatMap(_.outPointOpt))
+        utxos <- vortexClient.listCoins
+        refs = utxos.map(_.outputReference)
         addrA <- lnd.getNewAddress
         addrB <- lnd.getNewAddress
         change = TransactionOutput(Satoshis(100000), addrA.scriptPubKey)
@@ -161,11 +133,12 @@ class VortexClientTest extends VortexClientFixture {
   }
 
   it must "fail to sign a psbt with a missing input" in { vortexClient =>
-    val lnd = vortexClient.lndRpcClient
+    val lnd = vortexClient.coinjoinWallet
+
     for {
-      utxos <- lnd.listUnspent
+      utxos <- vortexClient.listCoins
       _ = require(utxos.nonEmpty)
-      refs <- vortexClient.getOutputReferences(utxos.flatMap(_.outPointOpt))
+      refs = utxos.map(_.outputReference)
       addrA <- lnd.getNewAddress
       addrB <- lnd.getNewAddress
       change = TransactionOutput(Satoshis(100000), addrA.scriptPubKey)
@@ -188,20 +161,5 @@ class VortexClientTest extends VortexClientFixture {
       res <- recoverToSucceededIf[RuntimeException](
         vortexClient.validateAndSignPsbt(psbt))
     } yield res
-  }
-
-  it must "correctly create input proofs" in { vortexClient =>
-    for {
-      utxos <- vortexClient.listCoins()
-      outRefs <- vortexClient.getOutputReferences(utxos.map(_.outPointOpt.get))
-      proofFs = outRefs.map(vortexClient.createInputProof(nonce, _))
-      proofs <- Future.sequence(proofFs)
-    } yield {
-      val inputRefs = outRefs.zip(proofs).map { case (outRef, proof) =>
-        InputReference(outRef, proof)
-      }
-
-      assert(inputRefs.forall(InputReference.verifyInputProof(_, nonce)))
-    }
   }
 }

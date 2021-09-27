@@ -1,4 +1,4 @@
-package com.lnvortex.client
+package com.lnvortex.client.lnd
 
 import com.lnvortex.testkit.LndChannelOpenerFixture
 import org.bitcoins.core.currency.Satoshis
@@ -22,7 +22,6 @@ class LndChannelOpenerTest extends LndChannelOpenerFixture {
                                                 peerAddrOpt = None,
                                                 fundingAmount = amount,
                                                 privateChannel = false)
-
     } yield {
       assert(fundDetails.amount == amount)
       assert(fundDetails.address.scriptPubKey.isInstanceOf[P2WSHWitnessSPKV0])
@@ -54,7 +53,7 @@ class LndChannelOpenerTest extends LndChannelOpenerFixture {
             Map(fundDetails.address -> fundDetails.amount))
           .map(_.psbt)
         // fund channel with psbt
-        _ <- opener.fundPendingChannel(fundDetails.chanId, psbt)
+        _ <- opener.fundPendingChannel(fundDetails.id, psbt)
 
         midChannelsA <- lndA.listChannels()
         midChannelsB <- lndB.listChannels()

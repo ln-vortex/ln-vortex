@@ -26,16 +26,16 @@ class DualClientTest extends DualClientFixture {
 
   it must "register inputs" in { case (clientA, clientB, coordinator) =>
     for {
-      nodeIdA <- clientA.lndRpcClient.nodeId
-      nodeIdB <- clientB.lndRpcClient.nodeId
+      nodeIdA <- clientA.coinjoinWallet.lndRpcClient.nodeId
+      nodeIdB <- clientB.coinjoinWallet.lndRpcClient.nodeId
       _ <- clientA.askNonce()
       _ <- clientB.askNonce()
       _ <- coordinator.beginInputRegistration()
       // don't select all coins
-      utxosA <- clientA.listCoins().map(_.tail)
-      _ <- clientA.registerCoins(utxosA.map(_.outPointOpt.get), nodeIdB, None)
-      utxosB <- clientB.listCoins().map(_.tail)
-      _ <- clientB.registerCoins(utxosB.map(_.outPointOpt.get), nodeIdA, None)
+      utxosA <- clientA.listCoins.map(_.tail)
+      _ <- clientA.registerCoins(utxosA.map(_.outputReference), nodeIdB, None)
+      utxosB <- clientB.listCoins.map(_.tail)
+      _ <- clientB.registerCoins(utxosB.map(_.outputReference), nodeIdA, None)
       // give time for messages to send
       _ <- TestAsyncUtil.awaitConditionF(
         () =>
@@ -50,16 +50,16 @@ class DualClientTest extends DualClientFixture {
   it must "register inputs & outputs" in {
     case (clientA, clientB, coordinator) =>
       for {
-        nodeIdA <- clientA.lndRpcClient.nodeId
-        nodeIdB <- clientB.lndRpcClient.nodeId
+        nodeIdA <- clientA.coinjoinWallet.lndRpcClient.nodeId
+        nodeIdB <- clientB.coinjoinWallet.lndRpcClient.nodeId
         _ <- clientA.askNonce()
         _ <- clientB.askNonce()
         _ <- coordinator.beginInputRegistration()
         // don't select all coins
-        utxosA <- clientA.listCoins().map(_.tail)
-        _ <- clientA.registerCoins(utxosA.map(_.outPointOpt.get), nodeIdB, None)
-        utxosB <- clientB.listCoins().map(_.tail)
-        _ <- clientB.registerCoins(utxosB.map(_.outPointOpt.get), nodeIdA, None)
+        utxosA <- clientA.listCoins.map(_.tail)
+        _ <- clientA.registerCoins(utxosA.map(_.outputReference), nodeIdB, None)
+        utxosB <- clientB.listCoins.map(_.tail)
+        _ <- clientB.registerCoins(utxosB.map(_.outputReference), nodeIdA, None)
         // wait until outputs are registered
         _ <- TestAsyncUtil.awaitConditionF(
           () =>
@@ -87,18 +87,18 @@ class DualClientTest extends DualClientFixture {
 
   it must "sign the psbt" in { case (clientA, clientB, coordinator) =>
     for {
-      nodeIdA <- clientA.lndRpcClient.nodeId
-      nodeIdB <- clientB.lndRpcClient.nodeId
+      nodeIdA <- clientA.coinjoinWallet.lndRpcClient.nodeId
+      nodeIdB <- clientB.coinjoinWallet.lndRpcClient.nodeId
       roundId = coordinator.getCurrentRoundId
 
       _ <- clientA.askNonce()
       _ <- clientB.askNonce()
       _ <- coordinator.beginInputRegistration()
       // don't select all coins
-      utxosA <- clientA.listCoins().map(_.tail)
-      _ <- clientA.registerCoins(utxosA.map(_.outPointOpt.get), nodeIdB, None)
-      utxosB <- clientB.listCoins().map(_.tail)
-      _ <- clientB.registerCoins(utxosB.map(_.outPointOpt.get), nodeIdA, None)
+      utxosA <- clientA.listCoins.map(_.tail)
+      _ <- clientA.registerCoins(utxosA.map(_.outputReference), nodeIdB, None)
+      utxosB <- clientB.listCoins.map(_.tail)
+      _ <- clientB.registerCoins(utxosB.map(_.outputReference), nodeIdA, None)
       // wait until outputs are registered
       _ <- TestAsyncUtil.awaitConditionF(
         () =>
@@ -128,18 +128,18 @@ class DualClientTest extends DualClientFixture {
 
   it must "open the channels" in { case (clientA, clientB, coordinator) =>
     for {
-      nodeIdA <- clientA.lndRpcClient.nodeId
-      nodeIdB <- clientB.lndRpcClient.nodeId
+      nodeIdA <- clientA.coinjoinWallet.lndRpcClient.nodeId
+      nodeIdB <- clientB.coinjoinWallet.lndRpcClient.nodeId
       roundId = coordinator.getCurrentRoundId
 
       _ <- clientA.askNonce()
       _ <- clientB.askNonce()
       _ <- coordinator.beginInputRegistration()
       // don't select all coins
-      utxosA <- clientA.listCoins().map(_.tail)
-      _ <- clientA.registerCoins(utxosA.map(_.outPointOpt.get), nodeIdB, None)
-      utxosB <- clientB.listCoins().map(_.tail)
-      _ <- clientB.registerCoins(utxosB.map(_.outPointOpt.get), nodeIdA, None)
+      utxosA <- clientA.listCoins.map(_.tail)
+      _ <- clientA.registerCoins(utxosA.map(_.outputReference), nodeIdB, None)
+      utxosB <- clientB.listCoins.map(_.tail)
+      _ <- clientB.registerCoins(utxosB.map(_.outputReference), nodeIdA, None)
       // wait until outputs are registered
       _ <- TestAsyncUtil.awaitConditionF(
         () =>
@@ -171,13 +171,15 @@ class DualClientTest extends DualClientFixture {
 
       // wait until clientA sees new channels
       _ <- TestAsyncUtil.awaitConditionF(
-        () => clientA.lndRpcClient.listChannels().map(_.size == 2),
+        () =>
+          clientA.coinjoinWallet.lndRpcClient.listChannels().map(_.size == 2),
         interval = interval,
         maxTries = 500)
 
       // wait until clientB sees new channels
       _ <- TestAsyncUtil.awaitConditionF(
-        () => clientB.lndRpcClient.listChannels().map(_.size == 2),
+        () =>
+          clientB.coinjoinWallet.lndRpcClient.listChannels().map(_.size == 2),
         interval = interval,
         maxTries = 500)
     } yield succeed

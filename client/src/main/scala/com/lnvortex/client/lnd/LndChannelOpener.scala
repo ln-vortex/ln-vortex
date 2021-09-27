@@ -1,7 +1,8 @@
-package com.lnvortex.client
+package com.lnvortex.client.lnd
 
 import akka.actor.ActorSystem
 import akka.stream.scaladsl.Sink
+import com.lnvortex.client.OutputDetails
 import com.lnvortex.core.NodeUri
 import grizzled.slf4j.Logging
 import lnrpc.FundingShim.Shim.{PsbtShim => FundingPsbtShim}
@@ -11,7 +12,6 @@ import lnrpc._
 import org.bitcoins.core.currency._
 import org.bitcoins.core.protocol.BitcoinAddress
 import org.bitcoins.core.protocol.ln.node.NodeId
-import org.bitcoins.core.protocol.transaction.TransactionOutput
 import org.bitcoins.core.psbt.PSBT
 import org.bitcoins.crypto._
 import org.bitcoins.lnd.rpc.LndRpcClient
@@ -30,11 +30,9 @@ case class LndChannelOpener(lndRpcClient: LndRpcClient)(implicit
   def initPSBTChannelOpen(
       nodeUri: NodeUri,
       fundingAmount: CurrencyUnit,
-      privateChannel: Boolean): Future[PSBTFundingChannelDetails] = {
-    val socketAddress =
-      InetSocketAddress.createUnresolved(nodeUri.host, nodeUri.port)
+      privateChannel: Boolean): Future[OutputDetails] = {
     initPSBTChannelOpen(nodeUri.nodeId,
-                        Some(socketAddress),
+                        Some(nodeUri.socketAddress),
                         fundingAmount,
                         privateChannel)
   }
@@ -50,7 +48,7 @@ case class LndChannelOpener(lndRpcClient: LndRpcClient)(implicit
       nodeId: NodeId,
       peerAddrOpt: Option[InetSocketAddress],
       fundingAmount: CurrencyUnit,
-      privateChannel: Boolean): Future[PSBTFundingChannelDetails] = {
+      privateChannel: Boolean): Future[OutputDetails] = {
     logger.trace("lnd calling openchannel")
 
     // generate random channel id
@@ -73,13 +71,13 @@ case class LndChannelOpener(lndRpcClient: LndRpcClient)(implicit
     connectF.flatMap { _ =>
       lnd
         .openChannel(request)
-        .filter(_.update.isPsbtFund)
-        .map { update =>
-          val fund = update.update.asInstanceOf[PsbtFund]
+        .map(_.update)
+        .filter(_.isPsbtFund)
+        .collect { case fund: PsbtFund =>
           val amt = Satoshis(fund.value.fundingAmount)
           val addr = BitcoinAddress.fromString(fund.value.fundingAddress)
 
-          PSBTFundingChannelDetails(chanId, amt, addr)
+          OutputDetails(chanId, amt, addr)
         }
         .runWith(Sink.head)
     }
@@ -108,17 +106,11 @@ case class LndChannelOpener(lndRpcClient: LndRpcClient)(implicit
     val cancel = ShimCancel(FundingShimCancel(chanId))
     val verifyMsg = FundingTransitionMsg(cancel)
 
-    for {
-      _ <- lnd.fundingStateStep(verifyMsg)
-    } yield ()
+    val fundF = lnd.fundingStateStep(verifyMsg).map(_ => ())
+
+    fundF.failed.foreach { err =>
+      logger.error("Failed to cancelPendingChannel", err)
+    }
+    fundF
   }
-}
-
-case class PSBTFundingChannelDetails(
-    chanId: ByteVector,
-    amount: CurrencyUnit,
-    address: BitcoinAddress) {
-
-  val output: TransactionOutput =
-    TransactionOutput(amount, address.scriptPubKey)
 }

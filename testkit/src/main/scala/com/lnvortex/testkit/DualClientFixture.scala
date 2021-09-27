@@ -1,6 +1,7 @@
 package com.lnvortex.testkit
 
 import com.lnvortex.client.VortexClient
+import com.lnvortex.client.lnd.LndCoinJoinWallet
 import com.lnvortex.server.coordinator.VortexCoordinator
 import com.lnvortex.testkit.LnVortexTestUtils.getTestConfigs
 import com.typesafe.config.ConfigFactory
@@ -14,10 +15,16 @@ import scala.reflect.io.Directory
 
 trait DualClientFixture extends BitcoinSFixture with CachedBitcoindV21 {
 
-  override type FixtureParam = (VortexClient, VortexClient, VortexCoordinator)
+  override type FixtureParam = (
+      VortexClient[LndCoinJoinWallet],
+      VortexClient[LndCoinJoinWallet],
+      VortexCoordinator)
 
   override def withFixture(test: OneArgAsyncTest): FutureOutcome = {
-    makeDependentFixture[(VortexClient, VortexClient, VortexCoordinator)](
+    makeDependentFixture[(
+        VortexClient[LndCoinJoinWallet],
+        VortexClient[LndCoinJoinWallet],
+        VortexCoordinator)](
       () => {
         implicit val (_, serverConf) = getTestConfigs()
 
@@ -37,9 +44,9 @@ trait DualClientFixture extends BitcoinSFixture with CachedBitcoindV21 {
           clientConfig = getTestConfigs(config)._1
 
           (lndA, lndB) <- LndTestUtils.createNodePair(bitcoind)
-          clientA = VortexClient(lndA)(system, clientConfig)
+          clientA = VortexClient(LndCoinJoinWallet(lndA))(system, clientConfig)
           _ <- clientA.start()
-          clientB = VortexClient(lndB)(system, clientConfig)
+          clientB = VortexClient(LndCoinJoinWallet(lndB))(system, clientConfig)
           _ <- clientB.start()
 
           _ <- LndRpcTestUtil.connectLNNodes(lndA, lndB)
@@ -53,11 +60,11 @@ trait DualClientFixture extends BitcoinSFixture with CachedBitcoindV21 {
       },
       { case (clientA, clientB, coordinator) =>
         for {
-          _ <- clientA.lndRpcClient.stop()
+          _ <- clientA.coinjoinWallet.stop()
           _ <- clientA.stop()
           _ <- clientA.config.stop()
 
-          _ <- clientB.lndRpcClient.stop()
+          _ <- clientB.coinjoinWallet.stop()
           _ <- clientB.stop()
           _ <- clientB.config.stop()
 

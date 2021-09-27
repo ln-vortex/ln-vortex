@@ -5,7 +5,7 @@ import org.bitcoins.core.number._
 import org.bitcoins.core.protocol.script._
 import org.bitcoins.core.protocol.tlv.TLVUtil
 import org.bitcoins.core.protocol.transaction._
-import org.bitcoins.core.psbt.PSBT
+import org.bitcoins.core.script.interpreter.ScriptInterpreter
 import org.bitcoins.crypto._
 import scodec.bits._
 
@@ -61,7 +61,7 @@ object InputReference extends Factory[InputReference] {
     BaseTransaction(version = Int32.two,
                     inputs = Vector(proofInput, invalidInput),
                     outputs = Vector(output),
-                    lockTime = UInt32.zero)
+                    lockTime = UInt32.max)
   }
 
   def constructInputProofTx(
@@ -73,14 +73,12 @@ object InputReference extends Factory[InputReference] {
   def verifyInputProof(
       inputReference: InputReference,
       nonce: SchnorrNonce): Boolean = {
-    val tx = constructInputProofTx(inputReference.outputReference, nonce)
+    val tx = constructInputProofTx(inputReference.outPoint, nonce)
 
-    PSBT
-      .fromUnsignedTx(tx)
-      .addWitnessUTXOToInput(inputReference.output, 0)
-      .addFinalizedScriptWitnessToInput(EmptyScriptSignature,
-                                        inputReference.inputProof,
-                                        0)
-      .verifyFinalizedInput(0)
+    val wtx = WitnessTransaction
+      .toWitnessTx(tx)
+      .updateWitness(0, inputReference.inputProof)
+
+    ScriptInterpreter.verifyInputScript(wtx, 0, inputReference.output)
   }
 }

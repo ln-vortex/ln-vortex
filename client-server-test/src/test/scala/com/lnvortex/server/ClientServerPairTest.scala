@@ -47,8 +47,8 @@ class ClientServerPairTest extends ClientServerPairFixture {
       _ <- client.askNonce()
       _ <- coordinator.beginInputRegistration()
       // don't select all coins
-      utxos <- client.listCoins().map(_.tail)
-      _ <- client.registerCoins(utxos.map(_.outPointOpt.get), nodeId, None)
+      utxos <- client.listCoins.map(_.tail)
+      _ <- client.registerCoins(utxos.map(_.outputReference), nodeId, None)
       // give time for messages to send
       _ <- TestAsyncUtil.awaitConditionF(
         () => coordinator.inputsDAO.findAll().map(_.size == utxos.size),
@@ -64,8 +64,8 @@ class ClientServerPairTest extends ClientServerPairFixture {
         _ <- client.askNonce()
         _ <- coordinator.beginInputRegistration()
         // don't select all coins
-        utxos <- client.listCoins().map(_.tail)
-        _ <- client.registerCoins(utxos.map(_.outPointOpt.get), nodeId, None)
+        utxos <- client.listCoins.map(_.tail)
+        _ <- client.registerCoins(utxos.map(_.outputReference), nodeId, None)
         // wait until outputs are registered
         _ <- TestAsyncUtil.awaitConditionF(
           () => coordinator.inputsDAO.findAll().map(_.size == utxos.size),
@@ -93,8 +93,8 @@ class ClientServerPairTest extends ClientServerPairFixture {
 
       _ <- coordinator.beginInputRegistration()
       // don't select all coins
-      utxos <- client.listCoins().map(_.tail)
-      _ <- client.registerCoins(utxos.map(_.outPointOpt.get), nodeId, None)
+      utxos <- client.listCoins.map(_.tail)
+      _ <- client.registerCoins(utxos.map(_.outputReference), nodeId, None)
       _ <- TestAsyncUtil.awaitConditionF(
         () => coordinator.inputsDAO.findAll().map(_.size == utxos.size),
         interval = interval,
@@ -127,8 +127,8 @@ class ClientServerPairTest extends ClientServerPairFixture {
 
       _ <- coordinator.beginInputRegistration()
       // don't select all coins
-      utxos <- client.listCoins().map(_.tail)
-      _ <- client.registerCoins(utxos.map(_.outPointOpt.get), nodeId, None)
+      utxos <- client.listCoins.map(_.tail)
+      _ <- client.registerCoins(utxos.map(_.outputReference), nodeId, None)
       _ <- TestAsyncUtil.awaitConditionF(
         () => coordinator.inputsDAO.findAll().map(_.size == utxos.size),
         interval = interval,

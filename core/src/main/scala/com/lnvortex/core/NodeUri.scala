@@ -3,10 +3,14 @@ package com.lnvortex.core
 import org.bitcoins.core.protocol.ln.node.NodeId
 import org.bitcoins.crypto.StringFactory
 
+import java.net.InetSocketAddress
 import scala.util.{Failure, Success, Try}
 
 case class NodeUri(nodeId: NodeId, host: String, port: Int) {
-  override def toString = s"$nodeId@$host:$port"
+  override val toString = s"$nodeId@$host:$port"
+
+  val socketAddress: InetSocketAddress =
+    InetSocketAddress.createUnresolved(host, port)
 }
 
 object NodeUri extends StringFactory[NodeUri] {
@@ -18,14 +22,13 @@ object NodeUri extends StringFactory[NodeUri] {
 
     val isUriWithPort = patternWithPort.findFirstIn(uri)
 
-    val nodeUriT = isUriWithPort match {
+    isUriWithPort match {
       case Some(withPort) =>
         Success(parse(withPort))
       case None =>
         Failure(
           new IllegalArgumentException(s"Failed to parse $uri to a NodeUri"))
     }
-    nodeUriT
   }
 
   override def fromString(string: String): NodeUri = {

@@ -1,6 +1,7 @@
 package com.lnvortex.testkit
 
 import com.lnvortex.client.VortexClient
+import com.lnvortex.client.lnd.LndCoinJoinWallet
 import com.lnvortex.server.coordinator.VortexCoordinator
 import com.lnvortex.testkit.LnVortexTestUtils.getTestConfigs
 import com.typesafe.config.ConfigFactory
@@ -15,10 +16,14 @@ import scala.reflect.io.Directory
 
 trait ClientServerPairFixture extends BitcoinSFixture with CachedBitcoindV21 {
 
-  override type FixtureParam = (VortexClient, VortexCoordinator, LndRpcClient)
+  override type FixtureParam =
+    (VortexClient[LndCoinJoinWallet], VortexCoordinator, LndRpcClient)
 
   override def withFixture(test: OneArgAsyncTest): FutureOutcome = {
-    makeDependentFixture[(VortexClient, VortexCoordinator, LndRpcClient)](
+    makeDependentFixture[(
+        VortexClient[LndCoinJoinWallet],
+        VortexCoordinator,
+        LndRpcClient)](
       () => {
         implicit val (_, serverConf) = getTestConfigs()
 
@@ -38,7 +43,7 @@ trait ClientServerPairFixture extends BitcoinSFixture with CachedBitcoindV21 {
           clientConfig = getTestConfigs(config)._1
 
           (lnd, peerLnd) <- LndTestUtils.createNodePair(bitcoind)
-          client = VortexClient(lnd)(system, clientConfig)
+          client = VortexClient(LndCoinJoinWallet(lnd))(system, clientConfig)
           _ <- client.start()
 
           _ <- LndRpcTestUtil.connectLNNodes(lnd, peerLnd)
@@ -51,7 +56,7 @@ trait ClientServerPairFixture extends BitcoinSFixture with CachedBitcoindV21 {
       { case (client, coordinator, peerLnd) =>
         for {
           _ <- peerLnd.stop()
-          _ <- client.lndRpcClient.stop()
+          _ <- client.coinjoinWallet.stop()
           _ <- client.stop()
           _ <- client.config.stop()
 

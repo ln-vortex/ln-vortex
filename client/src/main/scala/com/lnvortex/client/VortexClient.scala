@@ -2,6 +2,7 @@ package com.lnvortex.client
 
 import akka.actor.{ActorRef, ActorSystem}
 import com.lnvortex.client.RoundDetails.getNonceOpt
+import com.lnvortex.client.api.CoinJoinWalletApi
 import com.lnvortex.client.config.VortexAppConfig
 import com.lnvortex.client.networking.{P2PClient, Peer}
 import com.lnvortex.core._
@@ -9,22 +10,19 @@ import com.lnvortex.core.crypto.BlindSchnorrUtil
 import com.lnvortex.core.crypto.BlindingTweaks.freshBlindingTweaks
 import grizzled.slf4j.Logging
 import org.bitcoins.asyncutil.AsyncUtil
-import org.bitcoins.commons.jsonmodels.lnd.UTXOResult
 import org.bitcoins.core.currency.Satoshis
 import org.bitcoins.core.number.UInt16
 import org.bitcoins.core.policy.Policy
 import org.bitcoins.core.protocol.ln.node.NodeId
-import org.bitcoins.core.protocol.script._
 import org.bitcoins.core.protocol.transaction._
 import org.bitcoins.core.psbt.PSBT
 import org.bitcoins.core.util.{FutureUtil, StartStopAsync}
 import org.bitcoins.crypto._
-import org.bitcoins.lnd.rpc.LndRpcClient
 
 import java.net.InetSocketAddress
 import scala.concurrent.{Future, Promise}
 
-case class VortexClient(lndRpcClient: LndRpcClient)(implicit
+case class VortexClient[+T <: CoinJoinWalletApi](coinjoinWallet: T)(implicit
     system: ActorSystem,
     val config: VortexAppConfig)
     extends StartStopAsync[Unit]
@@ -35,19 +33,14 @@ case class VortexClient(lndRpcClient: LndRpcClient)(implicit
 
   private var roundDetails: RoundDetails = NoDetails
 
-  private[client] def setRoundDetails(details: RoundDetails): Unit = {
+  private[client] def setRoundDetails(details: RoundDetails): Unit =
     roundDetails = details
-  }
 
   private[lnvortex] def getCurrentRoundDetails: RoundDetails =
     roundDetails
 
-  private val knownVersions = Vector(UInt16.zero)
-
-  private val channelOpener = LndChannelOpener(lndRpcClient)
-
   private[client] def setRound(adv: MixDetails): Unit = {
-    if (knownVersions.contains(adv.version)) {
+    if (VortexClient.knownVersions.contains(adv.version)) {
       roundDetails = KnownRound(adv)
     } else {
       throw new RuntimeException(
@@ -77,23 +70,7 @@ case class VortexClient(lndRpcClient: LndRpcClient)(implicit
     } yield handler ! AskMixDetails(config.network)
   }
 
-  def listCoins(): Future[Vector[UTXOResult]] = {
-    lndRpcClient.listUnspent
-  }
-
-  def getOutputReferences(outpoints: Vector[TransactionOutPoint]): Future[
-    Vector[OutputReference]] = {
-    lndRpcClient.listUnspent.map { all =>
-      val outRefs =
-        all.filter(t => outpoints.contains(t.outPointOpt.get)).map { utxoRes =>
-          val output = TransactionOutput(utxoRes.amount, utxoRes.spk)
-          OutputReference(utxoRes.outPointOpt.get, output)
-        }
-      require(outRefs.size == outpoints.size,
-              "Did not find all output references")
-      outRefs
-    }
-  }
+  def listCoins: Future[Vector[UnspentCoin]] = coinjoinWallet.listCoins
 
   def askNonce(): Future[SchnorrNonce] = {
     logger.info("Asking nonce from coordinator")
@@ -114,22 +91,6 @@ case class VortexClient(lndRpcClient: LndRpcClient)(implicit
     }
   }
 
-  /** Creates a proof of ownership for the input and then locks it
-    * @param nonce Round Nonce for the peer
-    * @param outputRef OutputReference for the input
-    * @return Signed ScriptWitness
-    */
-  private[client] def createInputProof(
-      nonce: SchnorrNonce,
-      outputRef: OutputReference): Future[ScriptWitness] = {
-    val tx = InputReference.constructInputProofTx(outputRef, nonce)
-
-    for {
-      (_, scriptWit) <- lndRpcClient.computeInputScript(tx, 0, outputRef.output)
-      _ <- lndRpcClient.leaseOutput(outputRef.outPoint, 3600)
-    } yield scriptWit
-  }
-
   private[client] def storeNonce(nonce: SchnorrNonce): Unit = {
     roundDetails match {
       case state @ (NoDetails | _: ReceivedNonce | _: InitializedRound) =>
@@ -140,19 +101,17 @@ case class VortexClient(lndRpcClient: LndRpcClient)(implicit
   }
 
   def registerCoins(
-      outpoints: Vector[TransactionOutPoint],
+      outputRefs: Vector[OutputReference],
       nodeUri: NodeUri): Future[Unit] = {
-    val socketAddress =
-      InetSocketAddress.createUnresolved(nodeUri.host, nodeUri.port)
-    registerCoins(outpoints, nodeUri.nodeId, Some(socketAddress))
+    registerCoins(outputRefs, nodeUri.nodeId, Some(nodeUri.socketAddress))
   }
 
   def registerCoins(
-      outpoints: Vector[TransactionOutPoint],
+      outputRefs: Vector[OutputReference],
       nodeId: NodeId,
       peerAddrOpt: Option[InetSocketAddress]): Future[Unit] = {
     logger.info(
-      s"Registering ${outpoints.size} coins to open a channel to $nodeId")
+      s"Registering ${outputRefs.size} coins to open a channel to $nodeId")
     roundDetails match {
       case state @ (NoDetails | _: KnownRound | _: InitializedRound) =>
         Future.failed(
@@ -162,7 +121,6 @@ case class VortexClient(lndRpcClient: LndRpcClient)(implicit
         val round = receivedNonce.round
         for {
           handler <- handlerP.future
-          outputRefs <- getOutputReferences(outpoints)
 
           selectedAmt = outputRefs.map(_.output.value).sum
           inputFees = Satoshis(outputRefs.size) * round.inputFee
@@ -175,34 +133,36 @@ case class VortexClient(lndRpcClient: LndRpcClient)(implicit
             s"Not enough coins selected, need ${changeAmt - Policy.dustThreshold} more, total selected $selectedAmt")
 
           inputProofs <- FutureUtil.sequentially(outputRefs)(
-            createInputProof(receivedNonce.nonce, _))
+            coinjoinWallet.createInputProof(receivedNonce.nonce, _))
+
           inputRefs = outputRefs.zip(inputProofs).map { case (outRef, proof) =>
             InputReference(outRef, proof)
           }
 
-          changeAddr <- lndRpcClient.getNewAddress
+          changeAddr <- coinjoinWallet.getChangeAddress
           changeOutput = TransactionOutput(changeAmt, changeAddr.scriptPubKey)
 
-          channelDetails <- channelOpener.initPSBTChannelOpen(
+          channelDetails <- coinjoinWallet.initChannelOpen(
             nodeId = nodeId,
             peerAddrOpt = peerAddrOpt,
             fundingAmount = receivedNonce.round.amount,
             privateChannel = false)
-          mixOutput = channelDetails.output
+        } yield {
+          val mixOutput = channelDetails.output
+          val hashedOutput =
+            BobMessage.calculateChallenge(mixOutput, round.roundId)
 
-          hashedOutput = BobMessage.calculateChallenge(mixOutput, round.roundId)
-
-          tweaks = freshBlindingTweaks(signerPubKey = round.publicKey,
-                                       signerNonce = receivedNonce.nonce)
-          challenge = BlindSchnorrUtil.generateChallenge(
+          val tweaks = freshBlindingTweaks(signerPubKey = round.publicKey,
+                                           signerNonce = receivedNonce.nonce)
+          val challenge = BlindSchnorrUtil.generateChallenge(
             signerPubKey = round.publicKey,
             signerNonce = receivedNonce.nonce,
             blindingTweaks = tweaks,
             message = hashedOutput)
-        } yield {
+
           val details = InitDetails(inputs = outputRefs,
                                     changeOutput = changeOutput,
-                                    chanId = channelDetails.chanId,
+                                    chanId = channelDetails.id,
                                     mixOutput = mixOutput,
                                     tweaks = tweaks)
           roundDetails = receivedNonce.nextStage(details)
@@ -247,25 +207,6 @@ case class VortexClient(lndRpcClient: LndRpcClient)(implicit
     }
   }
 
-  private[client] def signPSBT(
-      unsigned: PSBT,
-      inputs: Vector[OutputReference]): Future[PSBT] = {
-    val txOutpoints = unsigned.transaction.inputs.map(_.previousOutput)
-
-    val sigFs = inputs.map { input =>
-      val idx = txOutpoints.indexOf(input.outPoint)
-      lndRpcClient
-        .computeInputScript(unsigned.transaction, idx, input.output)
-        .map { case (scriptSig, witness) => (scriptSig, witness, idx) }
-    }
-
-    Future.sequence(sigFs).map { sigs =>
-      sigs.foldLeft(unsigned) { case (psbt, (scriptSig, witness, idx)) =>
-        psbt.addFinalizedScriptWitnessToInput(scriptSig, witness, idx)
-      }
-    }
-  }
-
   def validateAndSignPsbt(unsigned: PSBT): Future[PSBT] = {
     logger.info("Received unsigned psbt from coordinator, verifying...")
     roundDetails match {
@@ -291,18 +232,17 @@ case class VortexClient(lndRpcClient: LndRpcClient)(implicit
           logger.info("PSBT is valid, giving channel peer")
           for {
             // tell peer about funding psbt
-            _ <- channelOpener.fundPendingChannel(state.initDetails.chanId,
-                                                  unsigned)
+            _ <- coinjoinWallet.completeChannelOpen(state.initDetails.chanId,
+                                                    unsigned)
             _ = logger.info("Valid with channel peer, signing")
             // sign to be sent to coordinator
-            signed <- signPSBT(unsigned, inputs)
+            signed <- coinjoinWallet.signPSBT(unsigned, inputs)
           } yield signed
         } else {
           Future.failed(
             new RuntimeException(
               "Received PSBT did not contain our inputs or outputs"))
         }
-
     }
   }
 
@@ -316,10 +256,14 @@ case class VortexClient(lndRpcClient: LndRpcClient)(implicit
       case _: PSBTSigned =>
         logger.info("Coinjoin complete!!")
         for {
-          _ <- lndRpcClient.publishTransaction(signedTx)
+          _ <- coinjoinWallet.broadcastTransaction(signedTx)
           _ <- stop()
           _ <- getNewRound
         } yield ()
     }
   }
+}
+
+object VortexClient {
+  val knownVersions: Vector[UInt16] = Vector(UInt16.zero)
 }
