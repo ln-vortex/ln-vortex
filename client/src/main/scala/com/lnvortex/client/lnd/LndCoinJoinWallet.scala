@@ -4,6 +4,7 @@ import akka.actor.ActorSystem
 import com.lnvortex.client.OutputDetails
 import com.lnvortex.client.api.CoinJoinWalletApi
 import com.lnvortex.core.{InputReference, UnspentCoin}
+import org.bitcoins.core.config.BitcoinNetwork
 import org.bitcoins.core.currency.CurrencyUnit
 import org.bitcoins.core.protocol.BitcoinAddress
 import org.bitcoins.core.protocol.ln.node.NodeId
@@ -23,6 +24,8 @@ case class LndCoinJoinWallet(lndRpcClient: LndRpcClient)(implicit
   import system.dispatcher
 
   private val channelOpener = LndChannelOpener(lndRpcClient)
+
+  override def network: BitcoinNetwork = lndRpcClient.instance.network
 
   override def getNewAddress: Future[BitcoinAddress] =
     lndRpcClient.getNewAddress

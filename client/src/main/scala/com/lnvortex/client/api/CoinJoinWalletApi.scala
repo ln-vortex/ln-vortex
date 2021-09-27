@@ -2,6 +2,7 @@ package com.lnvortex.client.api
 
 import com.lnvortex.client.OutputDetails
 import com.lnvortex.core._
+import org.bitcoins.core.config.BitcoinNetwork
 import org.bitcoins.core.currency.CurrencyUnit
 import org.bitcoins.core.protocol.BitcoinAddress
 import org.bitcoins.core.protocol.ln.node.NodeId
@@ -16,6 +17,8 @@ import java.net.InetSocketAddress
 import scala.concurrent._
 
 abstract class CoinJoinWalletApi extends StartStopAsync[Unit] {
+
+  def network: BitcoinNetwork
 
   def getNewAddress: Future[BitcoinAddress]
   def getChangeAddress: Future[BitcoinAddress]

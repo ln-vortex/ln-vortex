@@ -67,7 +67,7 @@ case class VortexClient[+T <: CoinJoinWalletApi](coinjoinWallet: T)(implicit
     for {
       _ <- P2PClient.connect(peer, this, Some(handlerP))
       handler <- handlerP.future
-    } yield handler ! AskMixDetails(config.network)
+    } yield handler ! AskMixDetails(coinjoinWallet.network)
   }
 
   def listCoins: Future[Vector[UnspentCoin]] = coinjoinWallet.listCoins

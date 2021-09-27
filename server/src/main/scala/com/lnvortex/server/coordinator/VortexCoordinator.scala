@@ -37,6 +37,9 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
     with Logging {
   import system.dispatcher
 
+  require(bitcoind.instance.network == config.network,
+          "Bitcoind on different network")
+
   final val version = UInt16.zero
 
   private[server] val bannedUtxoDAO = BannedUtxoDAO()
