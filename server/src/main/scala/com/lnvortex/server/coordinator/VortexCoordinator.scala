@@ -92,7 +92,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       mixFee = config.mixFee,
       inputFee = inputFee,
       outputFee = outputFee,
-      publicKey = km.publicKey,
+      publicKey = publicKey,
       time = UInt64(roundStartTime())
     )
 
@@ -398,7 +398,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
 
   private[server] def verifyAndRegisterBob(bob: BobMessage): Future[Unit] = {
     logger.info("A bob is registering an output")
-    if (bob.verifySigAndOutput(km.publicKey, currentRoundId)) {
+    if (bob.verifySigAndOutput(publicKey, currentRoundId)) {
       val db = RegisteredOutputDb(bob.output, bob.sig, currentRoundId)
       for {
         roundOpt <- roundDAO.read(currentRoundId)
