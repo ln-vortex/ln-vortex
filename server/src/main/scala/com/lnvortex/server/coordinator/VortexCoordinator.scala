@@ -200,7 +200,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       roundDb <- roundDAO.read(currentRoundId).map(_.get)
       updated = roundDb.copy(status = RegisterAlices)
       _ <- roundDAO.update(updated)
-    } yield ()
+    } yield connectionHandlerMap.values.foreach(_ ! AskInputs(currentRoundId))
   }
 
   private[server] def beginOutputRegistration(): Future[Unit] = {
@@ -237,7 +237,11 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
 
         connectionHandlerMap.put(peerId, connectionHandler)
 
-        aliceDAO.create(aliceDb)
+        aliceDAO.create(aliceDb).flatMap { db =>
+          if (connectionHandlerMap.values.size >= config.maxPeers) {
+            beginInputRegistration().map(_ => db)
+          } else Future.successful(db)
+        }
     }
   }
 

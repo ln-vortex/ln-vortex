@@ -31,6 +31,13 @@ class VortexMessageSerializationTest extends BitcoinSUnitTest {
     }
   }
 
+  "AskInputs" must "have serialization symmetry" in {
+    forAll(Generators.askInputs) { msg =>
+      assert(AskInputs(msg.bytes) == msg)
+      assert(VortexMessage(msg.bytes) == msg)
+    }
+  }
+
   "Nonce" must "have serialization symmetry" in {
     forAll(Generators.nonceMsg) { msg =>
       assert(NonceMessage(msg.bytes) == msg)

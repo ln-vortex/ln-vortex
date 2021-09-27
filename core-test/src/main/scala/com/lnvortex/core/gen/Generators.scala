@@ -42,6 +42,12 @@ object Generators {
     } yield NonceMessage(nonce)
   }
 
+  def askInputs: Gen[AskInputs] = {
+    for {
+      roundId <- CryptoGenerators.doubleSha256Digest
+    } yield AskInputs(roundId)
+  }
+
   def inputReference: Gen[InputReference] = {
     for {
       outpoint <- TransactionGenerators.outPoint

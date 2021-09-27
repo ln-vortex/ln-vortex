@@ -43,6 +43,8 @@ class ClientDataHandler(
       case NonceMessage(schnorrNonce) =>
         vortexClient.storeNonce(schnorrNonce)
         Future.unit
+      case AskInputs(roundId) =>
+        vortexClient.registerCoins(roundId)
       case BlindedSig(blindOutputSig) =>
         for {
           _ <- vortexClient.processBlindOutputSig(blindOutputSig)

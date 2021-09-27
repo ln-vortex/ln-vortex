@@ -86,54 +86,72 @@ case class VortexClient[+T <: CoinJoinWalletApi](coinjoinWallet: T)(implicit
           logger.info(s"Got nonce from coordinator $nonce")
           nonce
         }
-      case _: ReceivedNonce | NoDetails | _: InitializedRound =>
+      case NoDetails | _: ReceivedNonce | _: InputsScheduled |
+          _: InitializedRound =>
         Future.failed(new RuntimeException("In incorrect state"))
     }
   }
 
   private[client] def storeNonce(nonce: SchnorrNonce): Unit = {
     roundDetails match {
-      case state @ (NoDetails | _: ReceivedNonce | _: InitializedRound) =>
+      case state @ (NoDetails | _: ReceivedNonce | _: InitializedRound |
+          _: InputsScheduled) =>
         throw new IllegalStateException(s"Cannot store nonce at state $state")
       case details: KnownRound =>
         roundDetails = details.nextStage(nonce)
     }
   }
 
-  def registerCoins(
+  def queueCoins(
       outputRefs: Vector[OutputReference],
-      nodeUri: NodeUri): Future[Unit] = {
-    registerCoins(outputRefs, nodeUri.nodeId, Some(nodeUri.socketAddress))
+      nodeUri: NodeUri): Unit = {
+    queueCoins(outputRefs, nodeUri.nodeId, Some(nodeUri.socketAddress))
   }
 
-  def registerCoins(
+  def queueCoins(
       outputRefs: Vector[OutputReference],
       nodeId: NodeId,
-      peerAddrOpt: Option[InetSocketAddress]): Future[Unit] = {
-    logger.info(
-      s"Registering ${outputRefs.size} coins to open a channel to $nodeId")
+      peerAddrOpt: Option[InetSocketAddress]): Unit = {
     roundDetails match {
-      case state @ (NoDetails | _: KnownRound | _: InitializedRound) =>
+      case state @ (NoDetails | _: KnownRound | _: InputsScheduled |
+          _: InputsRegistered | _: MixOutputRegistered | _: PSBTSigned) =>
+        throw new IllegalStateException(
+          s"At invalid state $state, cannot sendRegisteredCoins")
+      case receivedNonce: ReceivedNonce =>
+        logger.info(
+          s"Queueing ${outputRefs.size} coins to open a channel to $nodeId")
+        roundDetails = receivedNonce.nextStage(outputRefs, nodeId, peerAddrOpt)
+    }
+  }
+
+  private[client] def registerCoins(
+      roundId: DoubleSha256Digest): Future[Unit] = {
+    roundDetails match {
+      case state @ (NoDetails | _: KnownRound | _: ReceivedNonce |
+          _: InitializedRound) =>
         Future.failed(
           new IllegalStateException(
             s"At invalid state $state, cannot register coins"))
-      case receivedNonce: ReceivedNonce =>
-        val round = receivedNonce.round
+      case scheduled: InputsScheduled =>
+        val round = scheduled.round
+        require(scheduled.round.roundId == roundId,
+                "Attempted to get coins for a different round")
+
+        val outputRefs = scheduled.inputs
+        val selectedAmt = outputRefs.map(_.output.value).sum
+        val inputFees = Satoshis(outputRefs.size) * round.inputFee
+        val outputFees = Satoshis(2) * round.outputFee
+        val onChainFees = inputFees + outputFees
+        val changeAmt = selectedAmt - round.amount - round.mixFee - onChainFees
+
+        require(
+          changeAmt > Policy.dustThreshold,
+          s"Not enough coins selected, need ${changeAmt - Policy.dustThreshold} more, total selected $selectedAmt")
+
         for {
           handler <- handlerP.future
-
-          selectedAmt = outputRefs.map(_.output.value).sum
-          inputFees = Satoshis(outputRefs.size) * round.inputFee
-          outputFees = Satoshis(2) * round.outputFee
-          onChainFees = inputFees + outputFees
-          changeAmt = selectedAmt - round.amount - round.mixFee - onChainFees
-
-          _ = require(
-            changeAmt > Policy.dustThreshold,
-            s"Not enough coins selected, need ${changeAmt - Policy.dustThreshold} more, total selected $selectedAmt")
-
           inputProofs <- FutureUtil.sequentially(outputRefs)(
-            coinjoinWallet.createInputProof(receivedNonce.nonce, _))
+            coinjoinWallet.createInputProof(scheduled.nonce, _))
 
           inputRefs = outputRefs.zip(inputProofs).map { case (outRef, proof) =>
             InputReference(outRef, proof)
@@ -143,9 +161,9 @@ case class VortexClient[+T <: CoinJoinWalletApi](coinjoinWallet: T)(implicit
           changeOutput = TransactionOutput(changeAmt, changeAddr.scriptPubKey)
 
           channelDetails <- coinjoinWallet.initChannelOpen(
-            nodeId = nodeId,
-            peerAddrOpt = peerAddrOpt,
-            fundingAmount = receivedNonce.round.amount,
+            nodeId = scheduled.nodeId,
+            peerAddrOpt = scheduled.peerAddrOpt,
+            fundingAmount = scheduled.round.amount,
             privateChannel = false)
         } yield {
           val mixOutput = channelDetails.output
@@ -153,10 +171,10 @@ case class VortexClient[+T <: CoinJoinWalletApi](coinjoinWallet: T)(implicit
             BobMessage.calculateChallenge(mixOutput, round.roundId)
 
           val tweaks = freshBlindingTweaks(signerPubKey = round.publicKey,
-                                           signerNonce = receivedNonce.nonce)
+                                           signerNonce = scheduled.nonce)
           val challenge = BlindSchnorrUtil.generateChallenge(
             signerPubKey = round.publicKey,
-            signerNonce = receivedNonce.nonce,
+            signerNonce = scheduled.nonce,
             blindingTweaks = tweaks,
             message = hashedOutput)
 
@@ -165,7 +183,8 @@ case class VortexClient[+T <: CoinJoinWalletApi](coinjoinWallet: T)(implicit
                                     chanId = channelDetails.id,
                                     mixOutput = mixOutput,
                                     tweaks = tweaks)
-          roundDetails = receivedNonce.nextStage(details)
+
+          roundDetails = scheduled.nextStage(details)
 
           handler ! RegisterInputs(inputRefs, challenge, changeOutput)
         }
@@ -176,7 +195,7 @@ case class VortexClient[+T <: CoinJoinWalletApi](coinjoinWallet: T)(implicit
     logger.info("Got blind sig from coordinator, processing..")
     roundDetails match {
       case state @ (NoDetails | _: KnownRound | _: ReceivedNonce |
-          _: MixOutputRegistered | _: PSBTSigned) =>
+          _: InputsScheduled | _: MixOutputRegistered | _: PSBTSigned) =>
         Future.failed(
           new IllegalStateException(
             s"At invalid state $state, cannot processBlindOutputSig"))
@@ -211,7 +230,7 @@ case class VortexClient[+T <: CoinJoinWalletApi](coinjoinWallet: T)(implicit
     logger.info("Received unsigned psbt from coordinator, verifying...")
     roundDetails match {
       case state @ (NoDetails | _: KnownRound | _: ReceivedNonce |
-          _: InputsRegistered | _: PSBTSigned) =>
+          _: InputsScheduled | _: InputsRegistered | _: PSBTSigned) =>
         Future.failed(
           new IllegalStateException(
             s"At invalid state $state, cannot validateAndSignPsbt"))
@@ -251,7 +270,7 @@ case class VortexClient[+T <: CoinJoinWalletApi](coinjoinWallet: T)(implicit
   def completeRound(signedTx: Transaction): Future[Unit] = {
     roundDetails match {
       case state @ (NoDetails | _: KnownRound | _: ReceivedNonce |
-          _: InputsRegistered | _: MixOutputRegistered) =>
+          _: InputsScheduled | _: InputsRegistered | _: MixOutputRegistered) =>
         Future.failed(
           new IllegalStateException(
             s"At invalid state $state, cannot completeRound"))

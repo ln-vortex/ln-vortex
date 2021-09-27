@@ -37,6 +37,7 @@ object VortexMessage extends Factory[VortexMessage] with Logging {
            MixDetails,
            AskNonce,
            NonceMessage,
+           AskInputs,
            RegisterInputs,
            BlindedSig,
            BobMessage,
@@ -108,7 +109,7 @@ case class AskMixDetails(network: BitcoinNetwork) extends ClientVortexMessage {
 }
 
 object AskMixDetails extends VortexMessageFactory[AskMixDetails] {
-  override val tpe: BigSizeUInt = BigSizeUInt(696961L)
+  override val tpe: BigSizeUInt = BigSizeUInt(42001)
 
   override val typeName: String = "AskMixDetails"
 
@@ -146,7 +147,7 @@ case class MixDetails(
 }
 
 object MixDetails extends VortexMessageFactory[MixDetails] {
-  override val tpe: BigSizeUInt = BigSizeUInt(696963L)
+  override val tpe: BigSizeUInt = BigSizeUInt(42003)
 
   override val typeName: String = "MixAdvertisement"
 
@@ -182,7 +183,7 @@ case class AskNonce(roundId: DoubleSha256Digest) extends ClientVortexMessage {
 }
 
 object AskNonce extends VortexMessageFactory[AskNonce] {
-  override val tpe: BigSizeUInt = BigSizeUInt(696965L)
+  override val tpe: BigSizeUInt = BigSizeUInt(42005)
 
   override val typeName: String = "AskNonce"
 
@@ -204,7 +205,7 @@ case class NonceMessage(schnorrNonce: SchnorrNonce)
 }
 
 object NonceMessage extends VortexMessageFactory[NonceMessage] {
-  override val tpe: BigSizeUInt = BigSizeUInt(696967L)
+  override val tpe: BigSizeUInt = BigSizeUInt(42007)
 
   override val typeName: String = "NonceMessage"
 
@@ -213,6 +214,27 @@ object NonceMessage extends VortexMessageFactory[NonceMessage] {
     val nonce = SchnorrNonce(iter.take(32))
 
     NonceMessage(nonce)
+  }
+}
+
+case class AskInputs(roundId: DoubleSha256Digest) extends ServerVortexMessage {
+  override val tpe: BigSizeUInt = AskInputs.tpe
+
+  override val value: ByteVector = {
+    roundId.bytes
+  }
+}
+
+object AskInputs extends VortexMessageFactory[AskInputs] {
+  override val tpe: BigSizeUInt = BigSizeUInt(42009)
+
+  override val typeName: String = "AskInputs"
+
+  override def fromTLVValue(value: ByteVector): AskInputs = {
+    val iter = ValueIterator(value)
+    val roundId = DoubleSha256Digest(iter.take(32))
+
+    AskInputs(roundId)
   }
 }
 
@@ -238,7 +260,7 @@ case class RegisterInputs(
 }
 
 object RegisterInputs extends VortexMessageFactory[RegisterInputs] {
-  override val tpe: BigSizeUInt = BigSizeUInt(696969L)
+  override val tpe: BigSizeUInt = BigSizeUInt(42011)
 
   override val typeName: String = "RegisterInputs"
 
@@ -269,7 +291,7 @@ case class BlindedSig(blindOutputSig: FieldElement)
 }
 
 object BlindedSig extends VortexMessageFactory[BlindedSig] {
-  override val tpe: BigSizeUInt = BigSizeUInt(696971L)
+  override val tpe: BigSizeUInt = BigSizeUInt(42013)
 
   override val typeName: String = "BlindedSig"
 
@@ -304,7 +326,7 @@ case class BobMessage(sig: SchnorrDigitalSignature, output: TransactionOutput)
 }
 
 object BobMessage extends VortexMessageFactory[BobMessage] {
-  override val tpe: BigSizeUInt = BigSizeUInt(696973L)
+  override val tpe: BigSizeUInt = BigSizeUInt(42015)
 
   override val typeName: String = "BobMessage"
 
@@ -334,7 +356,7 @@ case class UnsignedPsbtMessage(psbt: PSBT) extends ServerVortexMessage {
 }
 
 object UnsignedPsbtMessage extends VortexMessageFactory[UnsignedPsbtMessage] {
-  override val tpe: BigSizeUInt = BigSizeUInt(696975L)
+  override val tpe: BigSizeUInt = BigSizeUInt(42017)
 
   override val typeName: String = "UnsignedPsbtMessage"
 
@@ -354,7 +376,7 @@ case class SignedPsbtMessage(psbt: PSBT) extends ClientVortexMessage {
 }
 
 object SignedPsbtMessage extends VortexMessageFactory[SignedPsbtMessage] {
-  override val tpe: BigSizeUInt = BigSizeUInt(696977L)
+  override val tpe: BigSizeUInt = BigSizeUInt(42019)
 
   override val typeName: String = "SignedPsbtMessage"
 
@@ -375,7 +397,7 @@ case class SignedTxMessage(transaction: Transaction)
 }
 
 object SignedTxMessage extends VortexMessageFactory[SignedTxMessage] {
-  override val tpe: BigSizeUInt = BigSizeUInt(696979L)
+  override val tpe: BigSizeUInt = BigSizeUInt(42021)
 
   override val typeName: String = "SignedTxMessage"
 
