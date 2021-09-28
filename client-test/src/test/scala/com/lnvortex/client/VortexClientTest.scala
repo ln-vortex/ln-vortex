@@ -49,11 +49,11 @@ class VortexClientTest extends VortexClientFixture {
       refs = utxos.map(_.outputReference)
       addrA <- lnd.getNewAddress
       addrB <- lnd.getNewAddress
-      change = TransactionOutput(Satoshis(100000), addrA.scriptPubKey)
+      change = TransactionOutput(Satoshis(599800000), addrA.scriptPubKey)
       mix = TransactionOutput(Satoshis(200000), addrB.scriptPubKey)
 
       testDetails = InitDetails(inputs = refs,
-                                changeOutput = change,
+                                changeSpk = change.scriptPubKey,
                                 chanId = Sha256Digest.empty.bytes,
                                 mixOutput = mix,
                                 tweaks = dummyTweaks)
@@ -79,11 +79,11 @@ class VortexClientTest extends VortexClientFixture {
 
       addrA <- lnd.getNewAddress
       addrB <- lnd.getNewAddress
-      change = TransactionOutput(Satoshis(100000), addrA.scriptPubKey)
+      change = TransactionOutput(Satoshis(599800000), addrA.scriptPubKey)
       mix = TransactionOutput(Satoshis(200000), addrB.scriptPubKey)
 
       testDetails = InitDetails(inputs = refs,
-                                changeOutput = change,
+                                changeSpk = change.scriptPubKey,
                                 chanId = Sha256Digest.empty.bytes,
                                 mixOutput = mix,
                                 tweaks = dummyTweaks)
@@ -110,11 +110,42 @@ class VortexClientTest extends VortexClientFixture {
         refs = utxos.map(_.outputReference)
         addrA <- lnd.getNewAddress
         addrB <- lnd.getNewAddress
-        change = TransactionOutput(Satoshis(100000), addrA.scriptPubKey)
+        change = TransactionOutput(Satoshis(599800000), addrA.scriptPubKey)
         mix = TransactionOutput(Satoshis(200000), addrB.scriptPubKey)
 
         testDetails = InitDetails(inputs = refs,
-                                  changeOutput = change,
+                                  changeSpk = change.scriptPubKey,
+                                  chanId = Sha256Digest.empty.bytes,
+                                  mixOutput = mix,
+                                  tweaks = dummyTweaks)
+        testState = MixOutputRegistered(dummyMix, nonce, testDetails)
+        _ = vortexClient.setRoundDetails(testState)
+
+        inputs = refs
+          .map(_.outPoint)
+          .map(TransactionInput(_, EmptyScriptSignature, UInt32.max))
+        outputs = Vector(mix)
+        tx = BaseTransaction(Int32.two, inputs, outputs, UInt32.zero)
+        psbt = PSBT.fromUnsignedTx(tx)
+        res <- recoverToSucceededIf[RuntimeException](
+          vortexClient.validateAndSignPsbt(psbt))
+      } yield res
+  }
+
+  it must "fail to sign a psbt with a too low change output" in {
+    vortexClient =>
+      val lnd = vortexClient.coinjoinWallet
+
+      for {
+        utxos <- vortexClient.listCoins
+        refs = utxos.map(_.outputReference)
+        addrA <- lnd.getNewAddress
+        addrB <- lnd.getNewAddress
+        change = TransactionOutput(Satoshis(599700000), addrA.scriptPubKey)
+        mix = TransactionOutput(Satoshis(200000), addrB.scriptPubKey)
+
+        testDetails = InitDetails(inputs = refs,
+                                  changeSpk = change.scriptPubKey,
                                   chanId = Sha256Digest.empty.bytes,
                                   mixOutput = mix,
                                   tweaks = dummyTweaks)
@@ -141,11 +172,11 @@ class VortexClientTest extends VortexClientFixture {
       refs = utxos.map(_.outputReference)
       addrA <- lnd.getNewAddress
       addrB <- lnd.getNewAddress
-      change = TransactionOutput(Satoshis(100000), addrA.scriptPubKey)
+      change = TransactionOutput(Satoshis(599800000), addrA.scriptPubKey)
       mix = TransactionOutput(Satoshis(200000), addrB.scriptPubKey)
 
       testDetails = InitDetails(inputs = refs,
-                                changeOutput = change,
+                                changeSpk = change.scriptPubKey,
                                 chanId = Sha256Digest.empty.bytes,
                                 mixOutput = mix,
                                 tweaks = dummyTweaks)

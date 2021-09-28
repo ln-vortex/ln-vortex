@@ -158,7 +158,6 @@ case class VortexClient[+T <: CoinJoinWalletApi](coinjoinWallet: T)(implicit
           }
 
           changeAddr <- coinjoinWallet.getChangeAddress
-          changeOutput = TransactionOutput(changeAmt, changeAddr.scriptPubKey)
 
           channelDetails <- coinjoinWallet.initChannelOpen(
             nodeId = scheduled.nodeId,
@@ -179,14 +178,16 @@ case class VortexClient[+T <: CoinJoinWalletApi](coinjoinWallet: T)(implicit
             message = hashedOutput)
 
           val details = InitDetails(inputs = outputRefs,
-                                    changeOutput = changeOutput,
+                                    changeSpk = changeAddr.scriptPubKey,
                                     chanId = channelDetails.id,
                                     mixOutput = mixOutput,
                                     tweaks = tweaks)
 
           roundDetails = scheduled.nextStage(details)
 
-          handler ! RegisterInputs(inputRefs, challenge, changeOutput)
+          handler ! RegisterInputs(inputRefs,
+                                   challenge,
+                                   changeAddr.scriptPubKey)
         }
     }
   }
@@ -237,16 +238,24 @@ case class VortexClient[+T <: CoinJoinWalletApi](coinjoinWallet: T)(implicit
       case state: MixOutputRegistered =>
         val inputs: Vector[OutputReference] = state.initDetails.inputs
         lazy val myOutpoints = inputs.map(_.outPoint)
-        lazy val txOutpoints = unsigned.transaction.inputs.map(_.previousOutput)
+        val tx = unsigned.transaction
+        lazy val txOutpoints = tx.inputs.map(_.previousOutput)
         // should we care if they don't have our inputs?
         lazy val hasInputs = myOutpoints.forall(txOutpoints.contains)
 
-        lazy val hasChangeOutput =
-          unsigned.transaction.outputs.contains(state.initDetails.changeOutput)
-        lazy val hasMixOutput =
-          unsigned.transaction.outputs.contains(state.initDetails.mixOutput)
+        lazy val hasCorrectChange = state.expectedAmtBackOpt match {
+          case Some(changeAmt) =>
+            val outputOpt =
+              tx.outputs.find(_.scriptPubKey == state.initDetails.changeSpk)
+            outputOpt.exists(_.value >= changeAmt)
+          case None => true
+        }
 
-        if (hasMixOutput && hasChangeOutput && hasInputs) {
+        lazy val hasMixOutput = tx.outputs.contains(state.initDetails.mixOutput)
+
+        lazy val noDust = tx.outputs.forall(_.value > Policy.dustThreshold)
+
+        if (hasMixOutput && hasCorrectChange && hasInputs && noDust) {
           logger.info("PSBT is valid, giving channel peer")
           for {
             // tell peer about funding psbt

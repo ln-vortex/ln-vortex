@@ -11,6 +11,7 @@ import grizzled.slf4j.Logging
 import org.bitcoins.commons.jsonmodels.bitcoind.RpcOpts.AddressType
 import org.bitcoins.core.currency._
 import org.bitcoins.core.number._
+import org.bitcoins.core.policy.Policy
 import org.bitcoins.core.protocol.BitcoinAddress
 import org.bitcoins.core.protocol.script._
 import org.bitcoins.core.protocol.transaction._
@@ -341,15 +342,14 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
 
       val inputAmt = registerInputs.inputs.map(_.output.value).sum
       val inputFees = Satoshis(registerInputs.inputs.size) * roundDb.inputFee
-      val outputFees = Satoshis(2) * roundDb.outputFee
-      val onChainFees = inputFees + outputFees
-      val changeAmt = inputAmt - roundDb.amount - roundDb.mixFee - onChainFees
+      val onChainFees = inputFees + roundDb.outputFee
+      val excess = inputAmt - roundDb.amount - roundDb.mixFee - onChainFees
 
       val validChange =
-        registerInputs.changeOutput.value <= changeAmt &&
-          registerInputs.changeOutput.scriptPubKey.scriptType == WITNESS_V0_KEYHASH
+        registerInputs.changeSpk.scriptType == WITNESS_V0_KEYHASH
 
-      if (validInputs && validChange) {
+      // todo test excess >= Satoshis.zero
+      if (validInputs && validChange && excess >= Satoshis.zero) {
         // .get is safe, validInputs will be false
         aliceDbF.map(_.get).flatMap { aliceDb =>
           val sig =
@@ -362,7 +362,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
             aliceDb.setOutputValues(numInputs = inputDbs.size,
                                     blindedOutput =
                                       registerInputs.blindedOutput,
-                                    changeOutput = registerInputs.changeOutput,
+                                    changeSpk = registerInputs.changeSpk,
                                     blindOutputSig = sig)
 
           for {
@@ -429,6 +429,24 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
     }
   }
 
+  private[coordinator] def calculateChangeOutput(
+      roundDb: RoundDb,
+      numInputs: Int,
+      inputAmount: CurrencyUnit,
+      changeSpk: ScriptPubKey): Either[CurrencyUnit, TransactionOutput] = {
+    val excess = inputAmount - roundDb.amount - roundDb.mixFee - (Satoshis(
+      numInputs) * roundDb.inputFee) - roundDb.outputFee
+
+    val dummy = TransactionOutput(Satoshis.zero, changeSpk)
+    val changeCost = roundDb.feeRate * dummy.byteSize
+
+    val excessAfterChange = excess - changeCost
+
+    if (excessAfterChange > Policy.dustThreshold)
+      Right(TransactionOutput(excessAfterChange, changeSpk))
+    else Left(excess)
+  }
+
   private[coordinator] def constructUnsignedPSBT(
       mixAddr: BitcoinAddress): Future[PSBT] = {
     val dbsF = for {
@@ -442,14 +460,36 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       val txBuilder = RawTxBuilder().setFinalizer(
         FilterDustFinalizer.andThen(ShuffleFinalizer))
 
+      val inputAmountByPeerId = inputDbs
+        .groupBy(_.peerId)
+        .map { case (peerId, dbs) =>
+          val amt = dbs.map(_.output.value).sum
+          (peerId, amt)
+        }
+
+      val changeOutputResults = aliceDbs.map { db =>
+        calculateChangeOutput(roundDb = roundDb,
+                              numInputs = db.numInputs,
+                              inputAmount = inputAmountByPeerId(db.peerId),
+                              changeSpk = db.changeSpkOpt.get)
+      }
+
+      val (changeOutputs, excess) = changeOutputResults.foldLeft(
+        (Vector.empty[TransactionOutput], CurrencyUnits.zero)) {
+        case ((outputs, amt), either) =>
+          either match {
+            case Left(extraFee)      => (outputs, amt + extraFee)
+            case Right(changeOutput) => (outputs :+ changeOutput, amt)
+          }
+      }
+
       // add inputs
       txBuilder ++= inputDbs.map(_.transactionInput)
 
       // add outputs
-      val mixFee = Satoshis(aliceDbs.size) * config.mixFee
+      val mixFee = excess + (Satoshis(aliceDbs.size) * config.mixFee)
       val mixFeeOutput = TransactionOutput(mixFee, mixAddr.scriptPubKey)
       val mixOutputs = outputDbs.map(_.output)
-      val changeOutputs = aliceDbs.map(_.changeOutputOpt.get)
       val outputsToAdd = mixOutputs ++ changeOutputs :+ mixFeeOutput
 
       txBuilder ++= outputsToAdd

@@ -62,8 +62,8 @@ object Generators {
       numInputs <- Gen.choose(1, 7)
       inputs <- Gen.listOfN(numInputs, inputReference)
       blindedOutput <- CryptoGenerators.fieldElement
-      changeOutput <- TransactionGenerators.output
-    } yield RegisterInputs(inputs.toVector, blindedOutput, changeOutput)
+      changeSpk <- ScriptGenerators.scriptPubKey.map(_._1)
+    } yield RegisterInputs(inputs.toVector, blindedOutput, changeSpk)
   }
 
   def blindedSig: Gen[BlindedSig] = {

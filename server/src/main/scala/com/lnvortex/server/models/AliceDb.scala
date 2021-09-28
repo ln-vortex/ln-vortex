@@ -1,7 +1,7 @@
 package com.lnvortex.server.models
 
 import org.bitcoins.core.hd._
-import org.bitcoins.core.protocol.transaction.TransactionOutput
+import org.bitcoins.core.protocol.script.ScriptPubKey
 import org.bitcoins.crypto._
 
 case class AliceDb(
@@ -15,7 +15,7 @@ case class AliceDb(
     nonce: SchnorrNonce,
     numInputs: Int,
     blindedOutputOpt: Option[FieldElement],
-    changeOutputOpt: Option[TransactionOutput],
+    changeSpkOpt: Option[ScriptPubKey],
     blindOutputSigOpt: Option[FieldElement]
 ) {
 
@@ -32,11 +32,11 @@ case class AliceDb(
   def setOutputValues(
       numInputs: Int,
       blindedOutput: FieldElement,
-      changeOutput: TransactionOutput,
+      changeSpk: ScriptPubKey,
       blindOutputSig: FieldElement): AliceDb = {
     copy(numInputs = numInputs,
          blindedOutputOpt = Some(blindedOutput),
-         changeOutputOpt = Some(changeOutput),
+         changeSpkOpt = Some(changeSpk),
          blindOutputSigOpt = Some(blindOutputSig))
   }
 }
@@ -64,7 +64,7 @@ object AliceDbs {
       nonce = nonce,
       numInputs = 0,
       blindedOutputOpt = None,
-      changeOutputOpt = None,
+      changeSpkOpt = None,
       blindOutputSigOpt = None
     )
   }

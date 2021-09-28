@@ -57,10 +57,11 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
 
       inputRef = InputReference(outputRef, proof)
       addr <- bitcoind.getNewAddress
-      change = TransactionOutput(Satoshis(4998989765L), addr.scriptPubKey)
 
       blind = ECPrivateKey.freshPrivateKey.fieldElement
-      registerInputs = RegisterInputs(Vector(inputRef), blind, change)
+      registerInputs = RegisterInputs(Vector(inputRef),
+                                      blind,
+                                      addr.scriptPubKey)
 
       _ <- coordinator.registerAlice(Sha256Digest.empty, registerInputs)
     } yield succeed
@@ -91,10 +92,11 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
 
         inputRef = InputReference(outputRef, proof)
         addr <- bitcoind.getNewAddress
-        change = TransactionOutput(Satoshis(4998989765L), addr.scriptPubKey)
 
         blind = ECPrivateKey.freshPrivateKey.fieldElement
-        registerInputs = RegisterInputs(Vector(inputRef), blind, change)
+        registerInputs = RegisterInputs(Vector(inputRef),
+                                        blind,
+                                        addr.scriptPubKey)
 
         res <- recoverToSucceededIf[RuntimeException](
           coordinator.registerAlice(Sha256Digest.empty, registerInputs))
@@ -133,10 +135,11 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
 
         inputRef = InputReference(outputRef, proof)
         addr <- bitcoind.getNewAddress
-        change = TransactionOutput(Satoshis(4998989765L), addr.scriptPubKey)
 
         blind = ECPrivateKey.freshPrivateKey.fieldElement
-        registerInputs = RegisterInputs(Vector(inputRef), blind, change)
+        registerInputs = RegisterInputs(Vector(inputRef),
+                                        blind,
+                                        addr.scriptPubKey)
 
         res <- recoverToSucceededIf[RuntimeException](
           coordinator.registerAlice(Sha256Digest.empty, registerInputs))
@@ -164,10 +167,11 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
 
       inputRef = InputReference(outputRef, proof)
       addr <- bitcoind.getNewAddress
-      change = TransactionOutput(Satoshis(4998989765L), addr.scriptPubKey)
 
       blind = ECPrivateKey.freshPrivateKey.fieldElement
-      registerInputs = RegisterInputs(Vector(inputRef), blind, change)
+      registerInputs = RegisterInputs(Vector(inputRef),
+                                      blind,
+                                      addr.scriptPubKey)
 
       res <- recoverToSucceededIf[IllegalArgumentException](
         coordinator.registerAlice(
@@ -227,10 +231,11 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
         inputRef = InputReference(outputRef, proof)
         // wrong address type
         addr <- bitcoind.getNewAddress(AddressType.Legacy)
-        change = TransactionOutput(Satoshis(4998989765L), addr.scriptPubKey)
 
         blind = ECPrivateKey.freshPrivateKey.fieldElement
-        registerInputs = RegisterInputs(Vector(inputRef), blind, change)
+        registerInputs = RegisterInputs(Vector(inputRef),
+                                        blind,
+                                        addr.scriptPubKey)
 
         res <- recoverToSucceededIf[IllegalArgumentException](
           coordinator.registerAlice(Sha256Digest.empty, registerInputs))
@@ -259,47 +264,15 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
       inputRef = InputReference(outputRef, proof)
       // wrong change addr
       addr <- bitcoind.getNewAddress(AddressType.P2SHSegwit)
-      change = TransactionOutput(Satoshis(4998989765L), addr.scriptPubKey)
 
       blind = ECPrivateKey.freshPrivateKey.fieldElement
-      registerInputs = RegisterInputs(Vector(inputRef), blind, change)
+      registerInputs = RegisterInputs(Vector(inputRef),
+                                      blind,
+                                      addr.scriptPubKey)
 
       res <- recoverToSucceededIf[IllegalArgumentException](
         coordinator.registerAlice(Sha256Digest.empty, registerInputs))
     } yield res
-  }
-
-  it must "fail register inputs with a invalid change amount" in {
-    coordinator =>
-      val bitcoind = coordinator.bitcoind
-      for {
-        aliceDb <- coordinator.getNonce(Sha256Digest.empty,
-                                        TestActorRef("test"),
-                                        AskNonce(coordinator.getCurrentRoundId))
-        _ <- coordinator.beginInputRegistration()
-
-        utxo <- bitcoind.listUnspent.map(_.head)
-        outputRef = {
-          val outpoint = TransactionOutPoint(utxo.txid, UInt32(utxo.vout))
-          val output = TransactionOutput(utxo.amount, utxo.scriptPubKey.get)
-          OutputReference(outpoint, output)
-        }
-        tx = InputReference.constructInputProofTx(outputRef, aliceDb.nonce)
-        signed <- bitcoind.walletProcessPSBT(PSBT.fromUnsignedTx(tx))
-        proof =
-          signed.psbt.inputMaps.head.finalizedScriptWitnessOpt.get.scriptWitness
-
-        inputRef = InputReference(outputRef, proof)
-        addr <- bitcoind.getNewAddress
-        // wrong amount
-        change = TransactionOutput(Bitcoins(50), addr.scriptPubKey)
-
-        blind = ECPrivateKey.freshPrivateKey.fieldElement
-        registerInputs = RegisterInputs(Vector(inputRef), blind, change)
-
-        res <- recoverToSucceededIf[IllegalArgumentException](
-          coordinator.registerAlice(Sha256Digest.empty, registerInputs))
-      } yield res
   }
 
   it must "fail register inputs with a invalid blind proof" in { coordinator =>
@@ -323,11 +296,12 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
 
       inputRef = InputReference(outputRef, proof)
       addr <- bitcoind.getNewAddress
-      change = TransactionOutput(Satoshis(4998989765L), addr.scriptPubKey)
 
       // wrong blind proof
       blind = FieldElement.zero
-      registerInputs = RegisterInputs(Vector(inputRef), blind, change)
+      registerInputs = RegisterInputs(Vector(inputRef),
+                                      blind,
+                                      addr.scriptPubKey)
 
       res <- recoverToSucceededIf[IllegalArgumentException](
         coordinator.registerAlice(Sha256Digest.empty, registerInputs))
@@ -355,7 +329,6 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
 
       inputRef = InputReference(outputRef, proof)
       addr <- bitcoind.getNewAddress
-      change = TransactionOutput(Satoshis(4998989765L), addr.scriptPubKey)
 
       tweaks = freshBlindingTweaks(signerPubKey = coordinator.publicKey,
                                    signerNonce = aliceDb.nonce)
@@ -369,7 +342,9 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
                                                  tweaks,
                                                  challenge)
 
-      registerInputs = RegisterInputs(Vector(inputRef), blind, change)
+      registerInputs = RegisterInputs(Vector(inputRef),
+                                      blind,
+                                      addr.scriptPubKey)
       blindSig <- coordinator.registerAlice(Sha256Digest.empty, registerInputs)
       sig = BlindSchnorrUtil.unblindSignature(blindSig,
                                               coordinator.publicKey,
@@ -414,7 +389,6 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
 
       inputRef = InputReference(outputRef, proof)
       addr <- bitcoind.getNewAddress
-      change = TransactionOutput(Satoshis(4998989765L), addr.scriptPubKey)
 
       tweaks = freshBlindingTweaks(signerPubKey = coordinator.publicKey,
                                    signerNonce = aliceDb.nonce)
@@ -429,7 +403,9 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
                                                  tweaks,
                                                  challenge)
 
-      registerInputs = RegisterInputs(Vector(inputRef), blind, change)
+      registerInputs = RegisterInputs(Vector(inputRef),
+                                      blind,
+                                      addr.scriptPubKey)
       blindSig <- coordinator.registerAlice(Sha256Digest.empty, registerInputs)
       sig = BlindSchnorrUtil.unblindSignature(blindSig,
                                               coordinator.publicKey,
@@ -464,7 +440,6 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
 
         inputRef = InputReference(outputRef, proof)
         addr <- bitcoind.getNewAddress
-        change = TransactionOutput(Satoshis(4998989765L), addr.scriptPubKey)
 
         tweaks = freshBlindingTweaks(signerPubKey = coordinator.publicKey,
                                      signerNonce = aliceDb.nonce)
@@ -479,7 +454,9 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
                                                    tweaks,
                                                    challenge)
 
-        registerInputs = RegisterInputs(Vector(inputRef), blind, change)
+        registerInputs = RegisterInputs(Vector(inputRef),
+                                        blind,
+                                        addr.scriptPubKey)
         blindSig <- coordinator.registerAlice(Sha256Digest.empty,
                                               registerInputs)
         sig = BlindSchnorrUtil.unblindSignature(blindSig,
@@ -508,10 +485,9 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
       aliceDbs <- Future.sequence(aliceDbFs)
       updatedAliceDbs = aliceDbs.map { db =>
         val spk = P2WPKHWitnessSPKV0(ECPublicKey.freshPublicKey)
-        val output = TransactionOutput(Bitcoins(1), spk)
         db.setOutputValues(1,
                            ECPrivateKey.freshPrivateKey.fieldElement,
-                           output,
+                           spk,
                            ECPrivateKey.freshPrivateKey.fieldElement)
       }
       _ <- coordinator.aliceDAO.updateAll(updatedAliceDbs)
@@ -559,7 +535,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
       assert(outputDbs.forall(d => tx.outputs.contains(d.output)))
 
       val hasChangeOutputs = updatedAliceDbs.forall { db =>
-        tx.outputs.contains(db.changeOutputOpt.get)
+        tx.outputs.exists(_.scriptPubKey == db.changeSpkOpt.get)
       }
       assert(hasChangeOutputs)
 
@@ -583,10 +559,9 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
       unspent <- bitcoind.listUnspent.map(_.head)
 
       updatedAliceDbs = {
-        val output = TransactionOutput(Bitcoins(1), addr.scriptPubKey)
         aliceDb.setOutputValues(1,
                                 ECPrivateKey.freshPrivateKey.fieldElement,
-                                output,
+                                addr.scriptPubKey,
                                 ECPrivateKey.freshPrivateKey.fieldElement)
       }
       _ <- coordinator.aliceDAO.update(updatedAliceDbs)
@@ -638,10 +613,9 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
       unspent <- bitcoind.listUnspent.map(_.head)
 
       updatedAliceDbs = {
-        val output = TransactionOutput(Bitcoins(1), addr.scriptPubKey)
         aliceDb.setOutputValues(1,
                                 ECPrivateKey.freshPrivateKey.fieldElement,
-                                output,
+                                addr.scriptPubKey,
                                 ECPrivateKey.freshPrivateKey.fieldElement)
       }
       _ <- coordinator.aliceDAO.update(updatedAliceDbs)
@@ -700,11 +674,10 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
       unspent <- bitcoind.listUnspent.map(_.head)
 
       updatedAliceDbs = {
-        val output = TransactionOutput(Bitcoins(1), addr.scriptPubKey)
         // wrong number of inputs
         aliceDb.setOutputValues(numInputs = 2,
                                 ECPrivateKey.freshPrivateKey.fieldElement,
-                                output,
+                                addr.scriptPubKey,
                                 ECPrivateKey.freshPrivateKey.fieldElement)
       }
       _ <- coordinator.aliceDAO.update(updatedAliceDbs)
@@ -759,11 +732,10 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
       unspent <- bitcoind.listUnspent.map(_.head)
 
       updatedAliceDbs = {
-        val output = TransactionOutput(Bitcoins(1), addr.scriptPubKey)
         // wrong number of inputs
         aliceDb.setOutputValues(numInputs = 2,
                                 ECPrivateKey.freshPrivateKey.fieldElement,
-                                output,
+                                addr.scriptPubKey,
                                 ECPrivateKey.freshPrivateKey.fieldElement)
       }
       _ <- coordinator.aliceDAO.update(updatedAliceDbs)

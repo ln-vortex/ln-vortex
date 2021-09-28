@@ -32,7 +32,7 @@ CREATE TABLE `alices`
     `nonce`          VARCHAR(254)             NOT NULL,
     `num_inputs`     INTEGER                  NOT NULL,
     `blinded_output` VARCHAR(254),
-    `change_output`  VARCHAR(254),
+    `change_spk`     VARCHAR(254),
     `blind_sig`      VARCHAR(254),
     constraint `fk_roundId` foreign key (`round_id`) references `rounds` (`round_id`) on update NO ACTION on delete NO ACTION
 );

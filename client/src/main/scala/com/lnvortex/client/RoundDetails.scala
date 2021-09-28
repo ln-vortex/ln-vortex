@@ -1,12 +1,11 @@
 package com.lnvortex.client
 
 import com.lnvortex.core.MixDetails
+import org.bitcoins.core.currency.{CurrencyUnit, Satoshis}
 import org.bitcoins.core.number.UInt32
+import org.bitcoins.core.policy.Policy
 import org.bitcoins.core.protocol.ln.node.NodeId
-import org.bitcoins.core.protocol.transaction.{
-  OutputReference,
-  TransactionOutPoint
-}
+import org.bitcoins.core.protocol.transaction._
 import org.bitcoins.core.psbt.PSBT
 import org.bitcoins.crypto.SchnorrNonce
 
@@ -60,6 +59,16 @@ sealed trait InitializedRound extends RoundDetails {
   def round: MixDetails
   def nonce: SchnorrNonce
   def initDetails: InitDetails
+
+  def expectedAmtBackOpt: Option[CurrencyUnit] = {
+    val excessAfterChange =
+      initDetails.inputAmt - round.amount - round.mixFee - (Satoshis(
+        initDetails.inputs.size) * round.inputFee) - round.outputFee - round.outputFee
+
+    if (excessAfterChange > Policy.dustThreshold)
+      Some(excessAfterChange)
+    else None
+  }
 }
 
 case class InputsRegistered(

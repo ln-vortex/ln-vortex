@@ -244,12 +244,12 @@ object AskInputs extends VortexMessageFactory[AskInputs] {
 /** First message from client to server
   * @param inputs inputs Alice is spending in the coin join
   * @param blindedOutput Response from BlindingTweaks.freshBlindingTweaks & BlindingTweaks.generateChallenge
-  * @param changeOutput output Alice should receive
+  * @param changeSpk SPK Alice should receive change for
   */
 case class RegisterInputs(
     inputs: Vector[InputReference],
     blindedOutput: FieldElement,
-    changeOutput: TransactionOutput)
+    changeSpk: ScriptPubKey)
     extends ClientVortexMessage {
   override val tpe: BigSizeUInt = RegisterInputs.tpe
 
@@ -258,7 +258,7 @@ case class RegisterInputs(
       inputs,
       (t: InputReference) => u16Prefix(t.bytes)) ++
       blindedOutput.bytes ++
-      u16Prefix(changeOutput.bytes)
+      u16Prefix(changeSpk.asmBytes)
   }
 }
 
@@ -276,10 +276,10 @@ object RegisterInputs extends VortexMessageFactory[RegisterInputs] {
 
     val blindedOutput = FieldElement(iter.take(32))
 
-    val output = iter.takeU16Prefixed[TransactionOutput](len =>
-      TransactionOutput(iter.take(len)))
+    val changeSpk = iter.takeU16Prefixed[ScriptPubKey](len =>
+      ScriptPubKey.fromAsmBytes(iter.take(len)))
 
-    RegisterInputs(inputs, blindedOutput, output)
+    RegisterInputs(inputs, blindedOutput, changeSpk)
   }
 }
 

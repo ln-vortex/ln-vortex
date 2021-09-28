@@ -2,7 +2,7 @@ package com.lnvortex.server.models
 
 import com.lnvortex.server.config.VortexCoordinatorAppConfig
 import org.bitcoins.core.hd._
-import org.bitcoins.core.protocol.transaction.TransactionOutput
+import org.bitcoins.core.protocol.script.ScriptPubKey
 import org.bitcoins.crypto._
 import org.bitcoins.db.{CRUD, DbCommonsColumnMappers, SlickUtil}
 import slick.lifted.ProvenShape
@@ -104,8 +104,7 @@ case class AliceDAO()(implicit
 
     def blindedOutputOpt: Rep[Option[FieldElement]] = column("blinded_output")
 
-    def changeOutputOpt: Rep[Option[TransactionOutput]] = column(
-      "change_output")
+    def changeSpkOpt: Rep[Option[ScriptPubKey]] = column("change_spk")
 
     def blindOutputSigOpt: Rep[Option[FieldElement]] = column("blind_sig")
 
@@ -120,7 +119,7 @@ case class AliceDAO()(implicit
        nonce,
        numInputs,
        blindedOutputOpt,
-       changeOutputOpt,
+       changeSpkOpt,
        blindOutputSigOpt).<>(AliceDb.tupled, AliceDb.unapply)
   }
 }
