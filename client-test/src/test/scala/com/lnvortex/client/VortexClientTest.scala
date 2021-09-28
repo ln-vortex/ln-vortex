@@ -16,7 +16,7 @@ import org.bitcoins.testkitcore.gen.NumberGenerator
 class VortexClientTest extends VortexClientFixture {
   behavior of "VortexClient"
 
-  val dummyAdvertisement: MixDetails = MixDetails(
+  val dummyMix: MixDetails = MixDetails(
     version = UInt16.zero,
     roundId = DoubleSha256Digest.empty,
     amount = Satoshis(200000),
@@ -30,14 +30,14 @@ class VortexClientTest extends VortexClientFixture {
   val nonce: SchnorrNonce = ECPublicKey.freshPublicKey.schnorrNonce
 
   val dummyTweaks: BlindingTweaks =
-    BlindingTweaks.freshBlindingTweaks(dummyAdvertisement.publicKey, nonce)
+    BlindingTweaks.freshBlindingTweaks(dummyMix.publicKey, nonce)
 
-  it must "fail to process an unknown version MixAdvertisement" in {
+  it must "fail to process an unknown version AskMixDetails" in {
     vortexClient =>
       forAll(NumberGenerator.uInt16.suchThat(!knownVersions.contains(_))) {
         version =>
           assertThrows[RuntimeException](
-            vortexClient.setRound(dummyAdvertisement.copy(version = version)))
+            vortexClient.setRound(dummyMix.copy(version = version)))
       }
   }
 
@@ -57,7 +57,7 @@ class VortexClientTest extends VortexClientFixture {
                                 chanId = Sha256Digest.empty.bytes,
                                 mixOutput = mix,
                                 tweaks = dummyTweaks)
-      testState = MixOutputRegistered(dummyAdvertisement, nonce, testDetails)
+      testState = MixOutputRegistered(dummyMix, nonce, testDetails)
       _ = vortexClient.setRoundDetails(testState)
 
       inputs = refs
@@ -87,7 +87,7 @@ class VortexClientTest extends VortexClientFixture {
                                 chanId = Sha256Digest.empty.bytes,
                                 mixOutput = mix,
                                 tweaks = dummyTweaks)
-      testState = MixOutputRegistered(dummyAdvertisement, nonce, testDetails)
+      testState = MixOutputRegistered(dummyMix, nonce, testDetails)
       _ = vortexClient.setRoundDetails(testState)
 
       inputs = refs
@@ -118,7 +118,7 @@ class VortexClientTest extends VortexClientFixture {
                                   chanId = Sha256Digest.empty.bytes,
                                   mixOutput = mix,
                                   tweaks = dummyTweaks)
-        testState = MixOutputRegistered(dummyAdvertisement, nonce, testDetails)
+        testState = MixOutputRegistered(dummyMix, nonce, testDetails)
         _ = vortexClient.setRoundDetails(testState)
 
         inputs = refs
@@ -149,7 +149,7 @@ class VortexClientTest extends VortexClientFixture {
                                 chanId = Sha256Digest.empty.bytes,
                                 mixOutput = mix,
                                 tweaks = dummyTweaks)
-      testState = MixOutputRegistered(dummyAdvertisement, nonce, testDetails)
+      testState = MixOutputRegistered(dummyMix, nonce, testDetails)
       _ = vortexClient.setRoundDetails(testState)
 
       inputs = refs

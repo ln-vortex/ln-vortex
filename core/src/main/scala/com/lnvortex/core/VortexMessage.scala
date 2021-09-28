@@ -27,7 +27,10 @@ sealed trait VortexMessage extends NetworkElement with TLVUtil {
   lazy val typeName: String = VortexMessage.getTypeName(tpe)
 }
 
+/** Messages sent by the client */
 sealed abstract class ClientVortexMessage extends VortexMessage
+
+/** Messages sent by the server */
 sealed abstract class ServerVortexMessage extends VortexMessage
 
 object VortexMessage extends Factory[VortexMessage] with Logging {
@@ -149,7 +152,7 @@ case class MixDetails(
 object MixDetails extends VortexMessageFactory[MixDetails] {
   override val tpe: BigSizeUInt = BigSizeUInt(42003)
 
-  override val typeName: String = "MixAdvertisement"
+  override val typeName: String = "MixDetails"
 
   override def fromTLVValue(value: ByteVector): MixDetails = {
     val iter = ValueIterator(value)

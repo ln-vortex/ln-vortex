@@ -48,7 +48,7 @@ trait ClientServerPairFixture extends BitcoinSFixture with CachedBitcoindV21 {
 
           _ <- LndRpcTestUtil.connectLNNodes(lnd, peerLnd)
 
-          // wait for it to receive mix advertisement
+          // wait for it to receive mix details
           _ <- TestAsyncUtil.awaitCondition(() =>
             client.getCurrentRoundDetails.order > 0)
         } yield (client, coordinator, peerLnd)

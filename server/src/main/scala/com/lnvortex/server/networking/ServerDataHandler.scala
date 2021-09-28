@@ -46,8 +46,7 @@ class ServerDataHandler(
           connectionHandler ! coordinator.mixDetails
           Future.unit
         } else {
-          logger.warn(
-            s"Received AskMixAdvertisement for different network $network")
+          logger.warn(s"Received AskMixDetails for different network $network")
           Future.unit
         }
       case askNonce: AskNonce =>
