@@ -105,6 +105,7 @@ class LndChannelOpenerTest extends LndChannelOpenerFixture {
       _ = assert(midChannelsA.isEmpty)
       _ = assert(midChannelsB.isEmpty)
 
+      // cancel channel
       txid = psbt.transaction.txIdBE
       vout = psbt.transaction.outputs.indexWhere(
         _.scriptPubKey == fundDetails.address.scriptPubKey)
