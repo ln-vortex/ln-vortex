@@ -21,12 +21,14 @@ abstract class CoinJoinWalletApi extends StartStopAsync[Unit] {
   def network: BitcoinNetwork
 
   def getNewAddress: Future[BitcoinAddress]
+
   def getChangeAddress: Future[BitcoinAddress]
 
   def listCoins: Future[Vector[UnspentCoin]]
 
   /** Creates a proof of ownership for the input and then locks it
-    * @param nonce Round Nonce for the peer
+    *
+    * @param nonce     Round Nonce for the peer
     * @param outputRef OutputReference for the input
     * @return Signed ScriptWitness
     */
@@ -45,4 +47,6 @@ abstract class CoinJoinWalletApi extends StartStopAsync[Unit] {
       privateChannel: Boolean): Future[OutputDetails]
 
   def completeChannelOpen(chanId: ByteVector, psbt: PSBT): Future[Unit]
+
+  def cancelChannel(chanOutPoint: TransactionOutPoint): Future[Unit]
 }

@@ -72,11 +72,11 @@ object Generators {
     } yield BlindedSig(blindOutputSig)
   }
 
-  def bobMessage: Gen[BobMessage] = {
+  def registerMixOutput: Gen[RegisterMixOutput] = {
     for {
       sig <- CryptoGenerators.schnorrDigitalSignature
       output <- TransactionGenerators.output
-    } yield BobMessage(sig, output)
+    } yield RegisterMixOutput(sig, output)
   }
 
   def unsignedPsbtMessage: Gen[UnsignedPsbtMessage] = {

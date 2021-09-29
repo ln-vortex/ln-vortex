@@ -44,7 +44,7 @@ object VortexMessage extends Factory[VortexMessage] with Logging {
       AskInputs,
       RegisterInputs,
       BlindedSig,
-      BobMessage,
+      RegisterMixOutput,
       UnsignedPsbtMessage,
       SignedPsbtMessage,
       SignedTxMessage,
@@ -311,33 +311,35 @@ object BlindedSig extends VortexMessageFactory[BlindedSig] {
 /** @param sig Response from BlindingTweaks.unblindSignature
   * @param output Output they are registering
   */
-case class BobMessage(sig: SchnorrDigitalSignature, output: TransactionOutput)
+case class RegisterMixOutput(
+    sig: SchnorrDigitalSignature,
+    output: TransactionOutput)
     extends ClientVortexMessage {
-  override val tpe: BigSizeUInt = BobMessage.tpe
+  override val tpe: BigSizeUInt = RegisterMixOutput.tpe
 
   override val value: ByteVector = sig.bytes ++ u16Prefix(output.bytes)
 
   def verifySig(
       publicKey: SchnorrPublicKey,
       roundId: DoubleSha256Digest): Boolean = {
-    val challenge = BobMessage.calculateChallenge(output, roundId)
+    val challenge = RegisterMixOutput.calculateChallenge(output, roundId)
     publicKey.verify(challenge, sig)
   }
 }
 
-object BobMessage extends VortexMessageFactory[BobMessage] {
+object RegisterMixOutput extends VortexMessageFactory[RegisterMixOutput] {
   override val tpe: BigSizeUInt = BigSizeUInt(42015)
 
-  override val typeName: String = "BobMessage"
+  override val typeName: String = "RegisterMixOutput"
 
-  override def fromTLVValue(value: ByteVector): BobMessage = {
+  override def fromTLVValue(value: ByteVector): RegisterMixOutput = {
     val iter = ValueIterator(value)
 
     val sig = iter.take(SchnorrDigitalSignature, 64)
     val output = iter.takeU16Prefixed[TransactionOutput](len =>
       TransactionOutput(iter.take(len)))
 
-    BobMessage(sig, output)
+    RegisterMixOutput(sig, output)
   }
 
   def calculateChallenge(

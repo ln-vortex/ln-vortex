@@ -310,6 +310,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       updated = aliceDb.unregister()
       _ <- aliceDAO.update(updated)
       _ <- inputsDAO.deleteByPeerId(updated.peerId, updated.roundId)
+      _ = connectionHandlerMap.remove(updated.peerId)
       _ = signedPMap.remove(updated.peerId)
     } yield ()
   }
@@ -441,7 +442,8 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
     }
   }
 
-  private[server] def verifyAndRegisterBob(bob: BobMessage): Future[Unit] = {
+  private[server] def verifyAndRegisterBob(
+      bob: RegisterMixOutput): Future[Unit] = {
     logger.info("A bob is registering an output")
 
     val validSpk = bob.output.scriptPubKey.scriptType == WITNESS_V0_SCRIPTHASH

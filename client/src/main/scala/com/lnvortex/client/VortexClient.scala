@@ -183,7 +183,7 @@ case class VortexClient[+T <: CoinJoinWalletApi](coinjoinWallet: T)(implicit
         } yield {
           val mixOutput = channelDetails.output
           val hashedOutput =
-            BobMessage.calculateChallenge(mixOutput, round.roundId)
+            RegisterMixOutput.calculateChallenge(mixOutput, round.roundId)
 
           val tweaks = freshBlindingTweaks(signerPubKey = round.publicKey,
                                            signerNonce = scheduled.nonce)
@@ -227,7 +227,7 @@ case class VortexClient[+T <: CoinJoinWalletApi](coinjoinWallet: T)(implicit
         val tweaks = details.initDetails.tweaks
 
         val challenge =
-          BobMessage.calculateChallenge(mixOutput, details.round.roundId)
+          RegisterMixOutput.calculateChallenge(mixOutput, details.round.roundId)
         val sig = BlindSchnorrUtil.unblindSignature(blindSig = blindOutputSig,
                                                     signerPubKey = publicKey,
                                                     signerNonce = nonce,
@@ -242,7 +242,7 @@ case class VortexClient[+T <: CoinJoinWalletApi](coinjoinWallet: T)(implicit
           bobHandler <- bobHandlerP.future
         } yield {
           roundDetails = details.nextStage
-          bobHandler ! BobMessage(sig, mixOutput)
+          bobHandler ! RegisterMixOutput(sig, mixOutput)
         }
     }
   }
@@ -312,17 +312,19 @@ case class VortexClient[+T <: CoinJoinWalletApi](coinjoinWallet: T)(implicit
     }
   }
 
-  def restartRound(msg: RestartRoundMessage): Unit = {
+  def restartRound(msg: RestartRoundMessage): Future[Unit] = {
     roundDetails match {
       case state @ (NoDetails | _: KnownRound | _: ReceivedNonce |
           _: InputsScheduled | _: InputsRegistered | _: MixOutputRegistered) =>
-        Future.failed(
-          new IllegalStateException(
-            s"At invalid state $state, cannot restartRound"))
+        throw new IllegalStateException(
+          s"At invalid state $state, cannot restartRound")
       case state: PSBTSigned =>
         logger.info("Round restarted..")
-        roundDetails =
-          state.restartRound(msg.mixDetails, msg.nonceMessage.schnorrNonce)
+
+        coinjoinWallet.cancelChannel(state.channelOutpoint).map { _ =>
+          roundDetails =
+            state.restartRound(msg.mixDetails, msg.nonceMessage.schnorrNonce)
+        }
     }
   }
 

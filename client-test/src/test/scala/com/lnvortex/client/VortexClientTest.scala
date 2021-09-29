@@ -46,6 +46,7 @@ class VortexClientTest extends VortexClientFixture {
     val lnd = vortexClient.coinjoinWallet
 
     for {
+      nodeId <- lnd.lndRpcClient.nodeId
       utxos <- vortexClient.listCoins
       refs = utxos.map(_.outputReference)
       addrA <- lnd.getNewAddress
@@ -54,6 +55,8 @@ class VortexClientTest extends VortexClientFixture {
       mix = TransactionOutput(Satoshis(200000), addrB.scriptPubKey)
 
       testDetails = InitDetails(inputs = refs,
+                                nodeId = nodeId,
+                                peerAddrOpt = None,
                                 changeSpk = change.scriptPubKey,
                                 chanId = Sha256Digest.empty.bytes,
                                 mixOutput = mix,
@@ -75,6 +78,7 @@ class VortexClientTest extends VortexClientFixture {
     val lnd = vortexClient.coinjoinWallet
 
     for {
+      nodeId <- lnd.lndRpcClient.nodeId
       utxos <- lnd.listCoins
       refs = utxos.map(_.outputReference)
 
@@ -84,6 +88,8 @@ class VortexClientTest extends VortexClientFixture {
       mix = TransactionOutput(Satoshis(200000), addrB.scriptPubKey)
 
       testDetails = InitDetails(inputs = refs,
+                                nodeId = nodeId,
+                                peerAddrOpt = None,
                                 changeSpk = change.scriptPubKey,
                                 chanId = Sha256Digest.empty.bytes,
                                 mixOutput = mix,
@@ -107,6 +113,7 @@ class VortexClientTest extends VortexClientFixture {
       val lnd = vortexClient.coinjoinWallet
 
       for {
+        nodeId <- lnd.lndRpcClient.nodeId
         utxos <- vortexClient.listCoins
         refs = utxos.map(_.outputReference)
         addrA <- lnd.getNewAddress
@@ -115,6 +122,8 @@ class VortexClientTest extends VortexClientFixture {
         mix = TransactionOutput(Satoshis(200000), addrB.scriptPubKey)
 
         testDetails = InitDetails(inputs = refs,
+                                  nodeId = nodeId,
+                                  peerAddrOpt = None,
                                   changeSpk = change.scriptPubKey,
                                   chanId = Sha256Digest.empty.bytes,
                                   mixOutput = mix,
@@ -138,6 +147,7 @@ class VortexClientTest extends VortexClientFixture {
       val lnd = vortexClient.coinjoinWallet
 
       for {
+        nodeId <- lnd.lndRpcClient.nodeId
         utxos <- vortexClient.listCoins
         refs = utxos.map(_.outputReference)
         addrA <- lnd.getNewAddress
@@ -146,6 +156,8 @@ class VortexClientTest extends VortexClientFixture {
         mix = TransactionOutput(Satoshis(200000), addrB.scriptPubKey)
 
         testDetails = InitDetails(inputs = refs,
+                                  nodeId = nodeId,
+                                  peerAddrOpt = None,
                                   changeSpk = change.scriptPubKey,
                                   chanId = Sha256Digest.empty.bytes,
                                   mixOutput = mix,
@@ -168,6 +180,7 @@ class VortexClientTest extends VortexClientFixture {
     val lnd = vortexClient.coinjoinWallet
 
     for {
+      nodeId <- lnd.lndRpcClient.nodeId
       utxos <- vortexClient.listCoins
       _ = require(utxos.nonEmpty)
       refs = utxos.map(_.outputReference)
@@ -177,6 +190,8 @@ class VortexClientTest extends VortexClientFixture {
       mix = TransactionOutput(Satoshis(200000), addrB.scriptPubKey)
 
       testDetails = InitDetails(inputs = refs,
+                                nodeId = nodeId,
+                                peerAddrOpt = None,
                                 changeSpk = change.scriptPubKey,
                                 chanId = Sha256Digest.empty.bytes,
                                 mixOutput = mix,

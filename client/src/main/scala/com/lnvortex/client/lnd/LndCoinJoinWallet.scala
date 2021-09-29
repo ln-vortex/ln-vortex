@@ -3,13 +3,13 @@ package com.lnvortex.client.lnd
 import akka.actor.ActorSystem
 import com.lnvortex.client.OutputDetails
 import com.lnvortex.client.api.CoinJoinWalletApi
-import com.lnvortex.core.{InputReference, UnspentCoin}
+import com.lnvortex.core._
 import org.bitcoins.core.config.BitcoinNetwork
 import org.bitcoins.core.currency.CurrencyUnit
 import org.bitcoins.core.protocol.BitcoinAddress
 import org.bitcoins.core.protocol.ln.node.NodeId
 import org.bitcoins.core.protocol.script.ScriptWitness
-import org.bitcoins.core.protocol.transaction.{OutputReference, Transaction}
+import org.bitcoins.core.protocol.transaction._
 import org.bitcoins.core.psbt.PSBT
 import org.bitcoins.crypto.SchnorrNonce
 import org.bitcoins.lnd.rpc.LndRpcClient
@@ -88,6 +88,9 @@ case class LndCoinJoinWallet(lndRpcClient: LndRpcClient)(implicit
   override def completeChannelOpen(
       chanId: ByteVector,
       psbt: PSBT): Future[Unit] = channelOpener.fundPendingChannel(chanId, psbt)
+
+  override def cancelChannel(chanOutPoint: TransactionOutPoint): Future[Unit] =
+    channelOpener.cancelChannel(chanOutPoint)
 
   override def start(): Future[Unit] = Future.unit
 

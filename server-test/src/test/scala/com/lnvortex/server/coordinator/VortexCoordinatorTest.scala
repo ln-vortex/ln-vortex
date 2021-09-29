@@ -451,8 +451,9 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
 
       p2wsh = P2WSHWitnessSPKV0(EmptyScriptPubKey)
       mixOutput = TransactionOutput(coordinator.config.mixAmount, p2wsh)
-      challenge = BobMessage.calculateChallenge(mixOutput,
-                                                coordinator.getCurrentRoundId)
+      challenge = RegisterMixOutput.calculateChallenge(
+        mixOutput,
+        coordinator.getCurrentRoundId)
       blind = BlindSchnorrUtil.generateChallenge(coordinator.publicKey,
                                                  aliceDb.nonce,
                                                  tweaks,
@@ -468,7 +469,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
                                               tweaks,
                                               challenge)
       _ <- coordinator.beginOutputRegistration()
-      _ <- coordinator.verifyAndRegisterBob(BobMessage(sig, mixOutput))
+      _ <- coordinator.verifyAndRegisterBob(RegisterMixOutput(sig, mixOutput))
     } yield succeed
   }
 
@@ -480,7 +481,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
       // random sig
       sig = ECPrivateKey.freshPrivateKey.schnorrSign(Sha256Digest.empty.bytes)
       res <- recoverToSucceededIf[InvalidOutputSignatureException](
-        coordinator.verifyAndRegisterBob(BobMessage(sig, mixOutput)))
+        coordinator.verifyAndRegisterBob(RegisterMixOutput(sig, mixOutput)))
     } yield res
   }
 
@@ -512,8 +513,9 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
       // wrong spk
       mixOutput = TransactionOutput(coordinator.config.mixAmount,
                                     addr.scriptPubKey)
-      challenge = BobMessage.calculateChallenge(mixOutput,
-                                                coordinator.getCurrentRoundId)
+      challenge = RegisterMixOutput.calculateChallenge(
+        mixOutput,
+        coordinator.getCurrentRoundId)
       blind = BlindSchnorrUtil.generateChallenge(coordinator.publicKey,
                                                  aliceDb.nonce,
                                                  tweaks,
@@ -530,7 +532,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
                                               challenge)
       _ <- coordinator.beginOutputRegistration()
       res <- recoverToSucceededIf[InvalidMixOutputScriptPubKeyException](
-        coordinator.verifyAndRegisterBob(BobMessage(sig, mixOutput)))
+        coordinator.verifyAndRegisterBob(RegisterMixOutput(sig, mixOutput)))
     } yield res
   }
 
@@ -561,8 +563,9 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
 
       p2wsh = P2WSHWitnessSPKV0(EmptyScriptPubKey)
       mixOutput = TransactionOutput(Bitcoins.one, p2wsh)
-      challenge = BobMessage.calculateChallenge(mixOutput,
-                                                coordinator.getCurrentRoundId)
+      challenge = RegisterMixOutput.calculateChallenge(
+        mixOutput,
+        coordinator.getCurrentRoundId)
       blind = BlindSchnorrUtil.generateChallenge(coordinator.publicKey,
                                                  aliceDb.nonce,
                                                  tweaks,
@@ -579,7 +582,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
                                               challenge)
       _ <- coordinator.beginOutputRegistration()
       res <- recoverToSucceededIf[InvalidMixOutputAmountException](
-        coordinator.verifyAndRegisterBob(BobMessage(sig, mixOutput)))
+        coordinator.verifyAndRegisterBob(RegisterMixOutput(sig, mixOutput)))
     } yield res
   }
 
@@ -612,8 +615,9 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
         p2wsh = P2WSHWitnessSPKV0(EmptyScriptPubKey)
         mixOutput = TransactionOutput(coordinator.config.mixAmount, p2wsh)
         // wrong roundId
-        challenge = BobMessage.calculateChallenge(mixOutput,
-                                                  DoubleSha256Digest.empty)
+        challenge = RegisterMixOutput.calculateChallenge(
+          mixOutput,
+          DoubleSha256Digest.empty)
         blind = BlindSchnorrUtil.generateChallenge(coordinator.publicKey,
                                                    aliceDb.nonce,
                                                    tweaks,
@@ -631,7 +635,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
                                                 challenge)
         _ <- coordinator.beginOutputRegistration()
         res <- recoverToSucceededIf[InvalidOutputSignatureException](
-          coordinator.verifyAndRegisterBob(BobMessage(sig, mixOutput)))
+          coordinator.verifyAndRegisterBob(RegisterMixOutput(sig, mixOutput)))
       } yield res
   }
 
