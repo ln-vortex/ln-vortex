@@ -42,6 +42,28 @@ class ClientServerPairTest extends ClientServerPairFixture {
       }
   }
 
+  it must "cancel a registration from the coordinator" in {
+    case (client, coordinator, peerLnd) =>
+      for {
+        nodeId <- peerLnd.nodeId
+        _ <- client.askNonce()
+        _ <- TestAsyncUtil.awaitConditionF(() =>
+          coordinator.aliceDAO.findAll().map(_.nonEmpty))
+        utxos <- client.listCoins.map(_.tail)
+        _ = client.queueCoins(utxos.map(_.outputReference), nodeId, None)
+        _ <- coordinator.beginInputRegistration()
+        // give time for messages to send
+        _ <- TestAsyncUtil.awaitConditionF(
+          () => coordinator.inputsDAO.findAll().map(_.nonEmpty),
+          interval = interval,
+          maxTries = 500)
+        _ <- client.cancelRegistration()
+        _ <- TestAsyncUtil.awaitConditionF(
+          () => coordinator.inputsDAO.findAll().map(_.isEmpty),
+          interval = interval)
+      } yield succeed
+  }
+
   it must "register inputs" in { case (client, coordinator, peerLnd) =>
     for {
       nodeId <- peerLnd.nodeId

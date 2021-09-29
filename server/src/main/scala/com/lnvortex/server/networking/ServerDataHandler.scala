@@ -63,6 +63,8 @@ class ServerDataHandler(
         coordinator.registerPSBTSignatures(id, psbt).map { signedTx =>
           connectionHandler ! SignedTxMessage(signedTx)
         }
+      case cancel: CancelRegistrationMessage =>
+        coordinator.cancelRegistration(cancel.nonce, cancel.roundId)
     }
   }
 }

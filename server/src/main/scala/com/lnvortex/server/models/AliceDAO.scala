@@ -39,6 +39,12 @@ case class AliceDAO()(implicit
       ts: Vector[AliceDb]): Query[AliceTable, AliceDb, Seq] =
     findByPrimaryKeys(ts.map(_.peerId))
 
+  def findByNonce(nonce: SchnorrNonce): Future[Option[AliceDb]] = {
+    val query = table.filter(_.nonce === nonce).result
+
+    safeDatabase.runVec(query).map(_.headOption)
+  }
+
   def findByRoundId(roundId: DoubleSha256Digest): Future[Vector[AliceDb]] = {
     val query = table.filter(_.roundId === roundId).result
 
@@ -98,7 +104,7 @@ case class AliceDAO()(implicit
 
     def nonceIndex: Rep[Int] = column("nonce_index")
 
-    def nonce: Rep[SchnorrNonce] = column("nonce")
+    def nonce: Rep[SchnorrNonce] = column("nonce", O.Unique)
 
     def numInputs: Rep[Int] = column("num_inputs")
 

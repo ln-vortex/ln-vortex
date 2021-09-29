@@ -69,6 +69,13 @@ sealed trait InitializedRound extends RoundDetails {
       Some(excessAfterChange)
     else None
   }
+
+  def restartRound(round: MixDetails, nonce: SchnorrNonce): InputsScheduled =
+    InputsScheduled(round,
+                    nonce = nonce,
+                    inputs = initDetails.inputs,
+                    nodeId = initDetails.nodeId,
+                    peerAddrOpt = initDetails.peerAddrOpt)
 }
 
 case class InputsRegistered(
@@ -114,6 +121,16 @@ case class PSBTSigned(
 }
 
 object RoundDetails {
+
+  def getMixDetailsOpt(details: RoundDetails): Option[MixDetails] = {
+    details match {
+      case NoDetails                  => None
+      case known: KnownRound          => Some(known.round)
+      case ReceivedNonce(round, _)    => Some(round)
+      case scheduled: InputsScheduled => Some(scheduled.round)
+      case round: InitializedRound    => Some(round.round)
+    }
+  }
 
   def getNonceOpt(details: RoundDetails): Option[SchnorrNonce] = {
     details match {

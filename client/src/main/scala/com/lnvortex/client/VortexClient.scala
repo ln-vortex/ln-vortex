@@ -1,7 +1,7 @@
 package com.lnvortex.client
 
 import akka.actor.{ActorRef, ActorSystem}
-import com.lnvortex.client.RoundDetails.getNonceOpt
+import com.lnvortex.client.RoundDetails.{getMixDetailsOpt, getNonceOpt}
 import com.lnvortex.client.VortexClientException._
 import com.lnvortex.client.api.CoinJoinWalletApi
 import com.lnvortex.client.config.VortexAppConfig
@@ -103,6 +103,21 @@ case class VortexClient[+T <: CoinJoinWalletApi](coinjoinWallet: T)(implicit
     }
   }
 
+  def cancelRegistration(): Future[Unit] = {
+    getNonceOpt(roundDetails) match {
+      case Some(nonce) =>
+        handlerP.future.map { handler =>
+          // .get is safe, can't have nonce without mix details
+          val mixDetails = getMixDetailsOpt(roundDetails).get
+          handler ! CancelRegistrationMessage(nonce, mixDetails.roundId)
+
+          roundDetails = ReceivedNonce(mixDetails, nonce)
+        }
+      case None =>
+        Future.failed(new IllegalStateException("No registration to cancel"))
+    }
+  }
+
   def queueCoins(
       outputRefs: Vector[OutputReference],
       nodeUri: NodeUri): Unit = {
@@ -178,11 +193,15 @@ case class VortexClient[+T <: CoinJoinWalletApi](coinjoinWallet: T)(implicit
             blindingTweaks = tweaks,
             message = hashedOutput)
 
-          val details = InitDetails(inputs = outputRefs,
-                                    changeSpk = changeAddr.scriptPubKey,
-                                    chanId = channelDetails.id,
-                                    mixOutput = mixOutput,
-                                    tweaks = tweaks)
+          val details = InitDetails(
+            inputs = outputRefs,
+            nodeId = scheduled.nodeId,
+            peerAddrOpt = scheduled.peerAddrOpt,
+            changeSpk = changeAddr.scriptPubKey,
+            chanId = channelDetails.id,
+            mixOutput = mixOutput,
+            tweaks = tweaks
+          )
 
           roundDetails = scheduled.nextStage(details)
 
@@ -290,6 +309,20 @@ case class VortexClient[+T <: CoinJoinWalletApi](coinjoinWallet: T)(implicit
           }
           Future.failed(exception)
         }
+    }
+  }
+
+  def restartRound(msg: RestartRoundMessage): Unit = {
+    roundDetails match {
+      case state @ (NoDetails | _: KnownRound | _: ReceivedNonce |
+          _: InputsScheduled | _: InputsRegistered | _: MixOutputRegistered) =>
+        Future.failed(
+          new IllegalStateException(
+            s"At invalid state $state, cannot restartRound"))
+      case state: PSBTSigned =>
+        logger.info("Round restarted..")
+        roundDetails =
+          state.restartRound(msg.mixDetails, msg.nonceMessage.schnorrNonce)
     }
   }
 

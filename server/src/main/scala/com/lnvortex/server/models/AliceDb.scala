@@ -42,11 +42,19 @@ case class AliceDb(
   }
 
   def markSigned(): AliceDb = {
-    require(blindOutputSigOpt.isDefined)
+    require(blindedOutputOpt.isDefined)
     require(changeSpkOpt.isDefined)
     require(blindOutputSigOpt.isDefined)
 
     copy(signed = true)
+  }
+
+  def unregister(): AliceDb = {
+    copy(blindedOutputOpt = None,
+         changeSpkOpt = None,
+         blindOutputSigOpt = None,
+         signed = false,
+         numInputs = -1)
   }
 }
 
@@ -71,7 +79,7 @@ object AliceDbs {
       chain = HDChainType.fromInt(chain.index),
       nonceIndex = address.index,
       nonce = nonce,
-      numInputs = 0,
+      numInputs = -1,
       blindedOutputOpt = None,
       changeSpkOpt = None,
       blindOutputSigOpt = None,

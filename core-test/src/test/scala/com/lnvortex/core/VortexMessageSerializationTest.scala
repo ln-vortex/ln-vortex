@@ -92,4 +92,11 @@ class VortexMessageSerializationTest extends BitcoinSUnitTest {
       assert(VortexMessage(msg.bytes) == msg)
     }
   }
+
+  "RestartRoundMessage" must "have serialization symmetry" in {
+    forAll(Generators.restartRoundMessage) { msg =>
+      assert(RestartRoundMessage(msg.bytes) == msg)
+      assert(VortexMessage(msg.bytes) == msg)
+    }
+  }
 }

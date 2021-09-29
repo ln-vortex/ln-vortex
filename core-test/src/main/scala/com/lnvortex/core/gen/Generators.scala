@@ -96,4 +96,11 @@ object Generators {
       tx <- TransactionGenerators.transaction
     } yield SignedTxMessage(tx)
   }
+
+  def restartRoundMessage: Gen[RestartRoundMessage] = {
+    for {
+      mixDetails <- mixDetails
+      nonceMsg <- nonceMsg
+    } yield RestartRoundMessage(mixDetails, nonceMsg)
+  }
 }

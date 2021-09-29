@@ -58,6 +58,9 @@ class ClientDataHandler(
         for {
           _ <- vortexClient.completeRound(transaction)
         } yield ()
+      case msg: RestartRoundMessage =>
+        vortexClient.restartRound(msg)
+        Future.unit
     }
   }
 }

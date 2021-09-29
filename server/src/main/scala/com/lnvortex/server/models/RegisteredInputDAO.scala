@@ -75,6 +75,24 @@ case class RegisteredInputDAO()(implicit
     safeDatabase.runVec(query)
   }
 
+  def findByPeerIds(
+      peerIds: Vector[Sha256Digest],
+      roundId: DoubleSha256Digest): Future[Vector[RegisteredInputDb]] = {
+    val query =
+      table.filter(t => t.peerId.inSet(peerIds) && t.roundId === roundId).result
+
+    safeDatabase.runVec(query)
+  }
+
+  def deleteByPeerId(
+      peerId: Sha256Digest,
+      roundId: DoubleSha256Digest): Future[Int] = {
+    val query =
+      table.filter(t => t.peerId === peerId && t.roundId === roundId).delete
+
+    safeDatabase.run(query)
+  }
+
   def deleteByRoundId(roundId: DoubleSha256Digest): Future[Int] = {
     val query = table.filter(_.roundId === roundId).delete
 

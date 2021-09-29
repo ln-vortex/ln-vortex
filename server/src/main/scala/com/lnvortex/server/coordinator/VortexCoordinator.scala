@@ -18,7 +18,7 @@ import org.bitcoins.core.protocol.script._
 import org.bitcoins.core.protocol.transaction._
 import org.bitcoins.core.psbt.PSBT
 import org.bitcoins.core.script.ScriptType._
-import org.bitcoins.core.util.{StartStopAsync, TimeUtil}
+import org.bitcoins.core.util.{FutureUtil, StartStopAsync, TimeUtil}
 import org.bitcoins.core.wallet.builder._
 import org.bitcoins.core.wallet.fee.SatoshisPerVirtualByte
 import org.bitcoins.crypto._
@@ -116,7 +116,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
 
   private var completedTxP: Promise[Transaction] = Promise[Transaction]()
 
-  def newRound(): Future[RoundDb] = {
+  def newRound(disconnect: Boolean = true): Future[RoundDb] = {
     // generate new round id
     currentRoundId = genRoundId
 
@@ -129,7 +129,8 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
     completedTxP = Promise[Transaction]()
 
     // disconnect peers so they all get new ids
-    disconnectPeers()
+    if (disconnect)
+      disconnectPeers()
     // clear maps
     connectionHandlerMap.clear()
     signedPMap.clear()
@@ -162,8 +163,9 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       // handle sending psbt when all outputs registered
       outputsRegisteredP.future.flatMap(_ => sendUnsignedPSBT())
 
-      // todo handle if alices don't sign
-      completedTxP.future.flatMap(onCompletedTransaction)
+      completedTxP.future
+        .flatMap(onCompletedTransaction)
+        .recoverWith(_ => reconcileRound())
 
       // return round
       created
@@ -292,6 +294,26 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
     }
   }
 
+  def cancelRegistration(
+      nonce: SchnorrNonce,
+      roundId: DoubleSha256Digest): Future[Unit] = {
+    require(roundId == currentRoundId,
+            "Attempted to cancel a previous registration")
+    for {
+      aliceDbOpt <- aliceDAO.findByNonce(nonce)
+      aliceDb = aliceDbOpt match {
+        case Some(db) => db
+        case None =>
+          throw new IllegalArgumentException(
+            s"No alice found with nonce $nonce")
+      }
+      updated = aliceDb.unregister()
+      _ <- aliceDAO.update(updated)
+      _ <- inputsDAO.deleteByPeerId(updated.peerId, updated.roundId)
+      _ = signedPMap.remove(updated.peerId)
+    } yield ()
+  }
+
   private[server] def registerAlice(
       peerId: Sha256Digest,
       registerInputs: RegisterInputs): Future[FieldElement] = {
@@ -394,8 +416,11 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
 
         val banDbs = registerInputs.inputs
           .map(_.outPoint)
-          .map(
-            BannedUtxoDb(_, bannedUntil, "Invalid inputs and proofs received"))
+          .map(outpoint =>
+            BannedUtxoDb(
+              outpoint,
+              bannedUntil,
+              s"Invalid inputs and proofs received in round ${roundDb.roundId.hex}"))
 
         val exception: Exception = if (!validInputs) {
           InvalidInputsException("Alice gave invalid inputs")
@@ -410,7 +435,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
         }
 
         bannedUtxoDAO
-          .createAll(banDbs)
+          .upsertAll(banDbs)
           .flatMap(_ => Future.failed(exception))
       }
     }
@@ -614,7 +639,11 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
 
               val dbs = inputs
                 .map(_.outPoint)
-                .map(BannedUtxoDb(_, bannedUntil, "Invalid psbt signature"))
+                .map(outpoint =>
+                  BannedUtxoDb(
+                    outpoint,
+                    bannedUntil,
+                    s"Invalid psbt signature in round ${roundDb.roundId.hex}"))
 
               val exception: Exception = if (!sameTx) {
                 DifferentTransactionException(
@@ -640,7 +669,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
 
               if (ban) {
                 bannedUtxoDAO
-                  .createAll(dbs)
+                  .upsertAll(dbs)
                   .flatMap(_ => Future.failed(exception))
               } else Future.failed(exception)
             }
@@ -651,6 +680,49 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
             Future.failed(exception)
         }
     }
+  }
+
+  def reconcileRound(): Future[Unit] = {
+    for {
+      // cancel round
+      round <- currentRound()
+      updated = round.copy(status = Canceled)
+      _ <- roundDAO.update(updated)
+
+      // get alices
+      alices <- aliceDAO.findRegisteredForRound(round.roundId)
+      unsignedPeerIds = alices.filterNot(_.signed).map(_.peerId)
+      signedPeerIds = alices.filter(_.signed).map(_.peerId)
+
+      // ban inputs that didn't sign
+      inputsToBan <- inputsDAO.findByPeerIds(unsignedPeerIds, round.roundId)
+      bannedUntil = TimeUtil.now.plusSeconds(86400) // 1 day
+      banReason = s"Alice never signed in round ${round.roundId.hex}"
+      banDbs = inputsToBan.map(db =>
+        BannedUtxoDb(db.outPoint, bannedUntil, banReason))
+      _ <- bannedUtxoDAO.upsertAll(banDbs)
+
+      // delete previous inputs and outputs so they can registered again
+      _ <- inputsDAO.deleteByRoundId(round.roundId)
+      _ <- outputsDAO.deleteByRoundId(round.roundId)
+
+      // save connectionHandlerMap because newRound() will clear it
+      oldMap = connectionHandlerMap
+      // restart round with good alices
+      newRound <- newRound(disconnect = false)
+
+      // send messages
+      _ <- FutureUtil.sequentially(signedPeerIds) { id =>
+        val connectionHandler = oldMap(id)
+        getNonce(id, oldMap(id), AskNonce(newRound.roundId)).map { db =>
+          val nonceMsg = NonceMessage(db.nonce)
+          connectionHandler ! RestartRoundMessage(mixDetails, nonceMsg)
+        }
+      }
+
+      // change state so they can begin registering inputs
+      _ <- beginInputRegistration()
+    } yield ()
   }
 
   private def updateFeeRate(): Future[SatoshisPerVirtualByte] = {

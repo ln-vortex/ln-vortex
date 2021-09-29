@@ -36,17 +36,21 @@ sealed abstract class ServerVortexMessage extends VortexMessage
 object VortexMessage extends Factory[VortexMessage] with Logging {
 
   val allFactories: Vector[VortexMessageFactory[VortexMessage]] =
-    Vector(AskMixDetails,
-           MixDetails,
-           AskNonce,
-           NonceMessage,
-           AskInputs,
-           RegisterInputs,
-           BlindedSig,
-           BobMessage,
-           UnsignedPsbtMessage,
-           SignedPsbtMessage,
-           SignedTxMessage)
+    Vector(
+      AskMixDetails,
+      MixDetails,
+      AskNonce,
+      NonceMessage,
+      AskInputs,
+      RegisterInputs,
+      BlindedSig,
+      BobMessage,
+      UnsignedPsbtMessage,
+      SignedPsbtMessage,
+      SignedTxMessage,
+      RestartRoundMessage,
+      CancelRegistrationMessage
+    )
 
   lazy val knownTypes: Vector[BigSizeUInt] = allFactories.map(_.tpe)
 
@@ -401,5 +405,54 @@ object SignedTxMessage extends VortexMessageFactory[SignedTxMessage] {
     val transaction = Transaction(value)
 
     SignedTxMessage(transaction)
+  }
+}
+
+case class RestartRoundMessage(
+    mixDetails: MixDetails,
+    nonceMessage: NonceMessage)
+    extends ServerVortexMessage {
+  override val tpe: BigSizeUInt = RestartRoundMessage.tpe
+
+  override lazy val value: ByteVector = mixDetails.bytes ++ nonceMessage.bytes
+}
+
+object RestartRoundMessage extends VortexMessageFactory[RestartRoundMessage] {
+  override val tpe: BigSizeUInt = BigSizeUInt(42023)
+
+  override val typeName: String = "RestartRoundMessage"
+
+  override def fromTLVValue(value: ByteVector): RestartRoundMessage = {
+    val iter = ValueIterator(value)
+
+    val mixDetails = iter.take(MixDetails)
+    val nonceMessage = iter.take(NonceMessage)
+
+    RestartRoundMessage(mixDetails, nonceMessage)
+  }
+}
+
+case class CancelRegistrationMessage(
+    nonce: SchnorrNonce,
+    roundId: DoubleSha256Digest)
+    extends ClientVortexMessage {
+  override val tpe: BigSizeUInt = RestartRoundMessage.tpe
+
+  override lazy val value: ByteVector = nonce.bytes ++ roundId.bytes
+}
+
+object CancelRegistrationMessage
+    extends VortexMessageFactory[CancelRegistrationMessage] {
+  override val tpe: BigSizeUInt = BigSizeUInt(42025)
+
+  override val typeName: String = "CancelRegistrationMessage"
+
+  override def fromTLVValue(value: ByteVector): CancelRegistrationMessage = {
+    val iter = ValueIterator(value)
+
+    val nonce = iter.take(SchnorrNonce)
+    val roundId = iter.take(DoubleSha256Digest)
+
+    CancelRegistrationMessage(nonce, roundId)
   }
 }
