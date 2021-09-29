@@ -1,6 +1,7 @@
 package com.lnvortex.client
 
 import com.lnvortex.client.VortexClient.knownVersions
+import com.lnvortex.client.VortexClientException._
 import com.lnvortex.core._
 import com.lnvortex.core.crypto.BlindingTweaks
 import com.lnvortex.testkit.VortexClientFixture
@@ -96,7 +97,7 @@ class VortexClientTest extends VortexClientFixture {
       outputs = Vector(change)
       tx = BaseTransaction(Int32.two, inputs, outputs, UInt32.zero)
       psbt = PSBT.fromUnsignedTx(tx)
-      res <- recoverToSucceededIf[RuntimeException](
+      res <- recoverToSucceededIf[InvalidMixedOutputException](
         vortexClient.validateAndSignPsbt(psbt))
     } yield res
   }
@@ -127,7 +128,7 @@ class VortexClientTest extends VortexClientFixture {
         outputs = Vector(mix)
         tx = BaseTransaction(Int32.two, inputs, outputs, UInt32.zero)
         psbt = PSBT.fromUnsignedTx(tx)
-        res <- recoverToSucceededIf[RuntimeException](
+        res <- recoverToSucceededIf[InvalidChangeOutputException](
           vortexClient.validateAndSignPsbt(psbt))
       } yield res
   }
@@ -155,10 +156,10 @@ class VortexClientTest extends VortexClientFixture {
         inputs = refs
           .map(_.outPoint)
           .map(TransactionInput(_, EmptyScriptSignature, UInt32.max))
-        outputs = Vector(mix)
+        outputs = Vector(change, mix)
         tx = BaseTransaction(Int32.two, inputs, outputs, UInt32.zero)
         psbt = PSBT.fromUnsignedTx(tx)
-        res <- recoverToSucceededIf[RuntimeException](
+        res <- recoverToSucceededIf[InvalidChangeOutputException](
           vortexClient.validateAndSignPsbt(psbt))
       } yield res
   }
@@ -189,7 +190,7 @@ class VortexClientTest extends VortexClientFixture {
       outputs = Vector(change, mix)
       tx = BaseTransaction(Int32.two, inputs.tail, outputs, UInt32.zero)
       psbt = PSBT.fromUnsignedTx(tx)
-      res <- recoverToSucceededIf[RuntimeException](
+      res <- recoverToSucceededIf[MissingInputsException](
         vortexClient.validateAndSignPsbt(psbt))
     } yield res
   }

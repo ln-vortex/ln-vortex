@@ -2,6 +2,7 @@ package com.lnvortex.client
 
 import akka.actor.{ActorRef, ActorSystem}
 import com.lnvortex.client.RoundDetails.getNonceOpt
+import com.lnvortex.client.VortexClientException._
 import com.lnvortex.client.api.CoinJoinWalletApi
 import com.lnvortex.client.config.VortexAppConfig
 import com.lnvortex.client.networking.{P2PClient, Peer}
@@ -241,7 +242,7 @@ case class VortexClient[+T <: CoinJoinWalletApi](coinjoinWallet: T)(implicit
         val tx = unsigned.transaction
         lazy val txOutpoints = tx.inputs.map(_.previousOutput)
         // should we care if they don't have our inputs?
-        lazy val hasInputs = myOutpoints.forall(txOutpoints.contains)
+        lazy val missingInputs = myOutpoints.filterNot(txOutpoints.contains)
 
         lazy val hasCorrectChange = state.expectedAmtBackOpt match {
           case Some(changeAmt) =>
@@ -255,7 +256,9 @@ case class VortexClient[+T <: CoinJoinWalletApi](coinjoinWallet: T)(implicit
 
         lazy val noDust = tx.outputs.forall(_.value > Policy.dustThreshold)
 
-        if (hasMixOutput && hasCorrectChange && hasInputs && noDust) {
+        if (
+          hasMixOutput && hasCorrectChange && missingInputs.isEmpty && noDust
+        ) {
           logger.info("PSBT is valid, giving channel peer")
           for {
             // tell peer about funding psbt
@@ -268,10 +271,24 @@ case class VortexClient[+T <: CoinJoinWalletApi](coinjoinWallet: T)(implicit
             roundDetails = state.nextStage(signed)
             signed
           }
-        } else {
-          Future.failed(
+        } else { // error
+          val exception: Exception = if (!hasMixOutput) {
+            InvalidMixedOutputException(
+              s"Missing expected mixed output ${state.initDetails.mixOutput}")
+          } else if (!hasCorrectChange) {
+            InvalidChangeOutputException(
+              s"Missing expected change output of ${state.expectedAmtBackOpt}")
+          } else if (missingInputs.nonEmpty) {
+            MissingInputsException(
+              s"Missing inputs form coinjoin transaction: ${missingInputs.mkString(",")}")
+          } else if (!noDust) {
+            DustOutputsException("Transaction contains dust outputs")
+          } else {
+            // this should be impossible
             new RuntimeException(
-              "Received PSBT did not contain our inputs or outputs"))
+              "Received PSBT did not contain our inputs or outputs")
+          }
+          Future.failed(exception)
         }
     }
   }
