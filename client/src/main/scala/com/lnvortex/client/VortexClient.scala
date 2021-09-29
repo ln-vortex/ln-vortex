@@ -11,7 +11,7 @@ import com.lnvortex.core.crypto.BlindSchnorrUtil
 import com.lnvortex.core.crypto.BlindingTweaks.freshBlindingTweaks
 import grizzled.slf4j.Logging
 import org.bitcoins.asyncutil.AsyncUtil
-import org.bitcoins.core.currency.Satoshis
+import org.bitcoins.core.currency.{CurrencyUnit, Satoshis}
 import org.bitcoins.core.number.UInt16
 import org.bitcoins.core.policy.Policy
 import org.bitcoins.core.protocol.ln.node.NodeId
@@ -21,6 +21,7 @@ import org.bitcoins.core.util.{FutureUtil, StartStopAsync}
 import org.bitcoins.crypto._
 
 import java.net.InetSocketAddress
+import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Future, Promise}
 
 case class VortexClient[+T <: CoinJoinWalletApi](coinjoinWallet: T)(implicit
@@ -80,8 +81,10 @@ case class VortexClient[+T <: CoinJoinWalletApi](coinjoinWallet: T)(implicit
         for {
           handler <- handlerP.future
           _ = handler ! AskNonce(round.roundId)
-          _ <- AsyncUtil.awaitCondition(() =>
-            getNonceOpt(roundDetails).isDefined)
+          _ <- AsyncUtil.awaitCondition(
+            () => getNonceOpt(roundDetails).isDefined,
+            interval = 100.milliseconds,
+            maxTries = 300)
         } yield {
           val nonce = getNonceOpt(roundDetails).get
           logger.info(s"Got nonce from coordinator $nonce")
@@ -141,7 +144,9 @@ case class VortexClient[+T <: CoinJoinWalletApi](coinjoinWallet: T)(implicit
   }
 
   private[client] def registerCoins(
-      roundId: DoubleSha256Digest): Future[Unit] = {
+      roundId: DoubleSha256Digest,
+      inputFee: CurrencyUnit,
+      outputFee: CurrencyUnit): Future[Unit] = {
     roundDetails match {
       case state @ (NoDetails | _: KnownRound | _: ReceivedNonce |
           _: InitializedRound) =>
@@ -155,8 +160,8 @@ case class VortexClient[+T <: CoinJoinWalletApi](coinjoinWallet: T)(implicit
 
         val outputRefs = scheduled.inputs
         val selectedAmt = outputRefs.map(_.output.value).sum
-        val inputFees = Satoshis(outputRefs.size) * round.inputFee
-        val outputFees = Satoshis(2) * round.outputFee
+        val inputFees = Satoshis(outputRefs.size) * inputFee
+        val outputFees = Satoshis(2) * outputFee
         val onChainFees = inputFees + outputFees
         val changeAmt = selectedAmt - round.amount - round.mixFee - onChainFees
 
@@ -203,7 +208,7 @@ case class VortexClient[+T <: CoinJoinWalletApi](coinjoinWallet: T)(implicit
             tweaks = tweaks
           )
 
-          roundDetails = scheduled.nextStage(details)
+          roundDetails = scheduled.nextStage(details, inputFee, outputFee)
 
           handler ! RegisterInputs(inputRefs,
                                    challenge,

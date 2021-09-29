@@ -50,20 +50,25 @@ case class InputsScheduled(
     extends RoundDetails {
   override val order: Int = 3
 
-  def nextStage(initDetails: InitDetails): InputsRegistered =
-    InputsRegistered(round, nonce, initDetails)
+  def nextStage(
+      initDetails: InitDetails,
+      inputFee: CurrencyUnit,
+      outputFee: CurrencyUnit): InputsRegistered =
+    InputsRegistered(round, inputFee, outputFee, nonce, initDetails)
 }
 
 sealed trait InitializedRound extends RoundDetails {
 
   def round: MixDetails
+  def inputFee: CurrencyUnit
+  def outputFee: CurrencyUnit
   def nonce: SchnorrNonce
   def initDetails: InitDetails
 
   def expectedAmtBackOpt: Option[CurrencyUnit] = {
     val excessAfterChange =
       initDetails.inputAmt - round.amount - round.mixFee - (Satoshis(
-        initDetails.inputs.size) * round.inputFee) - round.outputFee - round.outputFee
+        initDetails.inputs.size) * inputFee) - outputFee - outputFee
 
     if (excessAfterChange > Policy.dustThreshold)
       Some(excessAfterChange)
@@ -71,7 +76,7 @@ sealed trait InitializedRound extends RoundDetails {
   }
 
   def restartRound(round: MixDetails, nonce: SchnorrNonce): InputsScheduled =
-    InputsScheduled(round,
+    InputsScheduled(round = round,
                     nonce = nonce,
                     inputs = initDetails.inputs,
                     nodeId = initDetails.nodeId,
@@ -80,28 +85,34 @@ sealed trait InitializedRound extends RoundDetails {
 
 case class InputsRegistered(
     round: MixDetails,
+    inputFee: CurrencyUnit,
+    outputFee: CurrencyUnit,
     nonce: SchnorrNonce,
     initDetails: InitDetails)
     extends InitializedRound {
   override val order: Int = 4
 
   def nextStage: MixOutputRegistered =
-    MixOutputRegistered(round, nonce, initDetails)
+    MixOutputRegistered(round, inputFee, outputFee, nonce, initDetails)
 }
 
 case class MixOutputRegistered(
     round: MixDetails,
+    inputFee: CurrencyUnit,
+    outputFee: CurrencyUnit,
     nonce: SchnorrNonce,
     initDetails: InitDetails)
     extends InitializedRound {
   override val order: Int = 5
 
   def nextStage(psbt: PSBT): PSBTSigned =
-    PSBTSigned(round, nonce, initDetails, psbt)
+    PSBTSigned(round, inputFee, outputFee, nonce, initDetails, psbt)
 }
 
 case class PSBTSigned(
     round: MixDetails,
+    inputFee: CurrencyUnit,
+    outputFee: CurrencyUnit,
     nonce: SchnorrNonce,
     initDetails: InitDetails,
     psbt: PSBT)

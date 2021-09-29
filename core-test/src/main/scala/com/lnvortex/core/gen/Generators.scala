@@ -20,13 +20,11 @@ object Generators {
       version <- NumberGenerator.uInt16
       roundId <- CryptoGenerators.doubleSha256Digest
       amount <- CurrencyUnitGenerator.positiveSatoshis
-      fee <- CurrencyUnitGenerator.positiveSatoshis
-      inFee <- CurrencyUnitGenerator.positiveSatoshis
-      outFee <- CurrencyUnitGenerator.positiveSatoshis
+      mixFee <- CurrencyUnitGenerator.positiveSatoshis
       pubkey <- CryptoGenerators.schnorrPublicKey
       time <- NumberGenerator.uInt64
     } yield {
-      MixDetails(version, roundId, amount, fee, inFee, outFee, pubkey, time)
+      MixDetails(version, roundId, amount, mixFee, pubkey, time)
     }
   }
 
@@ -45,7 +43,9 @@ object Generators {
   def askInputs: Gen[AskInputs] = {
     for {
       roundId <- CryptoGenerators.doubleSha256Digest
-    } yield AskInputs(roundId)
+      inFee <- CurrencyUnitGenerator.positiveSatoshis
+      outFee <- CurrencyUnitGenerator.positiveSatoshis
+    } yield AskInputs(roundId, inFee, outFee)
   }
 
   def inputReference: Gen[InputReference] = {

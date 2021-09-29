@@ -95,8 +95,6 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       roundId = currentRoundId,
       amount = config.mixAmount,
       mixFee = config.mixFee,
-      inputFee = inputFee,
-      outputFee = outputFee,
       publicKey = publicKey,
       time = UInt64(roundStartTime())
     )
@@ -195,13 +193,16 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
   private[server] def beginInputRegistration(): Future[Unit] = {
     logger.info("Starting input registration")
 
+    val feeRateF = updateFeeRate()
+
     beginInputRegistrationCancellable.foreach(_.cancel())
     beginInputRegistrationCancellable = None
     inputRegStartTime = TimeUtil.currentEpochSecond
 
     for {
       roundDb <- currentRound()
-      updated = roundDb.copy(status = RegisterAlices)
+      feeRate <- feeRateF
+      updated = roundDb.copy(status = RegisterAlices, feeRate = feeRate)
       _ <- roundDAO.update(updated)
     } yield {
       beginOutputRegistrationCancellable = Some(
@@ -210,7 +211,8 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
           ()
         }
       )
-      connectionHandlerMap.values.foreach(_ ! AskInputs(currentRoundId))
+      connectionHandlerMap.values.foreach(
+        _ ! AskInputs(currentRoundId, inputFee, outputFee))
     }
   }
 

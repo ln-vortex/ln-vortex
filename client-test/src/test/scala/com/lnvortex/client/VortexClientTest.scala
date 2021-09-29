@@ -22,8 +22,6 @@ class VortexClientTest extends VortexClientFixture {
     roundId = DoubleSha256Digest.empty,
     amount = Satoshis(200000),
     mixFee = Satoshis.zero,
-    inputFee = Satoshis.zero,
-    outputFee = Satoshis.zero,
     publicKey = ECPublicKey.freshPublicKey.schnorrPublicKey,
     time = UInt64.zero
   )
@@ -61,7 +59,11 @@ class VortexClientTest extends VortexClientFixture {
                                 chanId = Sha256Digest.empty.bytes,
                                 mixOutput = mix,
                                 tweaks = dummyTweaks)
-      testState = MixOutputRegistered(dummyMix, nonce, testDetails)
+      testState = MixOutputRegistered(dummyMix,
+                                      Satoshis.zero,
+                                      Satoshis.zero,
+                                      nonce,
+                                      testDetails)
       _ = vortexClient.setRoundDetails(testState)
 
       inputs = refs
@@ -94,7 +96,11 @@ class VortexClientTest extends VortexClientFixture {
                                 chanId = Sha256Digest.empty.bytes,
                                 mixOutput = mix,
                                 tweaks = dummyTweaks)
-      testState = MixOutputRegistered(dummyMix, nonce, testDetails)
+      testState = MixOutputRegistered(dummyMix,
+                                      Satoshis.zero,
+                                      Satoshis.zero,
+                                      nonce,
+                                      testDetails)
       _ = vortexClient.setRoundDetails(testState)
 
       inputs = refs
@@ -128,7 +134,11 @@ class VortexClientTest extends VortexClientFixture {
                                   chanId = Sha256Digest.empty.bytes,
                                   mixOutput = mix,
                                   tweaks = dummyTweaks)
-        testState = MixOutputRegistered(dummyMix, nonce, testDetails)
+        testState = MixOutputRegistered(dummyMix,
+                                        Satoshis.zero,
+                                        Satoshis.zero,
+                                        nonce,
+                                        testDetails)
         _ = vortexClient.setRoundDetails(testState)
 
         inputs = refs
@@ -162,7 +172,11 @@ class VortexClientTest extends VortexClientFixture {
                                   chanId = Sha256Digest.empty.bytes,
                                   mixOutput = mix,
                                   tweaks = dummyTweaks)
-        testState = MixOutputRegistered(dummyMix, nonce, testDetails)
+        testState = MixOutputRegistered(dummyMix,
+                                        Satoshis.zero,
+                                        Satoshis.zero,
+                                        nonce,
+                                        testDetails)
         _ = vortexClient.setRoundDetails(testState)
 
         inputs = refs
@@ -196,7 +210,11 @@ class VortexClientTest extends VortexClientFixture {
                                 chanId = Sha256Digest.empty.bytes,
                                 mixOutput = mix,
                                 tweaks = dummyTweaks)
-      testState = MixOutputRegistered(dummyMix, nonce, testDetails)
+      testState = MixOutputRegistered(dummyMix,
+                                      Satoshis.zero,
+                                      Satoshis.zero,
+                                      nonce,
+                                      testDetails)
       _ = vortexClient.setRoundDetails(testState)
 
       inputs = refs

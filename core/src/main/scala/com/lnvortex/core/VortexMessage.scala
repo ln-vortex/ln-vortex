@@ -134,8 +134,6 @@ case class MixDetails(
     roundId: DoubleSha256Digest,
     amount: CurrencyUnit,
     mixFee: CurrencyUnit,
-    inputFee: CurrencyUnit,
-    outputFee: CurrencyUnit,
     publicKey: SchnorrPublicKey,
     time: UInt64)
     extends ServerVortexMessage {
@@ -146,8 +144,6 @@ case class MixDetails(
       roundId.bytes ++
       amount.satoshis.toUInt64.bytes ++
       mixFee.satoshis.toUInt64.bytes ++
-      inputFee.satoshis.toUInt64.bytes ++
-      outputFee.satoshis.toUInt64.bytes ++
       publicKey.bytes ++
       time.bytes
   }
@@ -165,8 +161,6 @@ object MixDetails extends VortexMessageFactory[MixDetails] {
     val roundId = DoubleSha256Digest(iter.take(32))
     val amount = iter.takeSats()
     val mixFee = iter.takeSats()
-    val inputFee = iter.takeSats()
-    val outputFee = iter.takeSats()
     val publicKey = SchnorrPublicKey(iter.take(32))
     val time = iter.takeU64()
 
@@ -174,8 +168,6 @@ object MixDetails extends VortexMessageFactory[MixDetails] {
                roundId = roundId,
                amount = amount,
                mixFee = mixFee,
-               inputFee = inputFee,
-               outputFee = outputFee,
                publicKey = publicKey,
                time = time)
   }
@@ -224,11 +216,15 @@ object NonceMessage extends VortexMessageFactory[NonceMessage] {
   }
 }
 
-case class AskInputs(roundId: DoubleSha256Digest) extends ServerVortexMessage {
+case class AskInputs(
+    roundId: DoubleSha256Digest,
+    inputFee: CurrencyUnit,
+    outputFee: CurrencyUnit)
+    extends ServerVortexMessage {
   override val tpe: BigSizeUInt = AskInputs.tpe
 
   override val value: ByteVector = {
-    roundId.bytes
+    roundId.bytes ++ inputFee.bytes ++ outputFee.bytes
   }
 }
 
@@ -240,8 +236,10 @@ object AskInputs extends VortexMessageFactory[AskInputs] {
   override def fromTLVValue(value: ByteVector): AskInputs = {
     val iter = ValueIterator(value)
     val roundId = DoubleSha256Digest(iter.take(32))
+    val inputFee = iter.takeSats()
+    val outputFee = iter.takeSats()
 
-    AskInputs(roundId)
+    AskInputs(roundId, inputFee, outputFee)
   }
 }
 
