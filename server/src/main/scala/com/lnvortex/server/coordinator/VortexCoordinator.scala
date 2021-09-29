@@ -67,6 +67,9 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
 
   def getCurrentRoundId: DoubleSha256Digest = currentRoundId
 
+  private def roundAddressLabel: String =
+    s"CoinJoin Round: ${currentRoundId.hex}"
+
   private[coordinator] def inputFee: CurrencyUnit =
     feeRate * 149 // p2wpkh input size
   private[coordinator] def outputFee: CurrencyUnit =
@@ -111,8 +114,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
   private val signedPMap: mutable.Map[Sha256Digest, Promise[PSBT]] =
     mutable.Map.empty
 
-  private var completedTxP: Promise[(Transaction, Int)] =
-    Promise[(Transaction, Int)]()
+  private var completedTxP: Promise[Transaction] = Promise[Transaction]()
 
   def newRound(): Future[RoundDb] = {
     // generate new round id
@@ -124,7 +126,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
     // reset promises
     inputsRegisteredP = Promise[Unit]()
     outputsRegisteredP = Promise[Unit]()
-    completedTxP = Promise[(Transaction, Int)]()
+    completedTxP = Promise[Transaction]()
 
     // disconnect peers so they all get new ids
     disconnectPeers()
@@ -161,22 +163,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       outputsRegisteredP.future.flatMap(_ => sendUnsignedPSBT())
 
       // todo handle if alices don't sign
-      completedTxP.future.flatMap { case (tx, numAlices) =>
-        // handle making new round
-        for {
-          _ <- bitcoind.sendRawTransaction(tx)
-          _ = logger.info(s"Broadcast transaction ${tx.txIdBE.hex}")
-
-          roundDb <- currentRound()
-          profit = Satoshis(numAlices) * roundDb.mixFee
-          updatedRoundDb = roundDb.copy(status = RoundStatus.Signed,
-                                        transactionOpt = Some(tx),
-                                        profitOpt = Some(profit))
-
-          _ <- roundDAO.update(updatedRoundDb)
-          _ <- newRound()
-        } yield ()
-      }
+      completedTxP.future.flatMap(onCompletedTransaction)
 
       // return round
       created
@@ -253,9 +240,31 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
   private[server] def sendUnsignedPSBT(): Future[Unit] = {
     logger.info("Sending unsigned PSBT to peers")
     for {
-      addr <- bitcoind.getNewAddress(AddressType.Bech32)
+      addr <- bitcoind.getNewAddress(roundAddressLabel, AddressType.Bech32)
       psbt <- constructUnsignedPSBT(addr)
     } yield connectionHandlerMap.values.foreach(_ ! UnsignedPsbtMessage(psbt))
+  }
+
+  private def onCompletedTransaction(tx: Transaction): Future[Unit] = {
+    for {
+      _ <- bitcoind.sendRawTransaction(tx)
+      _ = logger.info(s"Broadcast transaction ${tx.txIdBE.hex}")
+
+      addrs <- bitcoind.listReceivedByAddress(confirmations = 0,
+                                              includeEmpty = false,
+                                              includeWatchOnly = true,
+                                              walletNameOpt = None)
+      addrOpt = addrs.find(_.label == roundAddressLabel)
+      profitOpt = addrOpt.map(_.amount)
+
+      roundDb <- currentRound()
+      updatedRoundDb = roundDb.copy(status = RoundStatus.Signed,
+                                    transactionOpt = Some(tx),
+                                    profitOpt = profitOpt)
+
+      _ <- roundDAO.update(updatedRoundDb)
+      _ <- newRound()
+    } yield ()
   }
 
   def getNonce(
@@ -603,7 +612,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
               }.flatten
 
               // make promise complete
-              completedTxP.tryComplete(signedT.map((_, signedFs.size)))
+              completedTxP.tryComplete(signedT)
 
               for {
                 _ <- markSignedF
