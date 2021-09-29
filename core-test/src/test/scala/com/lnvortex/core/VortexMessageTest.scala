@@ -2,7 +2,6 @@ package com.lnvortex.core
 
 import com.lnvortex.core.crypto.{BlindSchnorrUtil, BlindingTweaks}
 import org.bitcoins.core.currency._
-import org.bitcoins.core.protocol.script.P2WSHWitnessSPKV0
 import org.bitcoins.core.protocol.transaction.TransactionOutput
 import org.bitcoins.crypto._
 import org.bitcoins.testkitcore.gen.ScriptGenerators
@@ -37,33 +36,9 @@ class VortexMessageTest extends BitcoinSUnitTest {
 
       val bobMsg = BobMessage(sig, output)
 
-      val verify = bobMsg.verifySigAndOutput(pubKey, roundId)
+      val verify = bobMsg.verifySig(pubKey, roundId)
 
       assert(verify)
-    }
-  }
-
-  it must "fail to verify a Bob message with non p2wsh spks" in {
-    forAll(
-      ScriptGenerators.scriptPubKey
-        .map(_._1)
-        .suchThat(!_.isInstanceOf[P2WSHWitnessSPKV0])) { spk =>
-      val output = TransactionOutput(amount, spk)
-      val hash = BobMessage.calculateChallenge(output, roundId)
-
-      val challenge =
-        BlindSchnorrUtil.generateChallenge(pubKey, nonce, tweaks, hash)
-
-      val blindSig = BlindSchnorrUtil.generateBlindSig(privKey, kVal, challenge)
-
-      val sig =
-        BlindSchnorrUtil.unblindSignature(blindSig, pubKey, nonce, tweaks, hash)
-
-      val bobMsg = BobMessage(sig, output)
-
-      val verify = bobMsg.verifySigAndOutput(pubKey, roundId)
-
-      assert(!verify)
     }
   }
 
@@ -103,7 +78,7 @@ class VortexMessageTest extends BitcoinSUnitTest {
 
       val bobMsg = BobMessage(sig, output)
 
-      val verify = bobMsg.verifySigAndOutput(kVal.schnorrPublicKey, roundId)
+      val verify = bobMsg.verifySig(kVal.schnorrPublicKey, roundId)
 
       assert(!verify)
     }

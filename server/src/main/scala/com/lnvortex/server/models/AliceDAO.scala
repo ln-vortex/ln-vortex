@@ -108,6 +108,8 @@ case class AliceDAO()(implicit
 
     def blindOutputSigOpt: Rep[Option[FieldElement]] = column("blind_sig")
 
+    def signed: Rep[Boolean] = column("signed")
+
     def * : ProvenShape[AliceDb] =
       (peerId,
        roundId,
@@ -120,6 +122,7 @@ case class AliceDAO()(implicit
        numInputs,
        blindedOutputOpt,
        changeSpkOpt,
-       blindOutputSigOpt).<>(AliceDb.tupled, AliceDb.unapply)
+       blindOutputSigOpt,
+       signed).<>(AliceDb.tupled, AliceDb.unapply)
   }
 }

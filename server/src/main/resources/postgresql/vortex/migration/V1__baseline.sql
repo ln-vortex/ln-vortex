@@ -34,6 +34,7 @@ CREATE TABLE `alices`
     `blinded_output` TEXT,
     `change_spk`     TEXT,
     `blind_sig`      TEXT,
+    `signed`         BOOLEAN          NOT NULL,
     constraint `fk_roundId` foreign key (`round_id`) references `rounds` (`round_id`) on update NO ACTION on delete NO ACTION
 );
 

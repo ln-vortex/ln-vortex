@@ -34,6 +34,7 @@ CREATE TABLE `alices`
     `blinded_output` VARCHAR(254),
     `change_spk`     VARCHAR(254),
     `blind_sig`      VARCHAR(254),
+    `signed`         INTEGER                  NOT NULL,
     constraint `fk_roundId` foreign key (`round_id`) references `rounds` (`round_id`) on update NO ACTION on delete NO ACTION
 );
 

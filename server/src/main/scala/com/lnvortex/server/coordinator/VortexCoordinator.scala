@@ -588,6 +588,8 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
             if (correctNumInputs && sameTx && validSigs) {
               // mark successful
               signedPMap(peerId).success(psbt)
+              val markSignedF = aliceDAO.update(aliceDb.markSigned())
+
               val signedFs = signedPMap.values.map(_.future)
 
               val signedT = Try {
@@ -603,7 +605,10 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
               // make promise complete
               completedTxP.tryComplete(signedT.map((_, signedFs.size)))
 
-              Future.fromTry(signedT)
+              for {
+                _ <- markSignedF
+                signed <- Future.fromTry(signedT)
+              } yield signed
             } else {
               val bannedUntil = TimeUtil.now.plusSeconds(86400) // 1 day
 

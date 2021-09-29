@@ -16,7 +16,8 @@ case class AliceDb(
     numInputs: Int,
     blindedOutputOpt: Option[FieldElement],
     changeSpkOpt: Option[ScriptPubKey],
-    blindOutputSigOpt: Option[FieldElement]
+    blindOutputSigOpt: Option[FieldElement],
+    signed: Boolean
 ) {
 
   val noncePath: BIP32Path = {
@@ -38,6 +39,14 @@ case class AliceDb(
          blindedOutputOpt = Some(blindedOutput),
          changeSpkOpt = Some(changeSpk),
          blindOutputSigOpt = Some(blindOutputSig))
+  }
+
+  def markSigned(): AliceDb = {
+    require(blindOutputSigOpt.isDefined)
+    require(changeSpkOpt.isDefined)
+    require(blindOutputSigOpt.isDefined)
+
+    copy(signed = true)
   }
 }
 
@@ -65,7 +74,8 @@ object AliceDbs {
       numInputs = 0,
       blindedOutputOpt = None,
       changeSpkOpt = None,
-      blindOutputSigOpt = None
+      blindOutputSigOpt = None,
+      signed = false
     )
   }
 }

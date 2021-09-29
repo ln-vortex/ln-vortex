@@ -75,7 +75,11 @@ case class RegisteredInputDAO()(implicit
     safeDatabase.runVec(query)
   }
 
-  // TODO MAKE IT SO YOU CAN REGISTER INPUTS
+  def deleteByRoundId(roundId: DoubleSha256Digest): Future[Int] = {
+    val query = table.filter(_.roundId === roundId).delete
+
+    safeDatabase.run(query)
+  }
 
   class RegisteredInputsTable(tag: Tag)
       extends Table[RegisteredInputDb](tag, schemaName, "registered_inputs") {

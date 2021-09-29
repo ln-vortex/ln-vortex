@@ -53,6 +53,12 @@ case class RegisteredOutputDAO()(implicit
     safeDatabase.runVec(query)
   }
 
+  def deleteByRoundId(roundId: DoubleSha256Digest): Future[Int] = {
+    val query = table.filter(_.roundId === roundId).delete
+
+    safeDatabase.run(query)
+  }
+
   class RegisteredOutputTable(tag: Tag)
       extends Table[RegisteredOutputDb](tag, schemaName, "registered_outputs") {
 
