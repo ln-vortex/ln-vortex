@@ -529,7 +529,56 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
                                               tweaks,
                                               challenge)
       _ <- coordinator.beginOutputRegistration()
-      res <- recoverToSucceededIf[InvalidOutputScriptPubKeyException](
+      res <- recoverToSucceededIf[InvalidMixOutputScriptPubKeyException](
+        coordinator.verifyAndRegisterBob(BobMessage(sig, mixOutput)))
+    } yield res
+  }
+
+  it must "fail to register an output with the wrong amount" in { coordinator =>
+    val bitcoind = coordinator.bitcoind
+    for {
+      aliceDb <- coordinator.getNonce(Sha256Digest.empty,
+                                      TestActorRef("test"),
+                                      AskNonce(coordinator.getCurrentRoundId))
+      _ <- coordinator.beginInputRegistration()
+
+      utxo <- bitcoind.listUnspent.map(_.head)
+      outputRef = {
+        val outpoint = TransactionOutPoint(utxo.txid, UInt32(utxo.vout))
+        val output = TransactionOutput(utxo.amount, utxo.scriptPubKey.get)
+        OutputReference(outpoint, output)
+      }
+      tx = InputReference.constructInputProofTx(outputRef, aliceDb.nonce)
+      signed <- bitcoind.walletProcessPSBT(PSBT.fromUnsignedTx(tx))
+      proof =
+        signed.psbt.inputMaps.head.finalizedScriptWitnessOpt.get.scriptWitness
+
+      inputRef = InputReference(outputRef, proof)
+      addr <- bitcoind.getNewAddress
+
+      tweaks = freshBlindingTweaks(signerPubKey = coordinator.publicKey,
+                                   signerNonce = aliceDb.nonce)
+
+      p2wsh = P2WSHWitnessSPKV0(EmptyScriptPubKey)
+      mixOutput = TransactionOutput(Bitcoins.one, p2wsh)
+      challenge = BobMessage.calculateChallenge(mixOutput,
+                                                coordinator.getCurrentRoundId)
+      blind = BlindSchnorrUtil.generateChallenge(coordinator.publicKey,
+                                                 aliceDb.nonce,
+                                                 tweaks,
+                                                 challenge)
+
+      registerInputs = RegisterInputs(Vector(inputRef),
+                                      blind,
+                                      addr.scriptPubKey)
+      blindSig <- coordinator.registerAlice(Sha256Digest.empty, registerInputs)
+      sig = BlindSchnorrUtil.unblindSignature(blindSig,
+                                              coordinator.publicKey,
+                                              aliceDb.nonce,
+                                              tweaks,
+                                              challenge)
+      _ <- coordinator.beginOutputRegistration()
+      res <- recoverToSucceededIf[InvalidMixOutputAmountException](
         coordinator.verifyAndRegisterBob(BobMessage(sig, mixOutput)))
     } yield res
   }

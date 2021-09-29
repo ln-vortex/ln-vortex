@@ -198,7 +198,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
     inputRegStartTime = TimeUtil.currentEpochSecond
 
     for {
-      roundDb <- roundDAO.read(currentRoundId).map(_.get)
+      roundDb <- currentRound()
       updated = roundDb.copy(status = RegisterAlices)
       _ <- roundDAO.update(updated)
     } yield {
@@ -219,7 +219,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
     beginOutputRegistrationCancellable = None
 
     for {
-      roundDb <- roundDAO.read(currentRoundId).map(_.get)
+      roundDb <- currentRound()
       updated = roundDb.copy(status = RegisterOutputs)
       _ <- roundDAO.update(updated)
 
@@ -302,13 +302,11 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
               _.output.scriptPubKey.scriptType == WITNESS_V0_KEYHASH),
             s"${peerId.hex} attempted to register non p2wpkh inputs")
 
-    val roundDbF = roundDAO.read(currentRoundId).map {
-      case None => throw new RuntimeException("No roundDb found")
-      case Some(roundDb) =>
-        if (roundDb.status != RegisterAlices)
-          throw new IllegalStateException(
-            s"Round in incorrect state ${roundDb.status}")
-        roundDb
+    val roundDbF = currentRound().map { roundDb =>
+      if (roundDb.status != RegisterAlices)
+        throw new IllegalStateException(
+          s"Round in incorrect state ${roundDb.status}")
+      roundDb
     }
 
     val aliceDbF = aliceDAO.read(peerId)
@@ -427,16 +425,14 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
     if (validSpk && validSig) {
       val db = RegisteredOutputDb(bob.output, bob.sig, currentRoundId)
       for {
-        roundOpt <- roundDAO.read(currentRoundId)
-        _ = roundOpt match {
-          case Some(round) =>
-            require(round.status == RegisterOutputs,
-                    s"Round is in invalid state ${round.status}")
-            require(round.amount == bob.output.value,
-                    "Output given is incorrect amount")
-          case None =>
-            throw new RuntimeException(
-              s"No round found for roundId ${currentRoundId.hex}")
+        round <- currentRound()
+        _ = {
+          if (round.status != RegisterOutputs)
+            throw new IllegalStateException(
+              s"Round is in invalid state ${round.status}")
+          if (round.amount != bob.output.value)
+            throw InvalidMixOutputAmountException(
+              s"Output given is incorrect amount, got ${bob.output.value} expected ${round.amount}")
         }
         _ <- outputsDAO.create(db)
 
@@ -453,7 +449,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
         InvalidOutputSignatureException(
           s"Bob attempted to register an output with an invalid sig ${bob.sig.hex}")
       } else if (!validSpk) {
-        InvalidOutputScriptPubKeyException(
+        InvalidMixOutputScriptPubKeyException(
           s"Bob attempted to register an output with an invalid script pub key ${bob.output.scriptPubKey}")
       } else {
         // this should be impossible
@@ -488,7 +484,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       aliceDbs <- aliceDAO.findRegisteredForRound(currentRoundId)
       inputDbs <- inputsDAO.findByRoundId(currentRoundId)
       outputDbs <- outputsDAO.findByRoundId(currentRoundId)
-      roundDb <- roundDAO.read(currentRoundId).map(_.get)
+      roundDb <- currentRound()
     } yield (aliceDbs, inputDbs, outputDbs, roundDb)
 
     dbsF.flatMap { case (aliceDbs, inputDbs, outputDbs, roundDb) =>
@@ -565,21 +561,16 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
     logger.info(s"${peerId.hex} is registering PSBT sigs")
 
     val dbsF = for {
-      roundOpt <- roundDAO.read(currentRoundId)
+      roundDb <- currentRound()
       aliceDbOpt <- aliceDAO.read(peerId)
       inputs <- inputsDAO.findByPeerId(peerId, currentRoundId)
-    } yield (roundOpt, aliceDbOpt, inputs)
+    } yield (roundDb, aliceDbOpt, inputs)
 
     dbsF.flatMap {
-      case (None, _, _) =>
-        signedPMap(peerId).failure(
-          new RuntimeException(s"No round found with id ${currentRoundId.hex}"))
-        Future.failed(
-          new RuntimeException(s"No round found with id ${currentRoundId.hex}"))
       case (_, None, _) =>
         Future.failed(
           new RuntimeException(s"No alice found with id ${peerId.hex}"))
-      case (Some(roundDb), Some(aliceDb), inputs) =>
+      case (roundDb, Some(aliceDb), inputs) =>
         if (roundDb.status != SigningPhase)
           throw new IllegalStateException(
             s"In invalid state ${roundDb.status} should be in state SigningPhase")

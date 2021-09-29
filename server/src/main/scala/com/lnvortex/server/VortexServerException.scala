@@ -22,7 +22,10 @@ object VortexServerException {
   case class InvalidOutputSignatureException(private val reason: String)
       extends VortexServerException(reason)
 
-  case class InvalidOutputScriptPubKeyException(private val reason: String)
+  case class InvalidMixOutputScriptPubKeyException(private val reason: String)
+      extends VortexServerException(reason)
+
+  case class InvalidMixOutputAmountException(private val reason: String)
       extends VortexServerException(reason)
 
   case class InvalidPSBTSignaturesException(private val reason: String)
