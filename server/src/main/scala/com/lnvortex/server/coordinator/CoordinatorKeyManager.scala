@@ -1,6 +1,7 @@
 package com.lnvortex.server.coordinator
 
 import com.lnvortex.core.crypto.BlindSchnorrUtil
+import com.lnvortex.server.VortexServerException.InvalidBlindChallengeException
 import com.lnvortex.server.config.VortexCoordinatorAppConfig
 import com.lnvortex.server.models.AliceDAO
 import grizzled.slf4j.Logging
@@ -66,7 +67,14 @@ class CoordinatorKeyManager()(implicit
       noncePath: BIP32Path): FieldElement = {
     val nonceKey =
       extPrivateKey.deriveChildPrivKey(noncePath).key
-    BlindSchnorrUtil.generateBlindSig(privKey, nonceKey, blindedOutput)
+
+    try {
+      BlindSchnorrUtil.generateBlindSig(privKey, nonceKey, blindedOutput)
+    } catch {
+      case _: IllegalArgumentException =>
+        throw InvalidBlindChallengeException(
+          s"Got a blinded challenge of $blindedOutput")
+    }
   }
 }
 

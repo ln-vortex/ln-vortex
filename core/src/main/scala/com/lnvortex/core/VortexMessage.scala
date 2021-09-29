@@ -313,18 +313,11 @@ case class BobMessage(sig: SchnorrDigitalSignature, output: TransactionOutput)
 
   override val value: ByteVector = sig.bytes ++ u16Prefix(output.bytes)
 
-  def verifySigAndOutput(
+  def verifySig(
       publicKey: SchnorrPublicKey,
       roundId: DoubleSha256Digest): Boolean = {
-    output.scriptPubKey match {
-      case _: P2WSHWitnessSPKV0 =>
-        val challenge = BobMessage.calculateChallenge(output, roundId)
-        publicKey.verify(challenge, sig)
-      case _: P2WPKHWitnessSPKV0 | _: WitnessCommitment |
-          _: UnassignedWitnessScriptPubKey | EmptyScriptPubKey |
-          _: NonWitnessScriptPubKey =>
-        false
-    }
+    val challenge = BobMessage.calculateChallenge(output, roundId)
+    publicKey.verify(challenge, sig)
   }
 }
 

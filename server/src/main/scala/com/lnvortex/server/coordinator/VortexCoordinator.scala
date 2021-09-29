@@ -3,6 +3,7 @@ package com.lnvortex.server.coordinator
 import akka.actor._
 import com.lnvortex.core.RoundStatus._
 import com.lnvortex.core._
+import com.lnvortex.server.VortexServerException._
 import com.lnvortex.server.config.VortexCoordinatorAppConfig
 import com.lnvortex.server.models._
 import com.lnvortex.server.networking.ServerConnectionHandler.CloseConnection
@@ -295,8 +296,9 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
     val roundDbF = roundDAO.read(currentRoundId).map {
       case None => throw new RuntimeException("No roundDb found")
       case Some(roundDb) =>
-        require(roundDb.status == RegisterAlices,
-                s"Round in incorrect state ${roundDb.status}")
+        if (roundDb.status != RegisterAlices)
+          throw new IllegalStateException(
+            s"Round in incorrect state ${roundDb.status}")
         roundDb
     }
 
@@ -320,6 +322,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
             val spk = ScriptPubKey.fromAsmHex(out.scriptPubKey.hex)
             TransactionOutput(out.value, spk) == output
         }
+        isConfirmed = txResult.confirmations.exists(_ > 0)
 
         aliceDb <- aliceDbF
         peerNonce = aliceDb match {
@@ -329,7 +332,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
               s"No alice found with ${peerId.hex}")
         }
         validProof = InputReference.verifyInputProof(inputRef, peerNonce)
-      } yield notBanned && isRealInput && validProof
+      } yield notBanned && isRealInput && validProof && isConfirmed
     }
 
     val f = for {
@@ -348,8 +351,9 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       val validChange =
         registerInputs.changeSpk.scriptType == WITNESS_V0_KEYHASH
 
-      // todo test excess >= Satoshis.zero
-      if (validInputs && validChange && excess >= Satoshis.zero) {
+      val enoughFunding = excess >= Satoshis.zero
+
+      if (validInputs && validChange && enoughFunding) {
         // .get is safe, validInputs will be false
         aliceDbF.map(_.get).flatMap { aliceDb =>
           val sig =
@@ -386,19 +390,32 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
           .map(
             BannedUtxoDb(_, bannedUntil, "Invalid inputs and proofs received"))
 
+        val exception: Exception = if (!validInputs) {
+          InvalidInputsException("Alice gave invalid inputs")
+        } else if (!validChange) {
+          InvalidChangeScriptPubKeyException(
+            s"Alice registered with invalid change spk ${registerInputs.changeSpk}")
+        } else if (!enoughFunding) {
+          NotEnoughFundingException(
+            s"Alice registered with not enough funding, need $excess more")
+        } else {
+          new IllegalArgumentException("Alice registered with invalid inputs")
+        }
+
         bannedUtxoDAO
           .createAll(banDbs)
-          .flatMap(_ =>
-            Future.failed(
-              new IllegalArgumentException(
-                "Alice registered with invalid inputs")))
+          .flatMap(_ => Future.failed(exception))
       }
     }
   }
 
   private[server] def verifyAndRegisterBob(bob: BobMessage): Future[Unit] = {
     logger.info("A bob is registering an output")
-    if (bob.verifySigAndOutput(publicKey, currentRoundId)) {
+
+    val validSpk = bob.output.scriptPubKey.scriptType == WITNESS_V0_SCRIPTHASH
+    lazy val validSig = bob.verifySig(publicKey, currentRoundId)
+
+    if (validSpk && validSig) {
       val db = RegisteredOutputDb(bob.output, bob.sig, currentRoundId)
       for {
         roundOpt <- roundDAO.read(currentRoundId)
@@ -422,10 +439,19 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
         }
         ()
       }
-    } else {
-      Future.failed(
-        new IllegalArgumentException(
-          s"Received invalid signature for output ${bob.output}"))
+    } else { // error
+      val exception: Exception = if (!validSig) {
+        InvalidOutputSignatureException(
+          s"Bob attempted to register an output with an invalid sig ${bob.sig.hex}")
+      } else if (!validSpk) {
+        InvalidOutputScriptPubKeyException(
+          s"Bob attempted to register an output with an invalid script pub key ${bob.output.scriptPubKey}")
+      } else {
+        // this should be impossible
+        new IllegalArgumentException(s"Received invalid output ${bob.output}")
+      }
+
+      Future.failed(exception)
     }
   }
 
@@ -545,15 +571,21 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
         Future.failed(
           new RuntimeException(s"No alice found with id ${peerId.hex}"))
       case (Some(roundDb), Some(aliceDb), inputs) =>
-        require(roundDb.status == SigningPhase)
+        if (roundDb.status != SigningPhase)
+          throw new IllegalStateException(
+            s"In invalid state ${roundDb.status} should be in state SigningPhase")
+
         roundDb.psbtOpt match {
           case Some(unsignedPsbt) =>
             val correctNumInputs = inputs.size == aliceDb.numInputs
             val sameTx = unsignedPsbt.transaction == psbt.transaction
-            lazy val verify =
-              inputs.map(_.indexOpt.get).forall(psbt.verifyFinalizedInput)
+            lazy val validSigs =
+              Try(
+                inputs
+                  .map(_.indexOpt.get)
+                  .forall(psbt.verifyFinalizedInput)).toOption.getOrElse(false)
 
-            if (correctNumInputs && sameTx && verify) {
+            if (correctNumInputs && sameTx && validSigs) {
               // mark successful
               signedPMap(peerId).success(psbt)
               val signedFs = signedPMap.values.map(_.future)
@@ -579,21 +611,39 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
                 .map(_.outPoint)
                 .map(BannedUtxoDb(_, bannedUntil, "Invalid psbt signature"))
 
-              signedPMap(peerId).failure(
-                new RuntimeException("Invalid psbt signature"))
+              val exception: Exception = if (!sameTx) {
+                DifferentTransactionException(
+                  s"Received different transaction in psbt from peer: ${psbt.transaction.txIdBE.hex}")
+              } else if (!validSigs) {
+                InvalidPSBTSignaturesException(
+                  "Received invalid psbt signature from peer")
+              } else if (!correctNumInputs) {
+                new IllegalStateException(
+                  s"numInputs in AliceDb (${aliceDb.numInputs}) did not match the InputDbs (${inputs.size})")
+              } else {
+                // this should be impossible
+                new RuntimeException("Received invalid signed psbt from peer")
+              }
 
-              bannedUtxoDAO
-                .createAll(dbs)
-                .flatMap(_ =>
-                  Future.failed(
-                    new IllegalArgumentException(
-                      s"Received invalid signature from peer ${peerId.hex}")))
+              // only ban if the user's fault
+              val ban =
+                if (!correctNumInputs && validSigs && sameTx)
+                  false
+                else true
+
+              signedPMap(peerId).failure(exception)
+
+              if (ban) {
+                bannedUtxoDAO
+                  .createAll(dbs)
+                  .flatMap(_ => Future.failed(exception))
+              } else Future.failed(exception)
             }
           case None =>
-            signedPMap(peerId).failure(
-              new RuntimeException("Round in invalid state, no psbt"))
-            Future.failed(
-              new RuntimeException("Round in invalid state, no psbt"))
+            val exception =
+              new IllegalStateException("Round in invalid state, no psbt")
+            signedPMap(peerId).failure(exception)
+            Future.failed(exception)
         }
     }
   }
