@@ -183,6 +183,17 @@ class DualClientTest extends DualClientFixture {
           clientB.coinjoinWallet.lndRpcClient.listChannels().map(_.size == 2),
         interval = interval,
         maxTries = 500)
-    } yield succeed
+
+      aliceDbs <- coordinator.aliceDAO.findByRoundId(roundId)
+      outputDbs <- coordinator.outputsDAO.findByRoundId(roundId)
+    } yield {
+      assert(outputDbs.nonEmpty)
+      val noNonceMatching = outputDbs.forall { db =>
+        val nonce = db.sig.rx
+        !aliceDbs.exists(_.nonce == nonce)
+      }
+
+      assert(noNonceMatching)
+    }
   }
 }
