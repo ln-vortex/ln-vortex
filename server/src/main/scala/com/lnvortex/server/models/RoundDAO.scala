@@ -72,6 +72,8 @@ case class RoundDAO()(implicit
 
     def transactionOpt: Rep[Option[Transaction]] = column("transaction")
 
+    def txIdOpt: Rep[Option[DoubleSha256DigestBE]] = column("txid")
+
     def profit: Rep[Option[CurrencyUnit]] = column("profit")
 
     def * : ProvenShape[RoundDb] =
@@ -85,6 +87,7 @@ case class RoundDAO()(implicit
        amount,
        psbtOpt,
        transactionOpt,
+       txIdOpt,
        profit).<>(RoundDb.tupled, RoundDb.unapply)
   }
 }

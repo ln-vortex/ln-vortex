@@ -17,6 +17,7 @@ CREATE TABLE `rounds`
     `amount`      INTEGER                  NOT NULL,
     `psbt`        VARCHAR(254),
     `transaction` VARCHAR(254),
+    `txid`        VARCHAR(254),
     `profit`      INTEGER
 );
 

@@ -6,7 +6,7 @@ import org.bitcoins.core.currency.CurrencyUnit
 import org.bitcoins.core.protocol.transaction.Transaction
 import org.bitcoins.core.psbt.PSBT
 import org.bitcoins.core.wallet.fee.SatoshisPerVirtualByte
-import org.bitcoins.crypto.DoubleSha256Digest
+import org.bitcoins.crypto._
 
 import java.time.Instant
 
@@ -21,8 +21,23 @@ case class RoundDb(
     amount: CurrencyUnit,
     psbtOpt: Option[PSBT],
     transactionOpt: Option[Transaction],
+    txIdOpt: Option[DoubleSha256DigestBE],
     profitOpt: Option[CurrencyUnit]
-)
+) {
+  // verify correct txid
+  transactionOpt match {
+    case Some(tx) =>
+      require(txIdOpt.contains(tx.txIdBE), "transaction must match txid")
+    case None => ()
+  }
+
+  def completeRound(tx: Transaction, profit: CurrencyUnit): RoundDb = {
+    copy(status = RoundStatus.Signed,
+         transactionOpt = Some(tx),
+         txIdOpt = Some(tx.txIdBE),
+         profitOpt = Some(profit))
+  }
+}
 
 object RoundDbs {
 
@@ -46,6 +61,7 @@ object RoundDbs {
       amount = amount,
       psbtOpt = None,
       transactionOpt = None,
+      txIdOpt = None,
       profitOpt = None
     )
   }

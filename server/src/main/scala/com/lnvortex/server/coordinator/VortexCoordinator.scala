@@ -260,11 +260,10 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
                                               walletNameOpt = None)
       addrOpt = addrs.find(_.label == roundAddressLabel)
       profitOpt = addrOpt.map(_.amount)
+      profit = profitOpt.getOrElse(Satoshis.zero)
 
       roundDb <- currentRound()
-      updatedRoundDb = roundDb.copy(status = RoundStatus.Signed,
-                                    transactionOpt = Some(tx),
-                                    profitOpt = profitOpt)
+      updatedRoundDb = roundDb.completeRound(tx, profit)
 
       _ <- roundDAO.update(updatedRoundDb)
       _ <- newRound()
