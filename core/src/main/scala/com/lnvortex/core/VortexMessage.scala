@@ -224,7 +224,7 @@ case class AskInputs(
   override val tpe: BigSizeUInt = AskInputs.tpe
 
   override val value: ByteVector = {
-    roundId.bytes ++ inputFee.bytes ++ outputFee.bytes
+    roundId.bytes ++ inputFee.satoshis.toUInt64.bytes ++ outputFee.satoshis.toUInt64.bytes
   }
 }
 
@@ -246,21 +246,27 @@ object AskInputs extends VortexMessageFactory[AskInputs] {
 /** First message from client to server
   * @param inputs inputs Alice is spending in the coin join
   * @param blindedOutput Response from BlindingTweaks.freshBlindingTweaks & BlindingTweaks.generateChallenge
-  * @param changeSpk SPK Alice should receive change for
+  * @param changeSpkOpt Optional SPK Alice should receive change for
   */
 case class RegisterInputs(
     inputs: Vector[InputReference],
     blindedOutput: FieldElement,
-    changeSpk: ScriptPubKey)
+    changeSpkOpt: Option[ScriptPubKey])
     extends ClientVortexMessage {
   override val tpe: BigSizeUInt = RegisterInputs.tpe
 
   override val value: ByteVector = {
+
+    val changeSpkBytes = changeSpkOpt match {
+      case Some(changeSpk) => u16Prefix(changeSpk.asmBytes)
+      case None            => UInt16.zero.bytes
+    }
+
     u16PrefixedList[InputReference](
       inputs,
       (t: InputReference) => u16Prefix(t.bytes)) ++
       blindedOutput.bytes ++
-      u16Prefix(changeSpk.asmBytes)
+      changeSpkBytes
   }
 }
 
@@ -278,10 +284,13 @@ object RegisterInputs extends VortexMessageFactory[RegisterInputs] {
 
     val blindedOutput = FieldElement(iter.take(32))
 
-    val changeSpk = iter.takeU16Prefixed[ScriptPubKey](len =>
-      ScriptPubKey.fromAsmBytes(iter.take(len)))
+    val changeSpkLen = iter.takeU16()
 
-    RegisterInputs(inputs, blindedOutput, changeSpk)
+    val changeSpkOpt = if (changeSpkLen != UInt16.zero) {
+      Some(ScriptPubKey.fromAsmBytes(iter.take(changeSpkLen.toInt)))
+    } else None
+
+    RegisterInputs(inputs, blindedOutput, changeSpkOpt)
   }
 }
 

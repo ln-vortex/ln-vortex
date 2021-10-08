@@ -62,7 +62,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
       blind = ECPrivateKey.freshPrivateKey.fieldElement
       registerInputs = RegisterInputs(Vector(inputRef),
                                       blind,
-                                      addr.scriptPubKey)
+                                      Some(addr.scriptPubKey))
 
       _ <- coordinator.registerAlice(Sha256Digest.empty, registerInputs)
     } yield succeed
@@ -101,7 +101,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
       blind = ECPrivateKey.freshPrivateKey.fieldElement
       registerInputs = RegisterInputs(Vector(inputRef),
                                       blind,
-                                      addr.scriptPubKey)
+                                      Some(addr.scriptPubKey))
 
       res <- recoverToSucceededIf[NotEnoughFundingException](
         coordinator.registerAlice(Sha256Digest.empty, registerInputs))
@@ -138,7 +138,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
       blind = ECPrivateKey.freshPrivateKey.fieldElement
       registerInputs = RegisterInputs(Vector(inputRef),
                                       blind,
-                                      addr.scriptPubKey)
+                                      Some(addr.scriptPubKey))
 
       res <- recoverToSucceededIf[InvalidInputsException](
         coordinator.registerAlice(Sha256Digest.empty, registerInputs))
@@ -177,7 +177,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
         blind = ECPrivateKey.freshPrivateKey.fieldElement
         registerInputs = RegisterInputs(Vector(inputRef),
                                         blind,
-                                        addr.scriptPubKey)
+                                        Some(addr.scriptPubKey))
 
         res <- recoverToSucceededIf[InvalidInputsException](
           coordinator.registerAlice(Sha256Digest.empty, registerInputs))
@@ -220,7 +220,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
         blind = ECPrivateKey.freshPrivateKey.fieldElement
         registerInputs = RegisterInputs(Vector(inputRef),
                                         blind,
-                                        addr.scriptPubKey)
+                                        Some(addr.scriptPubKey))
 
         res <- recoverToSucceededIf[InvalidInputsException](
           coordinator.registerAlice(Sha256Digest.empty, registerInputs))
@@ -252,7 +252,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
       blind = ECPrivateKey.freshPrivateKey.fieldElement
       registerInputs = RegisterInputs(Vector(inputRef),
                                       blind,
-                                      addr.scriptPubKey)
+                                      Some(addr.scriptPubKey))
 
       res <- recoverToSucceededIf[IllegalArgumentException](
         coordinator.registerAlice(
@@ -309,7 +309,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
       blind = ECPrivateKey.freshPrivateKey.fieldElement
       registerInputs = RegisterInputs(Vector(inputRef),
                                       blind,
-                                      addr.scriptPubKey)
+                                      Some(addr.scriptPubKey))
 
       res <- recoverToSucceededIf[IllegalStateException](
         coordinator.registerAlice(Sha256Digest.empty, registerInputs))
@@ -351,7 +351,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
         blind = ECPrivateKey.freshPrivateKey.fieldElement
         registerInputs = RegisterInputs(Vector(inputRef),
                                         blind,
-                                        addr.scriptPubKey)
+                                        Some(addr.scriptPubKey))
 
         res <- recoverToSucceededIf[InvalidChangeScriptPubKeyException](
           coordinator.registerAlice(Sha256Digest.empty, registerInputs))
@@ -384,7 +384,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
       blind = ECPrivateKey.freshPrivateKey.fieldElement
       registerInputs = RegisterInputs(Vector(inputRef),
                                       blind,
-                                      addr.scriptPubKey)
+                                      Some(addr.scriptPubKey))
 
       res <- recoverToSucceededIf[InvalidChangeScriptPubKeyException](
         coordinator.registerAlice(Sha256Digest.empty, registerInputs))
@@ -417,7 +417,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
       blind = FieldElement.zero
       registerInputs = RegisterInputs(Vector(inputRef),
                                       blind,
-                                      addr.scriptPubKey)
+                                      Some(addr.scriptPubKey))
 
       res <- recoverToSucceededIf[InvalidBlindChallengeException](
         coordinator.registerAlice(Sha256Digest.empty, registerInputs))
@@ -461,7 +461,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
 
       registerInputs = RegisterInputs(Vector(inputRef),
                                       blind,
-                                      addr.scriptPubKey)
+                                      Some(addr.scriptPubKey))
       blindSig <- coordinator.registerAlice(Sha256Digest.empty, registerInputs)
       sig = BlindSchnorrUtil.unblindSignature(blindSig,
                                               coordinator.publicKey,
@@ -523,7 +523,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
 
       registerInputs = RegisterInputs(Vector(inputRef),
                                       blind,
-                                      addr.scriptPubKey)
+                                      Some(addr.scriptPubKey))
       blindSig <- coordinator.registerAlice(Sha256Digest.empty, registerInputs)
       sig = BlindSchnorrUtil.unblindSignature(blindSig,
                                               coordinator.publicKey,
@@ -573,7 +573,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
 
       registerInputs = RegisterInputs(Vector(inputRef),
                                       blind,
-                                      addr.scriptPubKey)
+                                      Some(addr.scriptPubKey))
       blindSig <- coordinator.registerAlice(Sha256Digest.empty, registerInputs)
       sig = BlindSchnorrUtil.unblindSignature(blindSig,
                                               coordinator.publicKey,
@@ -625,7 +625,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
 
         registerInputs = RegisterInputs(Vector(inputRef),
                                         blind,
-                                        addr.scriptPubKey)
+                                        Some(addr.scriptPubKey))
         blindSig <- coordinator.registerAlice(Sha256Digest.empty,
                                               registerInputs)
         sig = BlindSchnorrUtil.unblindSignature(blindSig,
@@ -656,7 +656,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
         val spk = P2WPKHWitnessSPKV0(ECPublicKey.freshPublicKey)
         db.setOutputValues(1,
                            ECPrivateKey.freshPrivateKey.fieldElement,
-                           spk,
+                           Some(spk),
                            ECPrivateKey.freshPrivateKey.fieldElement)
       }
       _ <- coordinator.aliceDAO.updateAll(updatedAliceDbs)
@@ -704,7 +704,10 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
       assert(outputDbs.forall(d => tx.outputs.contains(d.output)))
 
       val hasChangeOutputs = updatedAliceDbs.forall { db =>
-        tx.outputs.exists(_.scriptPubKey == db.changeSpkOpt.get)
+        db.changeSpkOpt match {
+          case Some(spk) => tx.outputs.exists(_.scriptPubKey == spk)
+          case None      => true
+        }
       }
       assert(hasChangeOutputs)
 
@@ -730,7 +733,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
       updatedAliceDbs = {
         aliceDb.setOutputValues(1,
                                 ECPrivateKey.freshPrivateKey.fieldElement,
-                                addr.scriptPubKey,
+                                Some(addr.scriptPubKey),
                                 ECPrivateKey.freshPrivateKey.fieldElement)
       }
       _ <- coordinator.aliceDAO.update(updatedAliceDbs)
@@ -784,7 +787,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
       updatedAliceDbs = {
         aliceDb.setOutputValues(1,
                                 ECPrivateKey.freshPrivateKey.fieldElement,
-                                addr.scriptPubKey,
+                                Some(addr.scriptPubKey),
                                 ECPrivateKey.freshPrivateKey.fieldElement)
       }
       _ <- coordinator.aliceDAO.update(updatedAliceDbs)
@@ -846,7 +849,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
         // wrong number of inputs
         aliceDb.setOutputValues(numInputs = 2,
                                 ECPrivateKey.freshPrivateKey.fieldElement,
-                                addr.scriptPubKey,
+                                Some(addr.scriptPubKey),
                                 ECPrivateKey.freshPrivateKey.fieldElement)
       }
       _ <- coordinator.aliceDAO.update(updatedAliceDbs)
@@ -901,7 +904,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
       updatedAliceDbs = {
         aliceDb.setOutputValues(numInputs = 1,
                                 ECPrivateKey.freshPrivateKey.fieldElement,
-                                addr.scriptPubKey,
+                                Some(addr.scriptPubKey),
                                 ECPrivateKey.freshPrivateKey.fieldElement)
       }
       _ <- coordinator.aliceDAO.update(updatedAliceDbs)

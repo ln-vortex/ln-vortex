@@ -380,8 +380,9 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       val onChainFees = inputFees + roundDb.outputFee
       val excess = inputAmt - roundDb.amount - roundDb.mixFee - onChainFees
 
+      // if change make sure it is of correct type
       val validChange =
-        registerInputs.changeSpk.scriptType == WITNESS_V0_KEYHASH
+        registerInputs.changeSpkOpt.forall(_.scriptType == WITNESS_V0_KEYHASH)
 
       val enoughFunding = excess >= Satoshis.zero
 
@@ -398,7 +399,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
             aliceDb.setOutputValues(numInputs = inputDbs.size,
                                     blindedOutput =
                                       registerInputs.blindedOutput,
-                                    changeSpk = registerInputs.changeSpk,
+                                    changeSpkOpt = registerInputs.changeSpkOpt,
                                     blindOutputSig = sig)
 
           for {
@@ -429,7 +430,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
           InvalidInputsException("Alice gave invalid inputs")
         } else if (!validChange) {
           InvalidChangeScriptPubKeyException(
-            s"Alice registered with invalid change spk ${registerInputs.changeSpk}")
+            s"Alice registered with invalid change spk ${registerInputs.changeSpkOpt}")
         } else if (!enoughFunding) {
           NotEnoughFundingException(
             s"Alice registered with not enough funding, need $excess more")
@@ -493,18 +494,24 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       roundDb: RoundDb,
       numInputs: Int,
       inputAmount: CurrencyUnit,
-      changeSpk: ScriptPubKey): Either[CurrencyUnit, TransactionOutput] = {
+      changeSpkOpt: Option[ScriptPubKey]): Either[
+    CurrencyUnit,
+    TransactionOutput] = {
     val excess = inputAmount - roundDb.amount - roundDb.mixFee - (Satoshis(
       numInputs) * roundDb.inputFee) - roundDb.outputFee
 
-    val dummy = TransactionOutput(Satoshis.zero, changeSpk)
-    val changeCost = roundDb.feeRate * dummy.byteSize
+    changeSpkOpt match {
+      case Some(changeSpk) =>
+        val dummy = TransactionOutput(Satoshis.zero, changeSpk)
+        val changeCost = roundDb.feeRate * dummy.byteSize
 
-    val excessAfterChange = excess - changeCost
+        val excessAfterChange = excess - changeCost
 
-    if (excessAfterChange > Policy.dustThreshold)
-      Right(TransactionOutput(excessAfterChange, changeSpk))
-    else Left(excess)
+        if (excessAfterChange > Policy.dustThreshold)
+          Right(TransactionOutput(excessAfterChange, changeSpk))
+        else Left(excess)
+      case None => Left(excess)
+    }
   }
 
   private[coordinator] def constructUnsignedPSBT(
@@ -531,7 +538,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
         calculateChangeOutput(roundDb = roundDb,
                               numInputs = db.numInputs,
                               inputAmount = inputAmountByPeerId(db.peerId),
-                              changeSpk = db.changeSpkOpt.get)
+                              changeSpkOpt = db.changeSpkOpt)
       }
 
       val (changeOutputs, excess) = changeOutputResults.foldLeft(

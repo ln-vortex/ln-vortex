@@ -33,11 +33,11 @@ case class AliceDb(
   def setOutputValues(
       numInputs: Int,
       blindedOutput: FieldElement,
-      changeSpk: ScriptPubKey,
+      changeSpkOpt: Option[ScriptPubKey],
       blindOutputSig: FieldElement): AliceDb = {
     copy(numInputs = numInputs,
          blindedOutputOpt = Some(blindedOutput),
-         changeSpkOpt = Some(changeSpk),
+         changeSpkOpt = changeSpkOpt,
          blindOutputSigOpt = Some(blindOutputSig))
   }
 

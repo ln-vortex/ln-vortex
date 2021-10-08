@@ -212,7 +212,7 @@ case class VortexClient[+T <: CoinJoinWalletApi](coinjoinWallet: T)(implicit
 
           handler ! RegisterInputs(inputRefs,
                                    challenge,
-                                   changeAddr.scriptPubKey)
+                                   Some(changeAddr.scriptPubKey))
         }
     }
   }

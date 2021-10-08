@@ -1,6 +1,7 @@
 package com.lnvortex.core.gen
 
 import com.lnvortex.core._
+import org.bitcoins.core.protocol.script.EmptyScriptPubKey
 import org.bitcoins.core.protocol.transaction.OutputReference
 import org.bitcoins.testkitcore.gen._
 import org.scalacheck.Gen
@@ -62,8 +63,12 @@ object Generators {
       numInputs <- Gen.choose(1, 7)
       inputs <- Gen.listOfN(numInputs, inputReference)
       blindedOutput <- CryptoGenerators.fieldElement
-      changeSpk <- ScriptGenerators.scriptPubKey.map(_._1)
-    } yield RegisterInputs(inputs.toVector, blindedOutput, changeSpk)
+      changeSpk <- ScriptGenerators.scriptPubKey
+        .map(_._1)
+        .suchThat(_ != EmptyScriptPubKey)
+      isNone <- NumberGenerator.bool
+      changeSpkOpt = if (isNone) None else Some(changeSpk)
+    } yield RegisterInputs(inputs.toVector, blindedOutput, changeSpkOpt)
   }
 
   def blindedSig: Gen[BlindedSig] = {
