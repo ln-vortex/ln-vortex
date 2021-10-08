@@ -38,7 +38,7 @@ case class LndCoinJoinWallet(lndRpcClient: LndRpcClient)(implicit
       UnspentCoin(utxo.address,
                   utxo.amount,
                   utxo.outPointOpt.get,
-                  utxo.confirmations)
+                  utxo.confirmations > 0)
     })
   }
 
