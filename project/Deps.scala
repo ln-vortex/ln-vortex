@@ -117,6 +117,9 @@ object Deps {
   val lndBackend: List[ModuleID] =
     List(Compile.bitcoinsLnd, Compile.grizzledSlf4j)
 
+  val bitcoindBackend: List[ModuleID] =
+    List(Compile.bitcoinsBitcoindRpc, Compile.grizzledSlf4j)
+
   val backend: List[ModuleID] = List(
     Compile.bitcoinsTor,
     Compile.bitcoinsDbCommons,

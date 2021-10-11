@@ -41,6 +41,8 @@ wixFeatures += WindowsFeature(
 lazy val root = project
   .in(file("."))
   .aggregate(
+    bitcoind,
+    bitcoindTest,
     core,
     coreTest,
     client,
@@ -53,6 +55,8 @@ lazy val root = project
     gui
   )
   .dependsOn(
+    bitcoind,
+    bitcoindTest,
     core,
     coreTest,
     client,
@@ -82,6 +86,19 @@ lazy val lndTest = project
   .settings(name := "lnd-test")
   .settings(parallelExecution := false)
   .dependsOn(lnd, testkit)
+
+lazy val bitcoind = project
+  .in(file("bitcoind"))
+  .settings(CommonSettings.settings: _*)
+  .settings(name := "bitcoind", libraryDependencies ++= Deps.bitcoindBackend)
+  .dependsOn(core)
+
+lazy val bitcoindTest = project
+  .in(file("bitcoind-test"))
+  .settings(CommonSettings.testSettings: _*)
+  .settings(name := "bitcoind-test")
+  .settings(parallelExecution := false)
+  .dependsOn(bitcoind, testkit)
 
 lazy val core = project
   .in(file("core"))
