@@ -5,7 +5,7 @@ import akka.event.LoggingReceive
 import akka.io.Tcp
 import akka.util.ByteString
 import com.lnvortex.client.VortexClient
-import com.lnvortex.client.api.CoinJoinWalletApi
+import com.lnvortex.core.api.CoinJoinWalletApi
 import com.lnvortex.core.{VortexMessage, VortexMessageParser}
 import grizzled.slf4j.Logging
 import scodec.bits.ByteVector

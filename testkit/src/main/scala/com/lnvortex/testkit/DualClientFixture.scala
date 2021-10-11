@@ -1,7 +1,7 @@
 package com.lnvortex.testkit
 
 import com.lnvortex.client.VortexClient
-import com.lnvortex.client.lnd.LndCoinJoinWallet
+import com.lnvortex.lnd.LndCoinJoinWallet
 import com.lnvortex.server.coordinator.VortexCoordinator
 import com.lnvortex.testkit.LnVortexTestUtils.getTestConfigs
 import com.typesafe.config.ConfigFactory

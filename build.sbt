@@ -44,6 +44,8 @@ lazy val root = project
     core,
     coreTest,
     client,
+    lnd,
+    lndTest,
     clientTest,
     clientServerTest,
     server,
@@ -56,6 +58,8 @@ lazy val root = project
     client,
     clientTest,
     clientServerTest,
+    lnd,
+    lndTest,
     server,
     serverTest,
     gui
@@ -65,6 +69,19 @@ lazy val root = project
     name := "ln-vortex",
     publish / skip := true
   )
+
+lazy val lnd = project
+  .in(file("lnd"))
+  .settings(CommonSettings.settings: _*)
+  .settings(name := "lnd", libraryDependencies ++= Deps.lndBackend)
+  .dependsOn(core)
+
+lazy val lndTest = project
+  .in(file("lnd-test"))
+  .settings(CommonSettings.testSettings: _*)
+  .settings(name := "lnd-test")
+  .settings(parallelExecution := false)
+  .dependsOn(lnd, testkit)
 
 lazy val core = project
   .in(file("core"))
@@ -117,7 +134,7 @@ lazy val testkit = project
   .in(file("testkit"))
   .settings(CommonSettings.testSettings: _*)
   .settings(name := "testkit", libraryDependencies ++= Deps.clientServerTest)
-  .dependsOn(core, client, server, coreTest)
+  .dependsOn(core, client, server, coreTest, lnd)
 
 lazy val gui = project
   .in(file("gui"))

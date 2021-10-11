@@ -3,10 +3,10 @@ package com.lnvortex.client
 import akka.actor.{ActorRef, ActorSystem}
 import com.lnvortex.client.RoundDetails.{getMixDetailsOpt, getNonceOpt}
 import com.lnvortex.client.VortexClientException._
-import com.lnvortex.client.api.CoinJoinWalletApi
 import com.lnvortex.client.config.VortexAppConfig
 import com.lnvortex.client.networking.{P2PClient, Peer}
 import com.lnvortex.core._
+import com.lnvortex.core.api.CoinJoinWalletApi
 import com.lnvortex.core.crypto.BlindSchnorrUtil
 import com.lnvortex.core.crypto.BlindingTweaks.freshBlindingTweaks
 import grizzled.slf4j.Logging

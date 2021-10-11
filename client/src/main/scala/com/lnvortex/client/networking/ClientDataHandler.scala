@@ -3,8 +3,8 @@ package com.lnvortex.client.networking
 import akka.actor._
 import akka.event.LoggingReceive
 import com.lnvortex.client.VortexClient
-import com.lnvortex.client.api.CoinJoinWalletApi
 import com.lnvortex.core._
+import com.lnvortex.core.api.CoinJoinWalletApi
 
 import scala.concurrent._
 

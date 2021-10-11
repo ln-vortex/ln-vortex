@@ -2,7 +2,7 @@ package com.lnvortex.testkit
 
 import com.lnvortex.client.VortexClient
 import com.lnvortex.client.config.VortexAppConfig
-import com.lnvortex.client.lnd.LndCoinJoinWallet
+import com.lnvortex.lnd.LndCoinJoinWallet
 import com.lnvortex.testkit.LnVortexTestUtils.getTestConfigs
 import org.bitcoins.core.currency.Bitcoins
 import org.bitcoins.testkit.async.TestAsyncUtil

@@ -1,4 +1,4 @@
-package com.lnvortex.client.lnd
+package com.lnvortex.lnd
 
 import com.lnvortex.core._
 import com.lnvortex.testkit.LndCoinJoinWalletFixture

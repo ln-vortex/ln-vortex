@@ -1,6 +1,5 @@
-package com.lnvortex.client.api
+package com.lnvortex.core.api
 
-import com.lnvortex.client.OutputDetails
 import com.lnvortex.core._
 import org.bitcoins.core.config.BitcoinNetwork
 import org.bitcoins.core.currency.CurrencyUnit

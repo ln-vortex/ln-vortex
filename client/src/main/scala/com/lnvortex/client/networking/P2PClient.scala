@@ -4,7 +4,7 @@ import akka.actor._
 import akka.event.LoggingReceive
 import akka.io.{IO, Tcp}
 import com.lnvortex.client.VortexClient
-import com.lnvortex.client.api.CoinJoinWalletApi
+import com.lnvortex.core.api.CoinJoinWalletApi
 import org.bitcoins.tor.Socks5Connection.{Socks5Connect, Socks5Connected}
 import org.bitcoins.tor.{Socks5Connection, Socks5ProxyParams}
 

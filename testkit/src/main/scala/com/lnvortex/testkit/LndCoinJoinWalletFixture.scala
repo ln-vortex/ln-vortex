@@ -1,6 +1,6 @@
 package com.lnvortex.testkit
 
-import com.lnvortex.client.lnd.LndCoinJoinWallet
+import com.lnvortex.lnd.LndCoinJoinWallet
 import org.bitcoins.core.currency.Bitcoins
 import org.bitcoins.testkit.async.TestAsyncUtil
 import org.bitcoins.testkit.fixtures.BitcoinSFixture

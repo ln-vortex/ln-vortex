@@ -61,6 +61,9 @@ object Deps {
     val bitcoinsLnd =
       "org.bitcoin-s" %% "bitcoin-s-lnd-rpc" % V.bitcoinsV withSources () withJavadoc ()
 
+    val bitcoinsBitcoindRpc =
+      "org.bitcoin-s" %% "bitcoin-s-bitcoind-rpc" % V.bitcoinsV withSources () withJavadoc ()
+
     val bitcoinsTestkitCore =
       "org.bitcoin-s" %% "bitcoin-s-testkit-core" % V.bitcoinsV withSources () withJavadoc ()
 
@@ -111,9 +114,11 @@ object Deps {
     Compile.grizzledSlf4j
   )
 
+  val lndBackend: List[ModuleID] =
+    List(Compile.bitcoinsLnd, Compile.grizzledSlf4j)
+
   val backend: List[ModuleID] = List(
     Compile.bitcoinsTor,
-    Compile.bitcoinsLnd,
     Compile.bitcoinsDbCommons,
     Compile.akkaActor,
     Compile.akkaHttp,
@@ -123,12 +128,14 @@ object Deps {
   )
 
   val server: List[ModuleID] =
-    List(Compile.bitcoinsKeyManager, Compile.bitcoinsFeeProvider) ++ backend
+    List(Compile.bitcoinsKeyManager,
+         Compile.bitcoinsFeeProvider,
+         Compile.bitcoinsBitcoindRpc) ++ backend
 
   val coreTest: List[ModuleID] = List(Compile.bitcoinsTestkitCore) ++ core
 
   val clientServerTest: List[ModuleID] =
-    List(Compile.bitcoinsTestkit) ++ backend
+    List(Compile.bitcoinsTestkit, Compile.bitcoinsBitcoindRpc) ++ backend
 
   val gui: List[ModuleID] =
     List(Compile.scalaFx, Compile.grizzledSlf4j) ++ Compile.javaFxDeps

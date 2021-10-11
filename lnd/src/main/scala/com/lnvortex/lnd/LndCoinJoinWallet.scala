@@ -1,9 +1,8 @@
-package com.lnvortex.client.lnd
+package com.lnvortex.lnd
 
 import akka.actor.ActorSystem
-import com.lnvortex.client.OutputDetails
-import com.lnvortex.client.api.CoinJoinWalletApi
-import com.lnvortex.core._
+import com.lnvortex.core.api.{CoinJoinWalletApi, OutputDetails}
+import com.lnvortex.core.{InputReference, UnspentCoin}
 import org.bitcoins.core.config.BitcoinNetwork
 import org.bitcoins.core.currency.CurrencyUnit
 import org.bitcoins.core.protocol.BitcoinAddress

@@ -1,9 +1,9 @@
-package com.lnvortex.client.lnd
+package com.lnvortex.lnd
 
 import akka.actor.ActorSystem
 import akka.stream.scaladsl.Sink
-import com.lnvortex.client.OutputDetails
-import com.lnvortex.core.NodeUri
+import com.lnvortex.core.{api, NodeUri}
+import com.lnvortex.core.api.OutputDetails
 import grizzled.slf4j.Logging
 import lnrpc.FundingShim.Shim.{PsbtShim => FundingPsbtShim}
 import lnrpc.FundingTransitionMsg.Trigger._
@@ -78,7 +78,7 @@ case class LndChannelOpener(lndRpcClient: LndRpcClient)(implicit
           val amt = Satoshis(fund.value.fundingAmount)
           val addr = BitcoinAddress.fromString(fund.value.fundingAddress)
 
-          OutputDetails(chanId, amt, addr)
+          api.OutputDetails(chanId, amt, addr)
         }
         .runWith(Sink.head)
     }

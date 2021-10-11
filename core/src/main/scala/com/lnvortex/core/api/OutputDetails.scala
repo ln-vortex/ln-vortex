@@ -1,4 +1,4 @@
-package com.lnvortex.client
+package com.lnvortex.core.api
 
 import org.bitcoins.core.currency.CurrencyUnit
 import org.bitcoins.core.protocol.BitcoinAddress
