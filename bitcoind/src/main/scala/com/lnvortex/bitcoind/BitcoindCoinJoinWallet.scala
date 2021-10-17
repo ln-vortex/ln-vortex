@@ -116,7 +116,9 @@ case class BitcoindCoinJoinWallet(
       psbt: PSBT): Future[Unit] = Future.failed(
     new UnsupportedOperationException("Bitcoind is not a lightning wallet"))
 
-  override def cancelChannel(chanOutPoint: TransactionOutPoint): Future[Unit] =
+  override def cancelChannel(
+      chanOutPoint: TransactionOutPoint,
+      nodeId: NodeId): Future[Unit] =
     Future.failed(
       new UnsupportedOperationException("Bitcoind is not a lightning wallet"))
 

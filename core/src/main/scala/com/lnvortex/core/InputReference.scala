@@ -55,8 +55,7 @@ object InputReference extends Factory[InputReference] {
 
     val nonceHash = CryptoUtil.sha256(nonce.bytes)
     val output =
-      TransactionOutput(Satoshis(-1),
-                        ScriptPubKey.fromAsmBytes(nonceHash.bytes))
+      TransactionOutput(Satoshis.zero, P2WSHWitnessSPKV0.fromHash(nonceHash))
 
     BaseTransaction(version = Int32.two,
                     inputs = Vector(proofInput, invalidInput),

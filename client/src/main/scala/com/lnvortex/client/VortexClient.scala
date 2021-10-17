@@ -326,10 +326,12 @@ case class VortexClient[+T <: CoinJoinWalletApi](coinjoinWallet: T)(implicit
       case state: PSBTSigned =>
         logger.info("Round restarted..")
 
-        coinjoinWallet.cancelChannel(state.channelOutpoint).map { _ =>
-          roundDetails =
-            state.restartRound(msg.mixDetails, msg.nonceMessage.schnorrNonce)
-        }
+        coinjoinWallet
+          .cancelChannel(state.channelOutpoint, state.initDetails.nodeId)
+          .map { _ =>
+            roundDetails =
+              state.restartRound(msg.mixDetails, msg.nonceMessage.schnorrNonce)
+          }
     }
   }
 

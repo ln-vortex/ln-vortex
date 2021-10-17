@@ -47,5 +47,7 @@ abstract class CoinJoinWalletApi extends StartStopAsync[Unit] {
 
   def completeChannelOpen(chanId: ByteVector, psbt: PSBT): Future[Unit]
 
-  def cancelChannel(chanOutPoint: TransactionOutPoint): Future[Unit]
+  def cancelChannel(
+      chanOutPoint: TransactionOutPoint,
+      nodeId: NodeId): Future[Unit]
 }

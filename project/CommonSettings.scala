@@ -8,6 +8,9 @@ import sbt._
 import sbtassembly.AssemblyKeys._
 import sbtprotoc.ProtocPlugin.autoImport.PB
 
+import java.nio.file.{Path, Paths}
+import scala.util.Properties
+
 object CommonSettings {
 
   lazy val settings: Vector[Setting[_]] = Vector(
@@ -173,4 +176,7 @@ object CommonSettings {
       dockerUpdateLatest := isSnapshot.value
     )
   }
+
+  lazy val binariesPath: Path =
+    Paths.get(Properties.userHome, ".bitcoin-s", "binaries")
 }

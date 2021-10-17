@@ -43,6 +43,8 @@ lazy val root = project
   .aggregate(
     bitcoind,
     bitcoindTest,
+    clightning,
+    clightningTest,
     core,
     coreTest,
     client,
@@ -57,6 +59,8 @@ lazy val root = project
   .dependsOn(
     bitcoind,
     bitcoindTest,
+    clightning,
+    clightningTest,
     core,
     coreTest,
     client,
@@ -86,6 +90,20 @@ lazy val lndTest = project
   .settings(name := "lnd-test")
   .settings(parallelExecution := false)
   .dependsOn(lnd, testkit)
+
+lazy val clightning = project
+  .in(file("clightning"))
+  .settings(CommonSettings.settings: _*)
+  .settings(name := "clightning",
+            libraryDependencies ++= Deps.cLightningBackend)
+  .dependsOn(core)
+
+lazy val clightningTest = project
+  .in(file("clightning-test"))
+  .settings(CommonSettings.testSettings: _*)
+  .settings(name := "clightning-test")
+  .settings(parallelExecution := false)
+  .dependsOn(clightning, testkit)
 
 lazy val bitcoind = project
   .in(file("bitcoind"))
@@ -151,7 +169,7 @@ lazy val testkit = project
   .in(file("testkit"))
   .settings(CommonSettings.testSettings: _*)
   .settings(name := "testkit", libraryDependencies ++= Deps.clientServerTest)
-  .dependsOn(core, client, server, coreTest, lnd)
+  .dependsOn(core, client, server, coreTest, lnd, clightning)
 
 lazy val gui = project
   .in(file("gui"))

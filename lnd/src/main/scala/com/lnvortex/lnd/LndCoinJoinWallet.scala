@@ -3,7 +3,7 @@ package com.lnvortex.lnd
 import akka.actor.ActorSystem
 import com.lnvortex.core.api.{CoinJoinWalletApi, OutputDetails}
 import com.lnvortex.core.{InputReference, UnspentCoin}
-import org.bitcoins.core.config.BitcoinNetwork
+import org.bitcoins.core.config.{BitcoinNetwork, BitcoinNetworks}
 import org.bitcoins.core.currency.CurrencyUnit
 import org.bitcoins.core.protocol.BitcoinAddress
 import org.bitcoins.core.protocol.ln.node.NodeId
@@ -12,10 +12,12 @@ import org.bitcoins.core.protocol.transaction._
 import org.bitcoins.core.psbt.PSBT
 import org.bitcoins.crypto.SchnorrNonce
 import org.bitcoins.lnd.rpc.LndRpcClient
+import org.bitcoins.lnd.rpc.config.{LndInstanceLocal, LndInstanceRemote}
 import scodec.bits.ByteVector
 
 import java.net.InetSocketAddress
-import scala.concurrent.Future
+import scala.concurrent.duration.DurationInt
+import scala.concurrent.{Await, Future}
 
 case class LndCoinJoinWallet(lndRpcClient: LndRpcClient)(implicit
     system: ActorSystem)
@@ -24,7 +26,15 @@ case class LndCoinJoinWallet(lndRpcClient: LndRpcClient)(implicit
 
   private val channelOpener = LndChannelOpener(lndRpcClient)
 
-  override def network: BitcoinNetwork = lndRpcClient.instance.network
+  override def network: BitcoinNetwork = lndRpcClient.instance match {
+    case local: LndInstanceLocal => local.network
+    case _: LndInstanceRemote =>
+      val networkF = lndRpcClient.getInfo
+        .map(_.chains.head.network)
+        .map(BitcoinNetworks.fromString)
+
+      Await.result(networkF, 15.seconds)
+  }
 
   override def getNewAddress: Future[BitcoinAddress] =
     lndRpcClient.getNewAddress
@@ -88,7 +98,9 @@ case class LndCoinJoinWallet(lndRpcClient: LndRpcClient)(implicit
       chanId: ByteVector,
       psbt: PSBT): Future[Unit] = channelOpener.fundPendingChannel(chanId, psbt)
 
-  override def cancelChannel(chanOutPoint: TransactionOutPoint): Future[Unit] =
+  override def cancelChannel(
+      chanOutPoint: TransactionOutPoint,
+      nodeId: NodeId): Future[Unit] =
     channelOpener.cancelChannel(chanOutPoint)
 
   override def start(): Future[Unit] = Future.unit

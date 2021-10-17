@@ -27,7 +27,7 @@ object Deps {
     val scalaFxV = "16.0.0-R25"
     val javaFxV = "17-ea+8"
     // todo update when lnd v0.14.0-beta is in bitcoin-s
-    val bitcoinsV = "1.7.0-180-cd327a78-SNAPSHOT"
+    val bitcoinsV = "1.7.0-232-e06f3846-SNAPSHOT"
 
     val grizzledSlf4jV = "1.3.4"
   }
@@ -60,6 +60,9 @@ object Deps {
 
     val bitcoinsLnd =
       "org.bitcoin-s" %% "bitcoin-s-lnd-rpc" % V.bitcoinsV withSources () withJavadoc ()
+
+    val bitcoinsCLightning =
+      "org.bitcoin-s" %% "bitcoin-s-clightning-rpc" % V.bitcoinsV withSources () withJavadoc ()
 
     val bitcoinsBitcoindRpc =
       "org.bitcoin-s" %% "bitcoin-s-bitcoind-rpc" % V.bitcoinsV withSources () withJavadoc ()
@@ -119,6 +122,12 @@ object Deps {
 
   val bitcoindBackend: List[ModuleID] =
     List(Compile.bitcoinsBitcoindRpc, Compile.grizzledSlf4j)
+
+  val cLightningBackend: List[ModuleID] =
+    List(Compile.bitcoinsCLightning,
+         Compile.grizzledSlf4j,
+         Compile.akkaActor,
+         Compile.bitcoinsCore)
 
   val backend: List[ModuleID] = List(
     Compile.bitcoinsTor,

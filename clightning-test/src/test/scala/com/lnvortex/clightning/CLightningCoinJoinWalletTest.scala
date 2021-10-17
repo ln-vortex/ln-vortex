@@ -1,18 +1,22 @@
-package com.lnvortex.lnd
+package com.lnvortex.clightning
 
 import com.lnvortex.core._
-import com.lnvortex.testkit.LndCoinJoinWalletFixture
-import org.bitcoins.core.currency._
-import org.bitcoins.core.number._
-import org.bitcoins.core.protocol.script._
-import org.bitcoins.core.protocol.transaction._
+import com.lnvortex.testkit.CLightningCoinJoinWalletFixture
+import org.bitcoins.core.currency.Satoshis
+import org.bitcoins.core.number.{Int32, UInt32}
+import org.bitcoins.core.protocol.script.EmptyScriptSignature
+import org.bitcoins.core.protocol.transaction.{
+  BaseTransaction,
+  TransactionInput,
+  TransactionOutput
+}
 import org.bitcoins.core.psbt.PSBT
 import org.bitcoins.crypto._
 
 import scala.concurrent.Future
 
-class LndCoinJoinWalletTest extends LndCoinJoinWalletFixture {
-  behavior of "LndCoinJoinWallet"
+class CLightningCoinJoinWalletTest extends CLightningCoinJoinWalletFixture {
+  behavior of "CLightningCoinJoinWallet"
 
   it must "correctly sign a psbt" in { coinjoinWallet =>
     for {
