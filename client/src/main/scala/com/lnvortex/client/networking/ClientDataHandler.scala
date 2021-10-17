@@ -5,6 +5,7 @@ import akka.event.LoggingReceive
 import com.lnvortex.client.VortexClient
 import com.lnvortex.core._
 import com.lnvortex.core.api.CoinJoinWalletApi
+import grizzled.slf4j.Logging
 
 import scala.concurrent._
 
@@ -12,7 +13,7 @@ class ClientDataHandler(
     vortexClient: VortexClient[CoinJoinWalletApi],
     connectionHandler: ActorRef)
     extends Actor
-    with ActorLogging {
+    with Logging {
   implicit val ec: ExecutionContextExecutor = context.system.dispatcher
 
   override def preStart(): Unit = {
@@ -21,15 +22,17 @@ class ClientDataHandler(
 
   override def receive: Receive = LoggingReceive {
     case serverMessage: ServerVortexMessage =>
-      log.info(s"Received VortexMessage ${serverMessage.typeName}")
+      logger.info(s"Received VortexMessage ${serverMessage.typeName}")
       val f: Future[Unit] = handleVortexMessage(serverMessage)
       f.failed.foreach { err =>
-        log.error(s"Failed to process vortexMessage=$serverMessage", err)
+        logger.error(s"Failed to process vortexMessage=$serverMessage", err)
       }
     case clientMessage: ClientVortexMessage =>
-      log.error(s"Received client message $clientMessage")
+      logger.error(s"Received client message $clientMessage")
+    case unknown: UnknownVortexMessage =>
+      logger.warn(s"Received unknown message $unknown")
     case ClientConnectionHandler.WriteFailed(_) =>
-      log.error("Write failed")
+      logger.error("Write failed")
     case Terminated(actor) if actor == connectionHandler =>
       context.stop(self)
   }

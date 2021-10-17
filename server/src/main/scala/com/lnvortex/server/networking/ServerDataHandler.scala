@@ -32,6 +32,8 @@ class ServerDataHandler(
       }
     case clientMessage: ServerVortexMessage =>
       logger.error(s"Received server message $clientMessage")
+    case unknown: UnknownVortexMessage =>
+      logger.warn(s"Received unknown message $unknown")
     case ServerConnectionHandler.WriteFailed(_) =>
       logger.error("Write failed")
     case Terminated(actor) if actor == connectionHandler =>
