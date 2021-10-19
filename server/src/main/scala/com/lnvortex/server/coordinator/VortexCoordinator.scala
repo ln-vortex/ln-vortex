@@ -60,9 +60,9 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
   private var feeRate: SatoshisPerVirtualByte =
     SatoshisPerVirtualByte.fromLong(0)
 
-  private var currentRoundId: DoubleSha256Digest = genRoundId
+  private var currentRoundId: DoubleSha256Digest = genRoundId()
 
-  private def genRoundId: DoubleSha256Digest =
+  private def genRoundId(): DoubleSha256Digest =
     CryptoUtil.doubleSHA256(ECPrivateKey.freshPrivateKey.bytes)
 
   def getCurrentRoundId: DoubleSha256Digest = currentRoundId
@@ -85,7 +85,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
   // next round occurs at the interval time
   private var lastRoundTime: Long = TimeUtil.currentEpochSecond
 
-  private def roundStartTime(): Long = {
+  private def roundStartTime: Long = {
     lastRoundTime + config.mixInterval.toSeconds
   }
 
@@ -96,10 +96,10 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       amount = config.mixAmount,
       mixFee = config.mixFee,
       publicKey = publicKey,
-      time = UInt64(roundStartTime())
+      time = UInt64(roundStartTime)
     )
 
-  private var inputRegStartTime = roundStartTime()
+  private var inputRegStartTime = roundStartTime
 
   def getInputRegStartTime: Long = inputRegStartTime
 
@@ -116,7 +116,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
 
   def newRound(disconnect: Boolean = true): Future[RoundDb] = {
     // generate new round id
-    currentRoundId = genRoundId
+    currentRoundId = genRoundId()
 
     logger.info(s"Creating new Round! ${currentRoundId.hex}")
     val feeRateF = updateFeeRate()
@@ -127,14 +127,15 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
     completedTxP = Promise[Transaction]()
 
     // disconnect peers so they all get new ids
-    if (disconnect)
+    if (disconnect) {
       disconnectPeers()
+    }
     // clear maps
     connectionHandlerMap.clear()
     signedPMap.clear()
 
     lastRoundTime = TimeUtil.currentEpochSecond
-    inputRegStartTime = roundStartTime()
+    inputRegStartTime = roundStartTime
     for {
       feeRate <- feeRateF
       roundDb = RoundDbs.newRound(
