@@ -27,7 +27,7 @@ object Deps {
     val scalaFxV = "16.0.0-R25"
     val javaFxV = "17-ea+8"
     // todo update when lnd v0.14.0-beta is in bitcoin-s
-    val bitcoinsV = "1.7.0-232-e06f3846-SNAPSHOT"
+    val bitcoinsV = "1.8.0-4-eac98c0b-SNAPSHOT"
 
     val grizzledSlf4jV = "1.3.4"
   }
