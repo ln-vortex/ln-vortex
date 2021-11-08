@@ -356,7 +356,7 @@ object RegisterMixOutput extends VortexMessageFactory[RegisterMixOutput] {
   }
 }
 
-/** @param psbt Unsigned PSBT of the coinjoin transaction
+/** @param psbt Unsigned PSBT of the transaction
   */
 case class UnsignedPsbtMessage(psbt: PSBT) extends ServerVortexMessage {
   override val tpe: BigSizeUInt = UnsignedPsbtMessage.tpe

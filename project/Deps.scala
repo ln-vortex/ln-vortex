@@ -20,14 +20,14 @@ object Deps {
   }
 
   object V {
-    val akkaV = "10.2.6"
-    val akkaStreamV = "2.6.16"
+    val akkaV = "10.2.7"
+    val akkaStreamV = "2.6.17"
     val akkaActorV: String = akkaStreamV
 
     val scalaFxV = "16.0.0-R25"
     val javaFxV = "17-ea+8"
     // todo update when lnd v0.14.0-beta is in bitcoin-s
-    val bitcoinsV = "1.8.0-4-eac98c0b-SNAPSHOT"
+    val bitcoinsV = "1.8.0-26-3337fdb7-20211107-1938-SNAPSHOT"
 
     val grizzledSlf4jV = "1.3.4"
   }

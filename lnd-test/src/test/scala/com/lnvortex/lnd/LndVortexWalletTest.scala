@@ -1,7 +1,7 @@
 package com.lnvortex.lnd
 
 import com.lnvortex.core._
-import com.lnvortex.testkit.LndCoinJoinWalletFixture
+import com.lnvortex.testkit.LndVortexWalletFixture
 import org.bitcoins.core.currency._
 import org.bitcoins.core.number._
 import org.bitcoins.core.protocol.script._
@@ -11,14 +11,13 @@ import org.bitcoins.crypto._
 
 import scala.concurrent.Future
 
-class LndCoinJoinWalletTest extends LndCoinJoinWalletFixture {
-  behavior of "LndCoinJoinWallet"
+class LndVortexWalletTest extends LndVortexWalletFixture {
 
-  it must "correctly sign a psbt" in { coinjoinWallet =>
+  it must "correctly sign a psbt" in { wallet =>
     for {
-      utxos <- coinjoinWallet.listCoins
+      utxos <- wallet.listCoins
       refs = utxos.map(_.outputReference)
-      addr <- coinjoinWallet.getNewAddress
+      addr <- wallet.getNewAddress
 
       inputs = utxos
         .map(_.outPoint)
@@ -35,17 +34,17 @@ class LndCoinJoinWalletTest extends LndCoinJoinWalletFixture {
         psbt.addWitnessUTXOToInput(utxo.output, idx)
       }
 
-      signed <- coinjoinWallet.signPSBT(psbt, refs)
+      signed <- wallet.signPSBT(psbt, refs)
     } yield assert(signed.extractTransactionAndValidate.isSuccess)
   }
 
-  it must "correctly create input proofs" in { coinjoinWallet =>
+  it must "correctly create input proofs" in { wallet =>
     val nonce: SchnorrNonce = ECPublicKey.freshPublicKey.schnorrNonce
 
     for {
-      utxos <- coinjoinWallet.listCoins
+      utxos <- wallet.listCoins
       outRefs = utxos.map(_.outputReference)
-      proofFs = outRefs.map(coinjoinWallet.createInputProof(nonce, _))
+      proofFs = outRefs.map(wallet.createInputProof(nonce, _))
       proofs <- Future.sequence(proofFs)
     } yield {
       val inputRefs = outRefs.zip(proofs).map { case (outRef, proof) =>

@@ -1,6 +1,6 @@
 package com.lnvortex.testkit
 
-import com.lnvortex.lnd.LndCoinJoinWallet
+import com.lnvortex.lnd.LndVortexWallet
 import org.bitcoins.core.currency.Bitcoins
 import org.bitcoins.testkit.async.TestAsyncUtil
 import org.bitcoins.testkit.fixtures.BitcoinSFixture
@@ -8,12 +8,12 @@ import org.bitcoins.testkit.lnd.LndRpcTestClient
 import org.bitcoins.testkit.rpc.CachedBitcoindV21
 import org.scalatest.FutureOutcome
 
-trait LndCoinJoinWalletFixture extends BitcoinSFixture with CachedBitcoindV21 {
+trait LndVortexWalletFixture extends BitcoinSFixture with CachedBitcoindV21 {
 
-  override type FixtureParam = LndCoinJoinWallet
+  override type FixtureParam = LndVortexWallet
 
   override def withFixture(test: OneArgAsyncTest): FutureOutcome = {
-    makeDependentFixture[LndCoinJoinWallet](
+    makeDependentFixture[LndVortexWallet](
       () => {
         for {
           bitcoind <- cachedBitcoindWithFundsF
@@ -46,7 +46,7 @@ trait LndCoinJoinWalletFixture extends BitcoinSFixture with CachedBitcoindV21 {
           _ <- TestAsyncUtil.awaitConditionF(() =>
             lnd.listUnspent.map(_.nonEmpty))
 
-        } yield LndCoinJoinWallet(lnd)
+        } yield LndVortexWallet(lnd)
       },
       { lnd =>
         for {

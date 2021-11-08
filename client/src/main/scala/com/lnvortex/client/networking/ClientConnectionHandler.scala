@@ -5,13 +5,13 @@ import akka.event.LoggingReceive
 import akka.io.Tcp
 import akka.util.ByteString
 import com.lnvortex.client.VortexClient
-import com.lnvortex.core.api.CoinJoinWalletApi
+import com.lnvortex.core.api.VortexWalletApi
 import com.lnvortex.core.{VortexMessage, VortexMessageParser}
 import grizzled.slf4j.Logging
 import scodec.bits.ByteVector
 
 class ClientConnectionHandler(
-    vortexClient: VortexClient[CoinJoinWalletApi],
+    vortexClient: VortexClient[VortexWalletApi],
     connection: ActorRef,
     dataHandlerFactory: ClientDataHandler.Factory)
     extends Actor
@@ -99,7 +99,7 @@ object ClientConnectionHandler extends Logging {
   case object Ack extends Tcp.Event
 
   def props(
-      vortexClient: VortexClient[CoinJoinWalletApi],
+      vortexClient: VortexClient[VortexWalletApi],
       connection: ActorRef,
       dataHandlerFactory: ClientDataHandler.Factory): Props = {
     Props(

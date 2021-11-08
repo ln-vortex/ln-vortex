@@ -67,8 +67,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
 
   def getCurrentRoundId: DoubleSha256Digest = currentRoundId
 
-  private def roundAddressLabel: String =
-    s"CoinJoin Round: ${currentRoundId.hex}"
+  private def roundAddressLabel: String = s"Vortex Round: ${currentRoundId.hex}"
 
   private[coordinator] def inputFee: CurrencyUnit =
     feeRate * 149 // p2wpkh input size

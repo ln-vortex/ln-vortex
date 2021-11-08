@@ -2,7 +2,7 @@ package com.lnvortex.testkit
 
 import com.lnvortex.client.VortexClient
 import com.lnvortex.client.config.VortexAppConfig
-import com.lnvortex.lnd.LndCoinJoinWallet
+import com.lnvortex.lnd.LndVortexWallet
 import com.lnvortex.testkit.LnVortexTestUtils.getTestConfigs
 import org.bitcoins.core.currency.Bitcoins
 import org.bitcoins.testkit.async.TestAsyncUtil
@@ -13,10 +13,10 @@ import org.scalatest.FutureOutcome
 
 trait VortexClientFixture extends BitcoinSFixture with CachedBitcoindV21 {
 
-  override type FixtureParam = VortexClient[LndCoinJoinWallet]
+  override type FixtureParam = VortexClient[LndVortexWallet]
 
   override def withFixture(test: OneArgAsyncTest): FutureOutcome = {
-    makeDependentFixture[VortexClient[LndCoinJoinWallet]](
+    makeDependentFixture[VortexClient[LndVortexWallet]](
       () => {
         implicit val conf: VortexAppConfig = getTestConfigs()._1
         for {
@@ -50,11 +50,11 @@ trait VortexClientFixture extends BitcoinSFixture with CachedBitcoindV21 {
           _ <- TestAsyncUtil.awaitConditionF(() =>
             lnd.listUnspent.map(_.nonEmpty))
 
-        } yield VortexClient(LndCoinJoinWallet(lnd))
+        } yield VortexClient(LndVortexWallet(lnd))
       },
       { vortex =>
         for {
-          _ <- vortex.coinjoinWallet.stop()
+          _ <- vortex.vortexWallet.stop()
         } yield ()
       }
     )(test)

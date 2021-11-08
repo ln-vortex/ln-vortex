@@ -1,6 +1,6 @@
 package com.lnvortex.testkit
 
-import com.lnvortex.clightning.CLightningCoinJoinWallet
+import com.lnvortex.clightning.CLightningVortexWallet
 import org.bitcoins.core.currency.Bitcoins
 import org.bitcoins.testkit.async.TestAsyncUtil
 import org.bitcoins.testkit.clightning._
@@ -10,14 +10,14 @@ import org.scalatest.FutureOutcome
 
 import scala.concurrent.duration.DurationInt
 
-trait CLightningCoinJoinWalletFixture
+trait CLightningVortexWalletFixture
     extends BitcoinSFixture
     with CachedBitcoindV21 {
 
-  override type FixtureParam = CLightningCoinJoinWallet
+  override type FixtureParam = CLightningVortexWallet
 
   override def withFixture(test: OneArgAsyncTest): FutureOutcome = {
-    makeDependentFixture[CLightningCoinJoinWallet](
+    makeDependentFixture[CLightningVortexWallet](
       () => {
         for {
           bitcoind <- cachedBitcoindWithFundsF
@@ -31,7 +31,7 @@ trait CLightningCoinJoinWalletFixture
             maxTries = 500)
           _ <- TestAsyncUtil.nonBlockingSleep(7.seconds)
 
-          client = CLightningCoinJoinWallet(clightning)
+          client = CLightningVortexWallet(clightning)
 
           addrA <- clightning.getNewAddress
           addrB <- clightning.getNewAddress

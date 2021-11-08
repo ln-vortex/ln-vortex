@@ -639,7 +639,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
       } yield res
   }
 
-  it must "construct the unsigned coinjoin tx" in { coordinator =>
+  it must "construct the unsigned tx" in { coordinator =>
     val peerIds =
       0.to(5)
         .map(_ => CryptoUtil.sha256(ECPrivateKey.freshPrivateKey.bytes))

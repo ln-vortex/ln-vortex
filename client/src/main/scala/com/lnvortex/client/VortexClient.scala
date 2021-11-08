@@ -6,7 +6,7 @@ import com.lnvortex.client.VortexClientException._
 import com.lnvortex.client.config.VortexAppConfig
 import com.lnvortex.client.networking.{P2PClient, Peer}
 import com.lnvortex.core._
-import com.lnvortex.core.api.CoinJoinWalletApi
+import com.lnvortex.core.api.VortexWalletApi
 import com.lnvortex.core.crypto.BlindSchnorrUtil
 import com.lnvortex.core.crypto.BlindingTweaks.freshBlindingTweaks
 import grizzled.slf4j.Logging
@@ -24,7 +24,7 @@ import java.net.InetSocketAddress
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Future, Promise}
 
-case class VortexClient[+T <: CoinJoinWalletApi](coinjoinWallet: T)(implicit
+case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
     system: ActorSystem,
     val config: VortexAppConfig)
     extends StartStopAsync[Unit]
@@ -69,10 +69,10 @@ case class VortexClient[+T <: CoinJoinWalletApi](coinjoinWallet: T)(implicit
     for {
       _ <- P2PClient.connect(peer, this, Some(handlerP))
       handler <- handlerP.future
-    } yield handler ! AskMixDetails(coinjoinWallet.network)
+    } yield handler ! AskMixDetails(vortexWallet.network)
   }
 
-  def listCoins: Future[Vector[UnspentCoin]] = coinjoinWallet.listCoins
+  def listCoins: Future[Vector[UnspentCoin]] = vortexWallet.listCoins
 
   def askNonce(): Future[SchnorrNonce] = {
     logger.info("Asking nonce from coordinator")
@@ -172,15 +172,15 @@ case class VortexClient[+T <: CoinJoinWalletApi](coinjoinWallet: T)(implicit
         for {
           handler <- handlerP.future
           inputProofs <- FutureUtil.sequentially(outputRefs)(
-            coinjoinWallet.createInputProof(scheduled.nonce, _))
+            vortexWallet.createInputProof(scheduled.nonce, _))
 
           inputRefs = outputRefs.zip(inputProofs).map { case (outRef, proof) =>
             InputReference(outRef, proof)
           }
 
-          changeAddr <- coinjoinWallet.getChangeAddress
+          changeAddr <- vortexWallet.getChangeAddress
 
-          channelDetails <- coinjoinWallet.initChannelOpen(
+          channelDetails <- vortexWallet.initChannelOpen(
             nodeId = scheduled.nodeId,
             peerAddrOpt = scheduled.peerAddrOpt,
             fundingAmount = scheduled.round.amount,
@@ -286,11 +286,11 @@ case class VortexClient[+T <: CoinJoinWalletApi](coinjoinWallet: T)(implicit
           logger.info("PSBT is valid, giving channel peer")
           for {
             // tell peer about funding psbt
-            _ <- coinjoinWallet.completeChannelOpen(state.initDetails.chanId,
-                                                    unsigned)
+            _ <- vortexWallet.completeChannelOpen(state.initDetails.chanId,
+                                                  unsigned)
             _ = logger.info("Valid with channel peer, signing")
             // sign to be sent to coordinator
-            signed <- coinjoinWallet.signPSBT(unsigned, inputs)
+            signed <- vortexWallet.signPSBT(unsigned, inputs)
           } yield {
             roundDetails = state.nextStage(signed)
             signed
@@ -304,7 +304,7 @@ case class VortexClient[+T <: CoinJoinWalletApi](coinjoinWallet: T)(implicit
               s"Missing expected change output of ${state.expectedAmtBackOpt}")
           } else if (missingInputs.nonEmpty) {
             MissingInputsException(
-              s"Missing inputs form coinjoin transaction: ${missingInputs.mkString(",")}")
+              s"Missing inputs from transaction: ${missingInputs.mkString(",")}")
           } else if (!noDust) {
             DustOutputsException("Transaction contains dust outputs")
           } else {
@@ -326,7 +326,7 @@ case class VortexClient[+T <: CoinJoinWalletApi](coinjoinWallet: T)(implicit
       case state: PSBTSigned =>
         logger.info("Round restarted..")
 
-        coinjoinWallet
+        vortexWallet
           .cancelChannel(state.channelOutpoint, state.initDetails.nodeId)
           .map { _ =>
             roundDetails =
@@ -343,9 +343,9 @@ case class VortexClient[+T <: CoinJoinWalletApi](coinjoinWallet: T)(implicit
           new IllegalStateException(
             s"At invalid state $state, cannot completeRound"))
       case _: PSBTSigned =>
-        logger.info("Coinjoin complete!!")
+        logger.info("Round complete!!")
         for {
-          _ <- coinjoinWallet.broadcastTransaction(signedTx)
+          _ <- vortexWallet.broadcastTransaction(signedTx)
           _ <- stop()
           _ <- getNewRound
         } yield ()

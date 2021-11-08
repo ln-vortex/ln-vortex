@@ -41,7 +41,7 @@ class VortexClientTest extends VortexClientFixture {
   }
 
   it must "fail to sign a psbt with no channel" in { vortexClient =>
-    val lnd = vortexClient.coinjoinWallet
+    val lnd = vortexClient.vortexWallet
 
     for {
       nodeId <- lnd.lndRpcClient.nodeId
@@ -77,7 +77,7 @@ class VortexClientTest extends VortexClientFixture {
   }
 
   it must "fail to sign a psbt with a missing mix output" in { vortexClient =>
-    val lnd = vortexClient.coinjoinWallet
+    val lnd = vortexClient.vortexWallet
 
     for {
       nodeId <- lnd.lndRpcClient.nodeId
@@ -116,7 +116,7 @@ class VortexClientTest extends VortexClientFixture {
 
   it must "fail to sign a psbt with a missing change output" in {
     vortexClient =>
-      val lnd = vortexClient.coinjoinWallet
+      val lnd = vortexClient.vortexWallet
 
       for {
         nodeId <- lnd.lndRpcClient.nodeId
@@ -154,7 +154,7 @@ class VortexClientTest extends VortexClientFixture {
 
   it must "fail to sign a psbt with a too low change output" in {
     vortexClient =>
-      val lnd = vortexClient.coinjoinWallet
+      val lnd = vortexClient.vortexWallet
 
       for {
         nodeId <- lnd.lndRpcClient.nodeId
@@ -191,7 +191,7 @@ class VortexClientTest extends VortexClientFixture {
   }
 
   it must "fail to sign a psbt with a missing input" in { vortexClient =>
-    val lnd = vortexClient.coinjoinWallet
+    val lnd = vortexClient.vortexWallet
 
     for {
       nodeId <- lnd.lndRpcClient.nodeId

@@ -2,7 +2,7 @@ package com.lnvortex.clightning
 
 import akka.actor.ActorSystem
 import com.bitcoins.clightning.rpc.CLightningRpcClient
-import com.lnvortex.core.api.{CoinJoinWalletApi, OutputDetails}
+import com.lnvortex.core.api.{OutputDetails, VortexWalletApi}
 import com.lnvortex.core.{InputReference, UnspentCoin}
 import org.bitcoins.core.config._
 import org.bitcoins.core.currency._
@@ -19,9 +19,9 @@ import java.net.InetSocketAddress
 import scala.concurrent._
 import scala.util.Try
 
-case class CLightningCoinJoinWallet(clightning: CLightningRpcClient)(implicit
+case class CLightningVortexWallet(clightning: CLightningRpcClient)(implicit
     system: ActorSystem)
-    extends CoinJoinWalletApi {
+    extends VortexWalletApi {
   implicit val executionContext: ExecutionContext = system.dispatcher
 
   private val channelOpener = CLightningChannelOpener(clightning)

@@ -46,7 +46,7 @@ case class VortexAppConfig(
   override def stop(): Future[Unit] = Future.unit
 
   lazy val torConf: TorAppConfig =
-    TorAppConfig(directory, conf: _*)
+    TorAppConfig(directory, None, conf: _*)
 
   lazy val socks5ProxyParams: Option[Socks5ProxyParams] =
     torConf.socks5ProxyParams

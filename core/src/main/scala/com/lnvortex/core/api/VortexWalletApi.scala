@@ -15,7 +15,7 @@ import scodec.bits.ByteVector
 import java.net.InetSocketAddress
 import scala.concurrent._
 
-abstract class CoinJoinWalletApi extends StartStopAsync[Unit] {
+abstract class VortexWalletApi extends StartStopAsync[Unit] {
 
   def network: BitcoinNetwork
 

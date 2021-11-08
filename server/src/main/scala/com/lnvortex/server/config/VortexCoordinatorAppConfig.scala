@@ -67,7 +67,7 @@ case class VortexCoordinatorAppConfig(
   override def stop(): Future[Unit] = Future.unit
 
   lazy val torConf: TorAppConfig =
-    TorAppConfig(directory, conf: _*)
+    TorAppConfig(directory, None, conf: _*)
 
   lazy val kmConf: KeyManagerAppConfig =
     KeyManagerAppConfig(directory, conf: _*)

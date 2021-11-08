@@ -1,7 +1,7 @@
 package com.lnvortex.testkit
 
 import com.lnvortex.client.VortexClient
-import com.lnvortex.lnd.LndCoinJoinWallet
+import com.lnvortex.lnd.LndVortexWallet
 import com.lnvortex.server.coordinator.VortexCoordinator
 import com.lnvortex.testkit.LnVortexTestUtils.getTestConfigs
 import com.typesafe.config.ConfigFactory
@@ -16,14 +16,14 @@ import scala.reflect.io.Directory
 trait DualClientFixture extends BitcoinSFixture with CachedBitcoindV21 {
 
   override type FixtureParam = (
-      VortexClient[LndCoinJoinWallet],
-      VortexClient[LndCoinJoinWallet],
+      VortexClient[LndVortexWallet],
+      VortexClient[LndVortexWallet],
       VortexCoordinator)
 
   override def withFixture(test: OneArgAsyncTest): FutureOutcome = {
     makeDependentFixture[(
-        VortexClient[LndCoinJoinWallet],
-        VortexClient[LndCoinJoinWallet],
+        VortexClient[LndVortexWallet],
+        VortexClient[LndVortexWallet],
         VortexCoordinator)](
       () => {
         implicit val (_, serverConf) = getTestConfigs()
@@ -44,9 +44,9 @@ trait DualClientFixture extends BitcoinSFixture with CachedBitcoindV21 {
           clientConfig = getTestConfigs(config)._1
 
           (lndA, lndB) <- LndTestUtils.createNodePair(bitcoind)
-          clientA = VortexClient(LndCoinJoinWallet(lndA))(system, clientConfig)
+          clientA = VortexClient(LndVortexWallet(lndA))(system, clientConfig)
           _ <- clientA.start()
-          clientB = VortexClient(LndCoinJoinWallet(lndB))(system, clientConfig)
+          clientB = VortexClient(LndVortexWallet(lndB))(system, clientConfig)
           _ <- clientB.start()
 
           _ <- LndRpcTestUtil.connectLNNodes(lndA, lndB)
@@ -60,11 +60,11 @@ trait DualClientFixture extends BitcoinSFixture with CachedBitcoindV21 {
       },
       { case (clientA, clientB, coordinator) =>
         for {
-          _ <- clientA.coinjoinWallet.stop()
+          _ <- clientA.vortexWallet.stop()
           _ <- clientA.stop()
           _ <- clientA.config.stop()
 
-          _ <- clientB.coinjoinWallet.stop()
+          _ <- clientB.vortexWallet.stop()
           _ <- clientB.stop()
           _ <- clientB.config.stop()
 

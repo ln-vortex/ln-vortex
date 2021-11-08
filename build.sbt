@@ -48,13 +48,14 @@ lazy val root = project
     core,
     coreTest,
     client,
-    lnd,
-    lndTest,
     clientTest,
     clientServerTest,
+    lnd,
+    lndTest,
     server,
     serverTest,
-    gui
+    gui,
+    testkit
   )
   .dependsOn(
     bitcoind,
@@ -70,7 +71,8 @@ lazy val root = project
     lndTest,
     server,
     serverTest,
-    gui
+    gui,
+    testkit
   )
   .settings(CommonSettings.settings: _*)
   .settings(

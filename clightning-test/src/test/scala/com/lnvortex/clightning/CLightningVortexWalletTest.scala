@@ -1,38 +1,27 @@
-package com.lnvortex.bitcoind
+package com.lnvortex.clightning
 
 import com.lnvortex.core._
-import org.bitcoins.core.currency._
-import org.bitcoins.core.number._
-import org.bitcoins.core.protocol.script._
-import org.bitcoins.core.protocol.transaction._
+import com.lnvortex.testkit.CLightningVortexWalletFixture
+import org.bitcoins.core.currency.Satoshis
+import org.bitcoins.core.number.{Int32, UInt32}
+import org.bitcoins.core.protocol.script.EmptyScriptSignature
+import org.bitcoins.core.protocol.transaction.{
+  BaseTransaction,
+  TransactionInput,
+  TransactionOutput
+}
 import org.bitcoins.core.psbt.PSBT
 import org.bitcoins.crypto._
-import org.bitcoins.testkit.fixtures.BitcoinSFixture
-import org.bitcoins.testkit.rpc.CachedBitcoindV21
-import org.scalatest.FutureOutcome
 
 import scala.concurrent.Future
 
-class BitcoindCoinJoinWalletTest
-    extends BitcoinSFixture
-    with CachedBitcoindV21 {
+class CLightningVortexWalletTest extends CLightningVortexWalletFixture {
 
-  override type FixtureParam = BitcoindCoinJoinWallet
-
-  override def withFixture(test: OneArgAsyncTest): FutureOutcome = {
-    makeDependentFixture[BitcoindCoinJoinWallet](
-      () => cachedBitcoindWithFundsF.map(BitcoindCoinJoinWallet(_, None)),
-      bitcoind => bitcoind.stop()
-    )(test)
-  }
-
-  // todo add negative tests
-
-  it must "correctly sign a psbt" in { coinjoinWallet =>
+  it must "correctly sign a psbt" in { wallet =>
     for {
-      utxos <- coinjoinWallet.listCoins
+      utxos <- wallet.listCoins
       refs = utxos.map(_.outputReference)
-      addr <- coinjoinWallet.getNewAddress
+      addr <- wallet.getNewAddress
 
       inputs = utxos
         .map(_.outPoint)
@@ -49,17 +38,17 @@ class BitcoindCoinJoinWalletTest
         psbt.addWitnessUTXOToInput(utxo.output, idx)
       }
 
-      signed <- coinjoinWallet.signPSBT(psbt, refs)
+      signed <- wallet.signPSBT(psbt, refs)
     } yield assert(signed.extractTransactionAndValidate.isSuccess)
   }
 
-  it must "correctly create input proofs" in { coinjoinWallet =>
+  it must "correctly create input proofs" in { wallet =>
     val nonce: SchnorrNonce = ECPublicKey.freshPublicKey.schnorrNonce
 
     for {
-      utxos <- coinjoinWallet.listCoins
+      utxos <- wallet.listCoins
       outRefs = utxos.map(_.outputReference)
-      proofFs = outRefs.map(coinjoinWallet.createInputProof(nonce, _))
+      proofFs = outRefs.map(wallet.createInputProof(nonce, _))
       proofs <- Future.sequence(proofFs)
     } yield {
       val inputRefs = outRefs.zip(proofs).map { case (outRef, proof) =>

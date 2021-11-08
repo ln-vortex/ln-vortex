@@ -4,7 +4,7 @@ import akka.actor._
 import akka.event.LoggingReceive
 import akka.io.{IO, Tcp}
 import com.lnvortex.client.VortexClient
-import com.lnvortex.core.api.CoinJoinWalletApi
+import com.lnvortex.core.api.VortexWalletApi
 import org.bitcoins.tor.Socks5Connection.{Socks5Connect, Socks5Connected}
 import org.bitcoins.tor.{Socks5Connection, Socks5ProxyParams}
 
@@ -13,7 +13,7 @@ import java.net.InetSocketAddress
 import scala.concurrent.{Future, Promise}
 
 class P2PClient(
-    vortex: VortexClient[CoinJoinWalletApi],
+    vortex: VortexClient[VortexWalletApi],
     connectedAddress: Option[Promise[InetSocketAddress]],
     handlerP: Option[Promise[ActorRef]],
     dataHandlerFactory: ClientDataHandler.Factory)
@@ -109,7 +109,7 @@ object P2PClient {
   case class Connect(peer: Peer)
 
   def props(
-      vortex: VortexClient[CoinJoinWalletApi],
+      vortex: VortexClient[VortexWalletApi],
       connectedAddress: Option[Promise[InetSocketAddress]],
       handlerP: Option[Promise[ActorRef]],
       dataHandlerFactory: ClientDataHandler.Factory): Props = Props(
@@ -117,7 +117,7 @@ object P2PClient {
 
   def connect(
       peer: Peer,
-      vortex: VortexClient[CoinJoinWalletApi],
+      vortex: VortexClient[VortexWalletApi],
       handlerP: Option[Promise[ActorRef]],
       dataHandlerFactory: ClientDataHandler.Factory =
         ClientDataHandler.defaultFactory)(implicit

@@ -1,7 +1,7 @@
 package com.lnvortex.bitcoind
 
 import akka.actor.ActorSystem
-import com.lnvortex.core.api.{CoinJoinWalletApi, OutputDetails}
+import com.lnvortex.core.api.{OutputDetails, VortexWalletApi}
 import com.lnvortex.core.{InputReference, UnspentCoin}
 import org.bitcoins.commons.jsonmodels.bitcoind.RpcOpts.LockUnspentOutputParameter
 import org.bitcoins.core.config.BitcoinNetwork
@@ -19,10 +19,10 @@ import scodec.bits.ByteVector
 import java.net.InetSocketAddress
 import scala.concurrent.Future
 
-case class BitcoindCoinJoinWallet(
+case class BitcoindVortexWallet(
     bitcoind: BitcoindRpcClient,
     walletNameOpt: Option[String] = None)(implicit system: ActorSystem)
-    extends CoinJoinWalletApi {
+    extends VortexWalletApi {
   import system.dispatcher
 
   override def network: BitcoinNetwork = bitcoind.instance.network match {

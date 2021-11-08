@@ -4,13 +4,13 @@ import akka.actor._
 import akka.event.LoggingReceive
 import com.lnvortex.client.VortexClient
 import com.lnvortex.core._
-import com.lnvortex.core.api.CoinJoinWalletApi
+import com.lnvortex.core.api.VortexWalletApi
 import grizzled.slf4j.Logging
 
 import scala.concurrent._
 
 class ClientDataHandler(
-    vortexClient: VortexClient[CoinJoinWalletApi],
+    vortexClient: VortexClient[VortexWalletApi],
     connectionHandler: ActorRef)
     extends Actor
     with Logging {
@@ -71,19 +71,19 @@ class ClientDataHandler(
 object ClientDataHandler {
 
   type Factory =
-    (VortexClient[CoinJoinWalletApi], ActorContext, ActorRef) => ActorRef
+    (VortexClient[VortexWalletApi], ActorContext, ActorRef) => ActorRef
 
   sealed trait Command
 
   def defaultFactory(
-      vortexClient: VortexClient[CoinJoinWalletApi],
+      vortexClient: VortexClient[VortexWalletApi],
       context: ActorContext,
       connectionHandler: ActorRef): ActorRef = {
     context.actorOf(props(vortexClient, connectionHandler))
   }
 
   def props(
-      vortexClient: VortexClient[CoinJoinWalletApi],
+      vortexClient: VortexClient[VortexWalletApi],
       connectionHandler: ActorRef): Props =
     Props(new ClientDataHandler(vortexClient, connectionHandler))
 }

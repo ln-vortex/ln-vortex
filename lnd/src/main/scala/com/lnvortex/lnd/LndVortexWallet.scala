@@ -1,7 +1,7 @@
 package com.lnvortex.lnd
 
 import akka.actor.ActorSystem
-import com.lnvortex.core.api.{CoinJoinWalletApi, OutputDetails}
+import com.lnvortex.core.api.{OutputDetails, VortexWalletApi}
 import com.lnvortex.core.{InputReference, UnspentCoin}
 import org.bitcoins.core.config.{BitcoinNetwork, BitcoinNetworks}
 import org.bitcoins.core.currency.CurrencyUnit
@@ -19,9 +19,9 @@ import java.net.InetSocketAddress
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Await, Future}
 
-case class LndCoinJoinWallet(lndRpcClient: LndRpcClient)(implicit
+case class LndVortexWallet(lndRpcClient: LndRpcClient)(implicit
     system: ActorSystem)
-    extends CoinJoinWalletApi {
+    extends VortexWalletApi {
   import system.dispatcher
 
   private val channelOpener = LndChannelOpener(lndRpcClient)
