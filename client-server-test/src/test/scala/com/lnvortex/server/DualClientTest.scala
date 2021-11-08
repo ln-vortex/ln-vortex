@@ -2,11 +2,12 @@ package com.lnvortex.server
 
 import com.lnvortex.client.RoundDetails.getInitDetailsOpt
 import com.lnvortex.testkit.{DualClientFixture, LnVortexTestUtils}
+import org.bitcoins.testkit.EmbeddedPg
 import org.bitcoins.testkit.async.TestAsyncUtil
 
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 
-class DualClientTest extends DualClientFixture {
+class DualClientTest extends DualClientFixture with EmbeddedPg {
 
   val interval: FiniteDuration =
     if (LnVortexTestUtils.torEnabled) 500.milliseconds else 100.milliseconds

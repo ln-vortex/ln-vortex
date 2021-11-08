@@ -16,11 +16,12 @@ import org.bitcoins.core.protocol.transaction._
 import org.bitcoins.core.psbt.PSBT
 import org.bitcoins.crypto._
 import org.bitcoins.rpc.BitcoindException.InvalidAddressOrKey
+import org.bitcoins.testkit.EmbeddedPg
 import org.bitcoins.testkitcore.Implicits.GeneratorOps
 
 import scala.concurrent.Future
 
-class VortexCoordinatorTest extends VortexCoordinatorFixture {
+class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
   behavior of "VortexCoordinator"
 
   val badPeerId: Sha256Digest = Sha256Digest(
