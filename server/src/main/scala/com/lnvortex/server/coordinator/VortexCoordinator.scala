@@ -17,8 +17,7 @@ import org.bitcoins.core.protocol.BitcoinAddress
 import org.bitcoins.core.protocol.script._
 import org.bitcoins.core.protocol.transaction._
 import org.bitcoins.core.psbt.PSBT
-import org.bitcoins.core.script.ScriptType._
-import org.bitcoins.core.util.{FutureUtil, StartStopAsync, TimeUtil}
+import org.bitcoins.core.util._
 import org.bitcoins.core.wallet.builder._
 import org.bitcoins.core.wallet.fee.SatoshisPerVirtualByte
 import org.bitcoins.crypto._
@@ -322,9 +321,11 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
     logger.info(s"Alice ${peerId.hex} is registering inputs")
     logger.debug(s"Alice's ${peerId.hex} inputs $registerInputs")
 
-    require(registerInputs.inputs.forall(
-              _.output.scriptPubKey.scriptType == WITNESS_V0_KEYHASH),
-            s"${peerId.hex} attempted to register non p2wpkh inputs")
+    require(
+      registerInputs.inputs.forall(
+        _.output.scriptPubKey.scriptType == config.inputScriptType),
+      s"${peerId.hex} attempted to register non ${config.inputScriptType} inputs"
+    )
 
     val roundDbF = currentRound().map { roundDb =>
       if (roundDb.status != RegisterAlices)
@@ -380,8 +381,8 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       val excess = inputAmt - roundDb.amount - roundDb.mixFee - onChainFees
 
       // if change make sure it is of correct type
-      val validChange =
-        registerInputs.changeSpkOpt.forall(_.scriptType == WITNESS_V0_KEYHASH)
+      val validChange = registerInputs.changeSpkOpt.forall(
+        _.scriptType == config.changeScriptType)
 
       val enoughFunding = excess >= Satoshis.zero
 
@@ -448,7 +449,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       bob: RegisterMixOutput): Future[Unit] = {
     logger.info("A bob is registering an output")
 
-    val validSpk = bob.output.scriptPubKey.scriptType == WITNESS_V0_SCRIPTHASH
+    val validSpk = bob.output.scriptPubKey.scriptType == config.mixScriptType
     lazy val validSig = bob.verifySig(publicKey, currentRoundId)
 
     if (validSpk && validSig) {

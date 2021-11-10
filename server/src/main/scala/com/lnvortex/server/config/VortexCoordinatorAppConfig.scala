@@ -7,6 +7,7 @@ import grizzled.slf4j.Logging
 import org.bitcoins.commons.config._
 import org.bitcoins.core.currency.Satoshis
 import org.bitcoins.core.hd.HDPurposes
+import org.bitcoins.core.script.ScriptType
 import org.bitcoins.core.wallet.keymanagement.KeyManagerParams
 import org.bitcoins.crypto._
 import org.bitcoins.db._
@@ -88,6 +89,21 @@ case class VortexCoordinatorAppConfig(
 
   lazy val aesPasswordOpt: Option[AesPassword] = kmConf.aesPasswordOpt
   lazy val bip39PasswordOpt: Option[String] = kmConf.bip39PasswordOpt
+
+  lazy val inputScriptType: ScriptType = {
+    val str = config.getString(s"$moduleName.inputScriptType")
+    ScriptType.fromString(str)
+  }
+
+  lazy val changeScriptType: ScriptType = {
+    val str = config.getString(s"$moduleName.changeScriptType")
+    ScriptType.fromString(str)
+  }
+
+  lazy val mixScriptType: ScriptType = {
+    val str = config.getString(s"$moduleName.mixScriptType")
+    ScriptType.fromString(str)
+  }
 
   lazy val maxPeers: Int = {
     config.getInt(s"$moduleName.maxPeers")
