@@ -336,7 +336,9 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
     val aliceDbF = aliceDAO.read(peerId)
 
     val verifyInputFs = registerInputs.inputs.map { inputRef: InputReference =>
-      import inputRef._
+      val outPoint = inputRef.outPoint
+      val output = inputRef.output
+
       for {
         banDbOpt <- bannedUtxoDAO.read(outPoint)
         notBanned = banDbOpt match {
