@@ -447,12 +447,12 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
               s"Invalid inputs and proofs received in round ${roundDb.roundId.hex}"))
 
         val exception: Exception = if (!validInputs) {
-          InvalidInputsException("Alice gave invalid inputs")
+          new InvalidInputsException("Alice gave invalid inputs")
         } else if (!validChange) {
-          InvalidChangeScriptPubKeyException(
+          new InvalidChangeScriptPubKeyException(
             s"Alice registered with invalid change spk ${registerInputs.changeSpkOpt}")
         } else if (!enoughFunding) {
-          NotEnoughFundingException(
+          new NotEnoughFundingException(
             s"Alice registered with not enough funding, need $excess more")
         } else {
           new IllegalArgumentException("Alice registered with invalid inputs")
@@ -481,7 +481,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
             throw new IllegalStateException(
               s"Round is in invalid state ${round.status}")
           if (round.amount != bob.output.value)
-            throw InvalidMixOutputAmountException(
+            throw new InvalidMixOutputAmountException(
               s"Output given is incorrect amount, got ${bob.output.value} expected ${round.amount}")
         }
         _ <- outputsDAO.create(db)
@@ -496,10 +496,10 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       }
     } else { // error
       val exception: Exception = if (!validSig) {
-        InvalidOutputSignatureException(
+        new InvalidOutputSignatureException(
           s"Bob attempted to register an output with an invalid sig ${bob.sig.hex}")
       } else if (!validSpk) {
-        InvalidMixOutputScriptPubKeyException(
+        new InvalidMixOutputScriptPubKeyException(
           s"Bob attempted to register an output with an invalid script pub key ${bob.output.scriptPubKey}")
       } else {
         // this should be impossible
@@ -677,10 +677,10 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
                     s"Invalid psbt signature in round ${roundDb.roundId.hex}"))
 
               val exception: Exception = if (!sameTx) {
-                DifferentTransactionException(
+                new DifferentTransactionException(
                   s"Received different transaction in psbt from peer: ${psbt.transaction.txIdBE.hex}")
               } else if (!validSigs) {
-                InvalidPSBTSignaturesException(
+                new InvalidPSBTSignaturesException(
                   "Received invalid psbt signature from peer")
               } else if (!correctNumInputs) {
                 new IllegalStateException(

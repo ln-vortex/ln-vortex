@@ -7,31 +7,31 @@ sealed abstract class VortexServerException(private val reason: String)
 
 object VortexServerException {
 
-  case class InvalidInputsException(private val reason: String)
+  class InvalidInputsException(private val reason: String)
       extends VortexServerException(reason)
 
-  case class InvalidChangeScriptPubKeyException(private val reason: String)
+  class InvalidChangeScriptPubKeyException(private val reason: String)
       extends VortexServerException(reason)
 
-  case class NotEnoughFundingException(private val reason: String)
+  class NotEnoughFundingException(private val reason: String)
       extends VortexServerException(reason)
 
-  case class InvalidBlindChallengeException(private val reason: String)
+  class InvalidBlindChallengeException(private val reason: String)
       extends VortexServerException(reason)
 
-  case class InvalidOutputSignatureException(private val reason: String)
+  class InvalidOutputSignatureException(private val reason: String)
       extends VortexServerException(reason)
 
-  case class InvalidMixOutputScriptPubKeyException(private val reason: String)
+  class InvalidMixOutputScriptPubKeyException(private val reason: String)
       extends VortexServerException(reason)
 
-  case class InvalidMixOutputAmountException(private val reason: String)
+  class InvalidMixOutputAmountException(private val reason: String)
       extends VortexServerException(reason)
 
-  case class InvalidPSBTSignaturesException(private val reason: String)
+  class InvalidPSBTSignaturesException(private val reason: String)
       extends VortexServerException(reason)
 
-  case class DifferentTransactionException(private val reason: String)
+  class DifferentTransactionException(private val reason: String)
       extends VortexServerException(reason)
 
 }

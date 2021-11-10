@@ -306,16 +306,16 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
           }
         } else { // error
           val exception: Exception = if (!hasMixOutput) {
-            InvalidMixedOutputException(
+            new InvalidMixedOutputException(
               s"Missing expected mixed output ${state.initDetails.mixOutput}")
           } else if (!hasCorrectChange) {
-            InvalidChangeOutputException(
+            new InvalidChangeOutputException(
               s"Missing expected change output of ${state.expectedAmtBackOpt}")
           } else if (missingInputs.nonEmpty) {
-            MissingInputsException(
+            new MissingInputsException(
               s"Missing inputs from transaction: ${missingInputs.mkString(",")}")
           } else if (!noDust) {
-            DustOutputsException("Transaction contains dust outputs")
+            new DustOutputsException("Transaction contains dust outputs")
           } else {
             // this should be impossible
             new RuntimeException(

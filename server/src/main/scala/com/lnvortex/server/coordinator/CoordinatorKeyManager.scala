@@ -72,7 +72,7 @@ class CoordinatorKeyManager()(implicit
       BlindSchnorrUtil.generateBlindSig(privKey, nonceKey, blindedOutput)
     } catch {
       case _: IllegalArgumentException =>
-        throw InvalidBlindChallengeException(
+        throw new InvalidBlindChallengeException(
           s"Got a blinded challenge of $blindedOutput")
     }
   }

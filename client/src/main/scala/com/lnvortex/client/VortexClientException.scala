@@ -7,15 +7,15 @@ sealed abstract class VortexClientException(private val reason: String)
 
 object VortexClientException {
 
-  case class InvalidMixedOutputException(private val reason: String)
+  class InvalidMixedOutputException(private val reason: String)
       extends VortexClientException(reason)
 
-  case class InvalidChangeOutputException(private val reason: String)
+  class InvalidChangeOutputException(private val reason: String)
       extends VortexClientException(reason)
 
-  case class MissingInputsException(private val reason: String)
+  class MissingInputsException(private val reason: String)
       extends VortexClientException(reason)
 
-  case class DustOutputsException(private val reason: String)
+  class DustOutputsException(private val reason: String)
       extends VortexClientException(reason)
 }
