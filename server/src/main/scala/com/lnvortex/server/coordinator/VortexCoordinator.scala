@@ -691,10 +691,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
               }
 
               // only ban if the user's fault
-              val ban =
-                if (!correctNumInputs && validSigs && sameTx)
-                  false
-                else true
+              val ban = !validSigs || !sameTx
 
               signedPMap(peerId).failure(exception)
 
