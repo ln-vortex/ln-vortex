@@ -69,17 +69,19 @@ class DualClientTest extends DualClientFixture with EmbeddedPg {
               .map(_.size == utxosA.size + utxosB.size),
           interval = interval,
           maxTries = 500)
+
+        // expected outputs should be set now, save for assertions
+        expectedOutputA =
+          getInitDetailsOpt(clientA.getCurrentRoundDetails).get.mixOutput
+        expectedOutputB =
+          getInitDetailsOpt(clientB.getCurrentRoundDetails).get.mixOutput
+
         _ <- TestAsyncUtil.awaitConditionF(
           () => coordinator.outputsDAO.findAll().map(_.size == 2),
           interval = interval,
           maxTries = 500)
         outputDbs <- coordinator.outputsDAO.findAll()
       } yield {
-        val expectedOutputA =
-          getInitDetailsOpt(clientA.getCurrentRoundDetails).get.mixOutput
-        val expectedOutputB =
-          getInitDetailsOpt(clientB.getCurrentRoundDetails).get.mixOutput
-
         assert(outputDbs.size == 2)
         assert(outputDbs.exists(_.output == expectedOutputA))
         assert(outputDbs.exists(_.output == expectedOutputB))

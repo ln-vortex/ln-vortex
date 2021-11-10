@@ -77,7 +77,7 @@ class VortexClientTest extends VortexClientFixture {
       testDetails = InitDetails(inputs = refs,
                                 nodeId = nodeId,
                                 peerAddrOpt = None,
-                                changeSpk = change.scriptPubKey,
+                                changeSpkOpt = Some(change.scriptPubKey),
                                 chanId = Sha256Digest.empty.bytes,
                                 mixOutput = mix,
                                 tweaks = dummyTweaks)
@@ -114,7 +114,7 @@ class VortexClientTest extends VortexClientFixture {
       testDetails = InitDetails(inputs = refs,
                                 nodeId = nodeId,
                                 peerAddrOpt = None,
-                                changeSpk = change.scriptPubKey,
+                                changeSpkOpt = Some(change.scriptPubKey),
                                 chanId = Sha256Digest.empty.bytes,
                                 mixOutput = mix,
                                 tweaks = dummyTweaks)
@@ -152,7 +152,7 @@ class VortexClientTest extends VortexClientFixture {
         testDetails = InitDetails(inputs = refs,
                                   nodeId = nodeId,
                                   peerAddrOpt = None,
-                                  changeSpk = change.scriptPubKey,
+                                  changeSpkOpt = Some(change.scriptPubKey),
                                   chanId = Sha256Digest.empty.bytes,
                                   mixOutput = mix,
                                   tweaks = dummyTweaks)
@@ -190,7 +190,7 @@ class VortexClientTest extends VortexClientFixture {
         testDetails = InitDetails(inputs = refs,
                                   nodeId = nodeId,
                                   peerAddrOpt = None,
-                                  changeSpk = change.scriptPubKey,
+                                  changeSpkOpt = Some(change.scriptPubKey),
                                   chanId = Sha256Digest.empty.bytes,
                                   mixOutput = mix,
                                   tweaks = dummyTweaks)
@@ -228,7 +228,7 @@ class VortexClientTest extends VortexClientFixture {
       testDetails = InitDetails(inputs = refs,
                                 nodeId = nodeId,
                                 peerAddrOpt = None,
-                                changeSpk = change.scriptPubKey,
+                                changeSpkOpt = Some(change.scriptPubKey),
                                 chanId = Sha256Digest.empty.bytes,
                                 mixOutput = mix,
                                 tweaks = dummyTweaks)

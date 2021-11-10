@@ -13,7 +13,7 @@ case class InitDetails(
     inputs: Vector[OutputReference],
     nodeId: NodeId,
     peerAddrOpt: Option[InetSocketAddress],
-    changeSpk: ScriptPubKey,
+    changeSpkOpt: Option[ScriptPubKey],
     chanId: ByteVector,
     mixOutput: TransactionOutput,
     tweaks: BlindingTweaks) {

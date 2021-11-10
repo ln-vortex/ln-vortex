@@ -65,15 +65,17 @@ sealed trait InitializedRound extends RoundDetails {
   def nonce: SchnorrNonce
   def initDetails: InitDetails
 
-  def expectedAmtBackOpt: Option[CurrencyUnit] = {
-    val excessAfterChange =
-      initDetails.inputAmt - round.amount - round.mixFee - (Satoshis(
-        initDetails.inputs.size) * inputFee) - outputFee - outputFee
+  // todo add tests
+  def expectedAmtBackOpt: Option[CurrencyUnit] =
+    initDetails.changeSpkOpt.flatMap { _ =>
+      val excessAfterChange =
+        initDetails.inputAmt - round.amount - round.mixFee - (Satoshis(
+          initDetails.inputs.size) * inputFee) - outputFee - outputFee
 
-    if (excessAfterChange > Policy.dustThreshold)
-      Some(excessAfterChange)
-    else None
-  }
+      if (excessAfterChange > Policy.dustThreshold)
+        Some(excessAfterChange)
+      else None
+    }
 
   def restartRound(round: MixDetails, nonce: SchnorrNonce): InputsScheduled =
     InputsScheduled(round = round,

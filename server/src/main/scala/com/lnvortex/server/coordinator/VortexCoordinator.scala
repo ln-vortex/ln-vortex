@@ -335,55 +335,74 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
 
     val aliceDbF = aliceDAO.read(peerId)
 
-    val verifyInputFs = registerInputs.inputs.map { inputRef: InputReference =>
-      val outPoint = inputRef.outPoint
-      val output = inputRef.output
+    val validInputsF = FutureUtil.foldLeftAsync(true, registerInputs.inputs) {
+      case (accum, inputRef) =>
+        if (accum) {
+          val outPoint = inputRef.outPoint
+          val output = inputRef.output
 
-      for {
-        banDbOpt <- bannedUtxoDAO.read(outPoint)
-        notBanned = banDbOpt match {
-          case Some(banDb) =>
-            TimeUtil.now.isAfter(banDb.bannedUntil)
-          case None => true
-        }
+          for {
+            banDbOpt <- bannedUtxoDAO.read(outPoint)
+            notBanned = banDbOpt match {
+              case Some(banDb) =>
+                TimeUtil.now.isAfter(banDb.bannedUntil)
+              case None => true
+            }
 
-        txResult <- bitcoind.getRawTransaction(outPoint.txIdBE)
-        txOutT = Try(txResult.vout(outPoint.vout.toInt))
-        isRealInput = txOutT match {
-          case Failure(_) => false
-          case Success(out) =>
-            val spk = ScriptPubKey.fromAsmHex(out.scriptPubKey.hex)
-            TransactionOutput(out.value, spk) == output
-        }
-        isConfirmed = txResult.confirmations.exists(_ > 0)
+            txResult <- bitcoind.getRawTransaction(outPoint.txIdBE)
+            txOutT = Try(txResult.vout(outPoint.vout.toInt))
+            isRealInput = txOutT match {
+              case Failure(_) => false
+              case Success(out) =>
+                val spk = ScriptPubKey.fromAsmHex(out.scriptPubKey.hex)
+                TransactionOutput(out.value, spk) == output
+            }
+            isConfirmed = txResult.confirmations.exists(_ > 0)
+            isRemix <- roundDAO.hasTxId(outPoint.txIdBE)
+            validConfs = isConfirmed || isRemix
 
-        aliceDb <- aliceDbF
-        peerNonce = aliceDb match {
-          case Some(db) => db.nonce
-          case None =>
-            throw new IllegalArgumentException(
-              s"No alice found with ${peerId.hex}")
-        }
-        validProof = InputReference.verifyInputProof(inputRef, peerNonce)
-      } yield notBanned && isRealInput && validProof && isConfirmed
+            validRemix =
+              if (isRemix) {
+                // if we are remixing, can only have one input
+                val singleInput = registerInputs.inputs.size == 1
+                // make sure it wasn't a change output
+                val isMixUtxo = output.value == config.remixAmount
+                val noChange = registerInputs.changeSpkOpt.isEmpty
+
+                singleInput && isMixUtxo && noChange
+              } else true
+
+            aliceDb <- aliceDbF
+            peerNonce = aliceDb match {
+              case Some(db) => db.nonce
+              case None =>
+                throw new IllegalArgumentException(
+                  s"No alice found with ${peerId.hex}")
+            }
+            validProof = InputReference.verifyInputProof(inputRef, peerNonce)
+          } yield notBanned && isRealInput && validProof && validConfs && validRemix
+        } else Future.successful(false)
     }
 
     val f = for {
-      verifyInputs <- Future.sequence(verifyInputFs)
+      validInputs <- validInputsF
       roundDb <- roundDbF
-    } yield (verifyInputs, roundDb)
+    } yield (validInputs, roundDb)
 
-    f.flatMap { case (verifyInputVec, roundDb) =>
-      val validInputs = verifyInputVec.forall(v => v)
-
-      val inputAmt = registerInputs.inputs.map(_.output.value).sum
-      val inputFees = Satoshis(registerInputs.inputs.size) * roundDb.inputFee
-      val onChainFees = inputFees + roundDb.outputFee
-      val excess = inputAmt - roundDb.amount - roundDb.mixFee - onChainFees
-
+    f.flatMap { case (validInputs, roundDb) =>
       // if change make sure it is of correct type
       val validChange = registerInputs.changeSpkOpt.forall(
         _.scriptType == config.changeScriptType)
+
+      val inputAmt = registerInputs.inputs.map(_.output.value).sum
+      val changeE = calculateChangeOutput(roundDb,
+                                          registerInputs.inputs.size,
+                                          inputAmt,
+                                          registerInputs.changeSpkOpt)
+      val excess = changeE match {
+        case Left(amt)     => amt
+        case Right(output) => output.value
+      }
 
       val enoughFunding = excess >= Satoshis.zero
 

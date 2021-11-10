@@ -165,9 +165,7 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
         val onChainFees = inputFees + outputFees
         val changeAmt = selectedAmt - round.amount - round.mixFee - onChainFees
 
-        require(
-          changeAmt > Policy.dustThreshold,
-          s"Not enough coins selected, need ${changeAmt - Policy.dustThreshold} more, total selected $selectedAmt")
+        val needsChange = changeAmt > Policy.dustThreshold
 
         for {
           handler <- handlerP.future
@@ -178,7 +176,9 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
             InputReference(outRef, proof)
           }
 
-          changeAddr <- vortexWallet.getChangeAddress
+          changeAddrOpt <-
+            if (needsChange) vortexWallet.getChangeAddress.map(Some(_))
+            else FutureUtil.none
 
           channelDetails <- vortexWallet.initChannelOpen(
             nodeId = scheduled.nodeId,
@@ -202,7 +202,7 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
             inputs = outputRefs,
             nodeId = scheduled.nodeId,
             peerAddrOpt = scheduled.peerAddrOpt,
-            changeSpk = changeAddr.scriptPubKey,
+            changeSpkOpt = changeAddrOpt.map(_.scriptPubKey),
             chanId = channelDetails.id,
             mixOutput = mixOutput,
             tweaks = tweaks
@@ -212,7 +212,7 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
 
           handler ! RegisterInputs(inputRefs,
                                    challenge,
-                                   Some(changeAddr.scriptPubKey))
+                                   changeAddrOpt.map(_.scriptPubKey))
         }
     }
   }
@@ -268,13 +268,22 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
         // should we care if they don't have our inputs?
         lazy val missingInputs = myOutpoints.filterNot(txOutpoints.contains)
 
-        lazy val hasCorrectChange = state.expectedAmtBackOpt match {
-          case Some(changeAmt) =>
-            val outputOpt =
-              tx.outputs.find(_.scriptPubKey == state.initDetails.changeSpk)
-            outputOpt.exists(_.value >= changeAmt)
-          case None => true
-        }
+        lazy val hasCorrectChange =
+          (state.expectedAmtBackOpt, state.initDetails.changeSpkOpt) match {
+            case (Some(changeAmt), Some(changeSpk)) =>
+              val outputOpt =
+                tx.outputs.find(_.scriptPubKey == changeSpk)
+              outputOpt.exists(_.value >= changeAmt)
+            case (None, None) => true
+            case (Some(_), None) =>
+              logger.error(
+                "Incorrect state expecting change when having no change address")
+              false
+            case (None, Some(_)) =>
+              logger.error(
+                "Incorrect state has change address when expecting no change")
+              false
+          }
 
         lazy val hasMixOutput = tx.outputs.contains(state.initDetails.mixOutput)
 
