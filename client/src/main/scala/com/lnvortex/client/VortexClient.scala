@@ -31,7 +31,7 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
     with Logging {
   import system.dispatcher
 
-  private var handlerP = Promise[ActorRef]()
+  private[client] var handlerP = Promise[ActorRef]()
 
   private var roundDetails: RoundDetails = NoDetails
 

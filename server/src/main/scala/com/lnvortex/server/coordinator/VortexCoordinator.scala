@@ -310,7 +310,6 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       updated = aliceDb.unregister()
       _ <- aliceDAO.update(updated)
       _ <- inputsDAO.deleteByPeerId(updated.peerId, updated.roundId)
-      _ = connectionHandlerMap.remove(updated.peerId)
       _ = signedPMap.remove(updated.peerId)
     } yield ()
   }

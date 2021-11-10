@@ -1,5 +1,6 @@
 package com.lnvortex.client
 
+import akka.testkit.TestActorRef
 import com.lnvortex.client.VortexClient.knownVersions
 import com.lnvortex.client.VortexClientException._
 import com.lnvortex.core._
@@ -38,6 +39,27 @@ class VortexClientTest extends VortexClientFixture {
           assertThrows[RuntimeException](
             vortexClient.setRound(dummyMix.copy(version = version)))
       }
+  }
+
+  it must "cancel a registration" in { vortexClient =>
+    val lnd = vortexClient.vortexWallet
+
+    for {
+      nodeId <- lnd.lndRpcClient.nodeId
+      utxos <- vortexClient.listCoins
+      refs = utxos.map(_.outputReference)
+
+      testState = InputsScheduled(round = dummyMix,
+                                  nonce = nonce,
+                                  inputs = refs,
+                                  nodeId = nodeId,
+                                  peerAddrOpt = None)
+      _ = vortexClient.setRoundDetails(testState)
+
+      _ = vortexClient.handlerP.success(TestActorRef("test"))
+      _ <- vortexClient.cancelRegistration()
+    } yield assert(
+      vortexClient.getCurrentRoundDetails == ReceivedNonce(dummyMix, nonce))
   }
 
   it must "fail to sign a psbt with no channel" in { vortexClient =>
