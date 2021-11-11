@@ -320,12 +320,6 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
     logger.info(s"Alice ${peerId.hex} is registering inputs")
     logger.debug(s"Alice's ${peerId.hex} inputs $registerInputs")
 
-    require(
-      registerInputs.inputs.forall(
-        _.output.scriptPubKey.scriptType == config.inputScriptType),
-      s"${peerId.hex} attempted to register non ${config.inputScriptType} inputs"
-    )
-
     val roundDbF = currentRound().map { roundDb =>
       if (roundDb.status != RegisterAlices)
         throw new IllegalStateException(
@@ -335,11 +329,17 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
 
     val aliceDbF = aliceDAO.read(peerId)
 
+    val otherInputDbsF =
+      roundDbF.flatMap(db => inputsDAO.findByRoundId(db.roundId))
+
     val validInputsF = FutureUtil.foldLeftAsync(true, registerInputs.inputs) {
       case (accum, inputRef) =>
         if (accum) {
           val outPoint = inputRef.outPoint
           val output = inputRef.output
+
+          val correctScriptType =
+            inputRef.output.scriptPubKey.scriptType == config.inputScriptType
 
           for {
             banDbOpt <- bannedUtxoDAO.read(outPoint)
@@ -380,19 +380,33 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
                   s"No alice found with ${peerId.hex}")
             }
             validProof = InputReference.verifyInputProof(inputRef, peerNonce)
-          } yield notBanned && isRealInput && validProof && validConfs && validRemix
+
+            otherInputs <- otherInputDbsF
+
+            uniqueSpk = !otherInputs
+              .map(_.output.scriptPubKey)
+              .contains(inputRef.output.scriptPubKey)
+
+          } yield correctScriptType && notBanned && isRealInput && validProof && validConfs && validRemix && uniqueSpk
         } else Future.successful(false)
     }
 
     val f = for {
       validInputs <- validInputsF
+      otherInputDbs <- otherInputDbsF
       roundDb <- roundDbF
-    } yield (validInputs, roundDb)
+    } yield (validInputs, otherInputDbs, roundDb)
 
-    f.flatMap { case (validInputs, roundDb) =>
+    f.flatMap { case (validInputs, otherInputDbs, roundDb) =>
+      val uniqueChangeSpk = registerInputs.changeSpkOpt.forall { spk =>
+        !otherInputDbs
+          .map(_.output.scriptPubKey)
+          .contains(spk)
+      }
+
       // if change make sure it is of correct type
       val validChange = registerInputs.changeSpkOpt.forall(
-        _.scriptType == config.changeScriptType)
+        _.scriptType == config.changeScriptType) && uniqueChangeSpk
 
       val inputAmt = registerInputs.inputs.map(_.output.value).sum
       val changeE = calculateChangeOutput(roundDb,
@@ -406,7 +420,16 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
 
       val enoughFunding = excess >= Satoshis.zero
 
-      if (validInputs && validChange && enoughFunding) {
+      lazy val changeSpkVec = registerInputs.changeSpkOpt match {
+        case Some(spk) => Vector(spk)
+        case None      => Vector.empty
+      }
+      lazy val allSpks =
+        registerInputs.inputs.map(_.output.scriptPubKey) ++ changeSpkVec
+
+      lazy val uniqueSpks = allSpks.size == allSpks.distinct.size
+
+      if (validInputs && validChange && enoughFunding && uniqueSpks) {
         // .get is safe, validInputs will be false
         aliceDbF.map(_.get).flatMap { aliceDb =>
           val sig =
@@ -454,6 +477,9 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
         } else if (!enoughFunding) {
           new NotEnoughFundingException(
             s"Alice registered with not enough funding, need $excess more")
+        } else if (!uniqueSpks) {
+          new AttemptedAddressReuseException(
+            s"Cannot have duplicate spks, got $allSpks")
         } else {
           new IllegalArgumentException("Alice registered with invalid inputs")
         }
@@ -472,6 +498,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
     val validSpk = bob.output.scriptPubKey.scriptType == config.mixScriptType
     lazy val validSig = bob.verifySig(publicKey, currentRoundId)
 
+    // todo verify address has never been in any tx
     if (validSpk && validSig) {
       val db = RegisteredOutputDb(bob.output, bob.sig, currentRoundId)
       for {
@@ -484,6 +511,20 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
             throw new InvalidMixOutputAmountException(
               s"Output given is incorrect amount, got ${bob.output.value} expected ${round.amount}")
         }
+
+        aliceDbs <- aliceDAO.findByRoundId(round.roundId)
+        inputDbs <- inputsDAO.findByRoundId(round.roundId)
+        spks = inputDbs.map(_.output.scriptPubKey) ++ aliceDbs.flatMap(
+          _.changeSpkOpt)
+        bobAddr = BitcoinAddress.fromScriptPubKey(bob.output.scriptPubKey,
+                                                  config.network)
+        _ <-
+          if (spks.contains(bob.output.scriptPubKey)) {
+            Future.failed(
+              new InvalidMixOutputScriptPubKeyException(
+                s"$bobAddr already registered as an input"))
+          } else Future.unit
+
         _ <- outputsDAO.create(db)
 
         registeredAlices <- aliceDAO.numRegisteredForRound(currentRoundId)

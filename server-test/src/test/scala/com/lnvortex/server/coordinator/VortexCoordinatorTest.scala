@@ -19,13 +19,24 @@ import org.bitcoins.rpc.BitcoindException.InvalidAddressOrKey
 import org.bitcoins.testkit.EmbeddedPg
 import org.bitcoins.testkitcore.Implicits.GeneratorOps
 
-import scala.concurrent.Future
+import scala.concurrent.duration.DurationInt
+import scala.concurrent.{Await, Future}
 
 class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
   behavior of "VortexCoordinator"
 
   val badPeerId: Sha256Digest = Sha256Digest(
     "ded8ab0e14ee02492b1008f72a0a3a5abac201c731b7e71a92d36dc2db160d53")
+
+  before {
+    val f = for {
+      bitcoind <- cachedBitcoindWithFundsF
+      addr <- bitcoind.getNewAddress
+      _ <- bitcoind.generateToAddress(6, addr)
+    } yield ()
+
+    Await.result(f, 30.seconds)
+  }
 
   it must "has the proper variable set after creating a new round" in {
     coordinator =>
@@ -67,6 +78,122 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
 
       _ <- coordinator.registerAlice(Sha256Digest.empty, registerInputs)
     } yield succeed
+  }
+
+  it must "fail to register inputs with duplicate change addresses" in {
+    coordinator =>
+      val bitcoind = coordinator.bitcoind
+      for {
+        aliceDb <- coordinator.getNonce(Sha256Digest.empty,
+                                        TestActorRef("test"),
+                                        AskNonce(coordinator.getCurrentRoundId))
+        _ <- coordinator.beginInputRegistration()
+
+        utxo <- bitcoind.listUnspent.map(_.head)
+        outputRef = {
+          val outpoint = TransactionOutPoint(utxo.txid, UInt32(utxo.vout))
+          val output = TransactionOutput(utxo.amount, utxo.scriptPubKey.get)
+          OutputReference(outpoint, output)
+        }
+        tx = InputReference.constructInputProofTx(outputRef, aliceDb.nonce)
+        signed <- bitcoind.walletProcessPSBT(PSBT.fromUnsignedTx(tx))
+        proof =
+          signed.psbt.inputMaps.head.finalizedScriptWitnessOpt.get.scriptWitness
+
+        inputRef = InputReference(outputRef, proof)
+
+        blind = ECPrivateKey.freshPrivateKey.fieldElement
+        registerInputs = RegisterInputs(Vector(inputRef),
+                                        blind,
+                                        utxo.scriptPubKey)
+
+        res <- recoverToSucceededIf[AttemptedAddressReuseException](
+          coordinator.registerAlice(Sha256Digest.empty, registerInputs))
+      } yield res
+  }
+
+  it must "fail to register inputs with reused addresses" in { coordinator =>
+    val bitcoind = coordinator.bitcoind
+
+    val otherPeerId = Sha256Digest(
+      "8140e6dbfe062fb23ec84a3f2c5ec19b5e0566cfd0b88082a7042ec82d1a6593")
+
+    for {
+      _ <- coordinator.getNonce(otherPeerId,
+                                TestActorRef("test1"),
+                                AskNonce(coordinator.getCurrentRoundId))
+      aliceDb <- coordinator.getNonce(Sha256Digest.empty,
+                                      TestActorRef("test"),
+                                      AskNonce(coordinator.getCurrentRoundId))
+      _ <- coordinator.beginInputRegistration()
+
+      utxo <- bitcoind.listUnspent.map(_.head)
+      outputRef = {
+        val outpoint = TransactionOutPoint(utxo.txid, UInt32(utxo.vout))
+        val output = TransactionOutput(utxo.amount, utxo.scriptPubKey.get)
+        OutputReference(outpoint, output)
+      }
+
+      // create a db with the same spk
+      badDb = RegisteredInputDb(
+        EmptyTransactionOutPoint,
+        outputRef.output,
+        EmptyScriptWitness,
+        None,
+        coordinator.getCurrentRoundId,
+        otherPeerId
+      )
+      _ <- coordinator.inputsDAO.create(badDb)
+
+      tx = InputReference.constructInputProofTx(outputRef, aliceDb.nonce)
+      signed <- bitcoind.walletProcessPSBT(PSBT.fromUnsignedTx(tx))
+      proof =
+        signed.psbt.inputMaps.head.finalizedScriptWitnessOpt.get.scriptWitness
+
+      inputRef = InputReference(outputRef, proof)
+
+      blind = ECPrivateKey.freshPrivateKey.fieldElement
+      registerInputs = RegisterInputs(Vector(inputRef),
+                                      blind,
+                                      utxo.scriptPubKey)
+
+      res <- recoverToSucceededIf[InvalidInputsException](
+        coordinator.registerAlice(Sha256Digest.empty, registerInputs))
+    } yield res
+  }
+
+  it must "fail to register inputs with wrong script types" in { coordinator =>
+    val bitcoind = coordinator.bitcoind
+    for {
+      aliceDb <- coordinator.getNonce(Sha256Digest.empty,
+                                      TestActorRef("test"),
+                                      AskNonce(coordinator.getCurrentRoundId))
+      _ <- coordinator.beginInputRegistration()
+
+      legacyAddr <- bitcoind.getNewAddress(AddressType.Legacy)
+
+      utxo <- bitcoind.listUnspent.map(_.head)
+      outputRef = {
+        val outpoint = TransactionOutPoint(utxo.txid, UInt32(utxo.vout))
+        val output = TransactionOutput(utxo.amount, legacyAddr.scriptPubKey)
+        OutputReference(outpoint, output)
+      }
+      tx = InputReference.constructInputProofTx(outputRef, aliceDb.nonce)
+      signed <- bitcoind.walletProcessPSBT(PSBT.fromUnsignedTx(tx))
+      proof =
+        signed.psbt.inputMaps.head.finalizedScriptWitnessOpt.get.scriptWitness
+
+      inputRef = InputReference(outputRef, proof)
+      addr <- bitcoind.getNewAddress
+
+      blind = ECPrivateKey.freshPrivateKey.fieldElement
+      registerInputs = RegisterInputs(Vector(inputRef),
+                                      blind,
+                                      Some(addr.scriptPubKey))
+
+      res <- recoverToSucceededIf[InvalidInputsException](
+        coordinator.registerAlice(Sha256Digest.empty, registerInputs))
+    } yield res
   }
 
   it must "fail to register inputs with not enough funding" in { coordinator =>
@@ -143,9 +270,6 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
 
       res <- recoverToSucceededIf[InvalidInputsException](
         coordinator.registerAlice(Sha256Digest.empty, registerInputs))
-
-      // clean up for future tests
-      _ <- bitcoind.generateToAddress(6, addr)
     } yield res
   }
 
@@ -265,27 +389,34 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
 
   it must "fail to register inputs with invalid proofs" in { coordinator =>
     val bitcoind = coordinator.bitcoind
-    val genInputs = Generators.registerInputs.sampleSome
+
     for {
       _ <- coordinator.getNonce(Sha256Digest.empty,
                                 TestActorRef("test"),
                                 AskNonce(coordinator.getCurrentRoundId))
       _ <- coordinator.beginInputRegistration()
 
-      unspent <- bitcoind.listUnspent
-      inputRefs = unspent.map { utxo =>
+      utxo <- bitcoind.listUnspent.map(_.head)
+      outputRef = {
         val outpoint = TransactionOutPoint(utxo.txid, UInt32(utxo.vout))
         val output = TransactionOutput(utxo.amount, utxo.scriptPubKey.get)
-
-        InputReference(outpoint,
-                       output,
-                       P2WPKHWitnessV0(ECPublicKey.freshPublicKey))
+        OutputReference(outpoint, output)
       }
+      proof = P2WPKHWitnessV0(ECPublicKey.freshPublicKey)
+
+      inputRef = InputReference(outputRef, proof)
+      addr <- bitcoind.getNewAddress
+
+      blind = ECPrivateKey.freshPrivateKey.fieldElement
+      registerInputs = RegisterInputs(Vector(inputRef),
+                                      blind,
+                                      Some(addr.scriptPubKey))
+
       res <- recoverToSucceededIf[InvalidInputsException](
-        coordinator.registerAlice(Sha256Digest.empty,
-                                  genInputs.copy(inputs = inputRefs)))
+        coordinator.registerAlice(Sha256Digest.empty, registerInputs))
     } yield res
   }
+
   it must "fail to register inputs when in an invalid state" in { coordinator =>
     val bitcoind = coordinator.bitcoind
     for {
@@ -484,6 +615,112 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
       res <- recoverToSucceededIf[InvalidOutputSignatureException](
         coordinator.verifyAndRegisterBob(RegisterMixOutput(sig, mixOutput)))
     } yield res
+  }
+
+  it must "fail to register an output with a reused change address" in {
+    coordinator =>
+      val bitcoind = coordinator.bitcoind
+      for {
+        aliceDb <- coordinator.getNonce(Sha256Digest.empty,
+                                        TestActorRef("test"),
+                                        AskNonce(coordinator.getCurrentRoundId))
+        _ <- coordinator.beginInputRegistration()
+
+        utxo <- bitcoind.listUnspent.map(_.head)
+        outputRef = {
+          val outpoint = TransactionOutPoint(utxo.txid, UInt32(utxo.vout))
+          val output = TransactionOutput(utxo.amount, utxo.scriptPubKey.get)
+          OutputReference(outpoint, output)
+        }
+        tx = InputReference.constructInputProofTx(outputRef, aliceDb.nonce)
+        signed <- bitcoind.walletProcessPSBT(PSBT.fromUnsignedTx(tx))
+        proof =
+          signed.psbt.inputMaps.head.finalizedScriptWitnessOpt.get.scriptWitness
+
+        inputRef = InputReference(outputRef, proof)
+        addr <- bitcoind.getNewAddress
+
+        tweaks = freshBlindingTweaks(signerPubKey = coordinator.publicKey,
+                                     signerNonce = aliceDb.nonce)
+
+        // change change addr spk
+        mixOutput = TransactionOutput(coordinator.config.mixAmount,
+                                      addr.scriptPubKey)
+        challenge = RegisterMixOutput.calculateChallenge(
+          mixOutput,
+          coordinator.getCurrentRoundId)
+        blind = BlindSchnorrUtil.generateChallenge(coordinator.publicKey,
+                                                   aliceDb.nonce,
+                                                   tweaks,
+                                                   challenge)
+
+        registerInputs = RegisterInputs(Vector(inputRef),
+                                        blind,
+                                        Some(addr.scriptPubKey))
+        blindSig <- coordinator.registerAlice(Sha256Digest.empty,
+                                              registerInputs)
+        sig = BlindSchnorrUtil.unblindSignature(blindSig,
+                                                coordinator.publicKey,
+                                                aliceDb.nonce,
+                                                tweaks,
+                                                challenge)
+        _ <- coordinator.beginOutputRegistration()
+        res <- recoverToSucceededIf[InvalidMixOutputScriptPubKeyException](
+          coordinator.verifyAndRegisterBob(RegisterMixOutput(sig, mixOutput)))
+      } yield res
+  }
+
+  it must "fail to register an output with a reused input address" in {
+    coordinator =>
+      val bitcoind = coordinator.bitcoind
+      for {
+        aliceDb <- coordinator.getNonce(Sha256Digest.empty,
+                                        TestActorRef("test"),
+                                        AskNonce(coordinator.getCurrentRoundId))
+        _ <- coordinator.beginInputRegistration()
+
+        utxo <- bitcoind.listUnspent.map(_.head)
+        outputRef = {
+          val outpoint = TransactionOutPoint(utxo.txid, UInt32(utxo.vout))
+          val output = TransactionOutput(utxo.amount, utxo.scriptPubKey.get)
+          OutputReference(outpoint, output)
+        }
+        tx = InputReference.constructInputProofTx(outputRef, aliceDb.nonce)
+        signed <- bitcoind.walletProcessPSBT(PSBT.fromUnsignedTx(tx))
+        proof =
+          signed.psbt.inputMaps.head.finalizedScriptWitnessOpt.get.scriptWitness
+
+        inputRef = InputReference(outputRef, proof)
+        addr <- bitcoind.getNewAddress
+
+        tweaks = freshBlindingTweaks(signerPubKey = coordinator.publicKey,
+                                     signerNonce = aliceDb.nonce)
+
+        // use input's spk
+        mixOutput = TransactionOutput(coordinator.config.mixAmount,
+                                      outputRef.output.scriptPubKey)
+        challenge = RegisterMixOutput.calculateChallenge(
+          mixOutput,
+          coordinator.getCurrentRoundId)
+        blind = BlindSchnorrUtil.generateChallenge(coordinator.publicKey,
+                                                   aliceDb.nonce,
+                                                   tweaks,
+                                                   challenge)
+
+        registerInputs = RegisterInputs(Vector(inputRef),
+                                        blind,
+                                        Some(addr.scriptPubKey))
+        blindSig <- coordinator.registerAlice(Sha256Digest.empty,
+                                              registerInputs)
+        sig = BlindSchnorrUtil.unblindSignature(blindSig,
+                                                coordinator.publicKey,
+                                                aliceDb.nonce,
+                                                tweaks,
+                                                challenge)
+        _ <- coordinator.beginOutputRegistration()
+        res <- recoverToSucceededIf[InvalidMixOutputScriptPubKeyException](
+          coordinator.verifyAndRegisterBob(RegisterMixOutput(sig, mixOutput)))
+      } yield res
   }
 
   it must "fail to register a non-p2wsh output" in { coordinator =>

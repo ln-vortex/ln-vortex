@@ -16,6 +16,9 @@ object VortexServerException {
   class NotEnoughFundingException(private val reason: String)
       extends VortexServerException(reason)
 
+  class AttemptedAddressReuseException(private val reason: String)
+      extends VortexServerException(reason)
+
   class InvalidBlindChallengeException(private val reason: String)
       extends VortexServerException(reason)
 
