@@ -128,6 +128,15 @@ object Deps {
          Compile.akkaActor,
          Compile.bitcoinsCore)
 
+  val client: List[ModuleID] = List(
+    Compile.bitcoinsTor,
+    Compile.akkaActor,
+    Compile.akkaHttp,
+    Compile.akkaStream,
+    Compile.akkaSlf4j,
+    Compile.grizzledSlf4j
+  )
+
   val backend: List[ModuleID] = List(
     Compile.bitcoinsTor,
     Compile.bitcoinsDbCommons,

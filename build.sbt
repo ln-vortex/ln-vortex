@@ -140,7 +140,7 @@ lazy val coreTest = project
 lazy val client = project
   .in(file("client"))
   .settings(CommonSettings.settings: _*)
-  .settings(name := "client", libraryDependencies ++= Deps.backend)
+  .settings(name := "client", libraryDependencies ++= Deps.client)
   .dependsOn(core)
 
 lazy val clientTest = project

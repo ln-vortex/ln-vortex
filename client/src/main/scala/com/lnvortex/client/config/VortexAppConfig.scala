@@ -5,7 +5,6 @@ import com.typesafe.config.Config
 import grizzled.slf4j.Logging
 import org.bitcoins.commons.config._
 import org.bitcoins.core.util.{FutureUtil, NetworkUtil}
-import org.bitcoins.db._
 import org.bitcoins.tor.config.TorAppConfig
 import org.bitcoins.tor.{Socks5ProxyParams, TorParams}
 
@@ -22,19 +21,13 @@ import scala.util.Properties
 case class VortexAppConfig(
     private val directory: Path,
     private val conf: Config*)(implicit system: ActorSystem)
-    extends DbAppConfig
-    with JdbcProfileComponent[VortexAppConfig]
-    with DbManagement
+    extends AppConfig
     with Logging {
   import system.dispatcher
 
   override val configOverrides: List[Config] = conf.toList
   override val moduleName: String = VortexAppConfig.moduleName
   override type ConfigType = VortexAppConfig
-
-  override val appConfig: VortexAppConfig = this
-
-  import profile.api._
 
   override def newConfigOfType(configs: Seq[Config]): VortexAppConfig =
     VortexAppConfig(directory, configs: _*)
@@ -57,8 +50,6 @@ case class VortexAppConfig(
     val str = config.getString(s"$moduleName.coordinator")
     NetworkUtil.parseInetSocketAddress(str, 12523)
   }
-
-  override lazy val allTables: List[TableQuery[Table[_]]] = List.empty
 }
 
 object VortexAppConfig
