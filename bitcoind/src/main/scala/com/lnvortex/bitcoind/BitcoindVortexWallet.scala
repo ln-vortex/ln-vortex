@@ -12,7 +12,7 @@ import org.bitcoins.core.protocol.ln.node.NodeId
 import org.bitcoins.core.protocol.script.ScriptWitness
 import org.bitcoins.core.protocol.transaction._
 import org.bitcoins.core.psbt.PSBT
-import org.bitcoins.crypto.SchnorrNonce
+import org.bitcoins.crypto.{DoubleSha256DigestBE, SchnorrNonce}
 import org.bitcoins.rpc.client.common.BitcoindRpcClient
 import scodec.bits.ByteVector
 
@@ -102,6 +102,11 @@ case class BitcoindVortexWallet(
 
   override def broadcastTransaction(transaction: Transaction): Future[Unit] =
     bitcoind.broadcastTransaction(transaction)
+
+  override def labelTransaction(
+      txId: DoubleSha256DigestBE,
+      label: String): Future[Unit] =
+    Future.unit // bitcoind doesn't have tx labeling
 
   override def initChannelOpen(
       nodeId: NodeId,

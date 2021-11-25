@@ -355,6 +355,7 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
         logger.info("Round complete!!")
         for {
           _ <- vortexWallet.broadcastTransaction(signedTx)
+          _ <- vortexWallet.labelTransaction(signedTx.txIdBE, "LnVortex Mix")
           _ <- stop()
           _ <- getNewRound
         } yield ()

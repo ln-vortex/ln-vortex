@@ -83,6 +83,10 @@ case class CLightningVortexWallet(clightning: CLightningRpcClient)(implicit
   override def broadcastTransaction(transaction: Transaction): Future[Unit] =
     Future.unit
 
+  override def labelTransaction(
+      txId: DoubleSha256DigestBE,
+      label: String): Future[Unit] = Future.unit
+
   override def initChannelOpen(
       nodeId: NodeId,
       peerAddrOpt: Option[InetSocketAddress],
