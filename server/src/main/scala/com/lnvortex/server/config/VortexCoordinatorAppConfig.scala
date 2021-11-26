@@ -1,6 +1,7 @@
 package com.lnvortex.server.config
 
 import akka.actor.ActorSystem
+import com.lnvortex.core.InputRegistrationType
 import com.lnvortex.server.models._
 import com.typesafe.config.Config
 import grizzled.slf4j.Logging
@@ -90,6 +91,11 @@ case class VortexCoordinatorAppConfig(
   lazy val aesPasswordOpt: Option[AesPassword] = kmConf.aesPasswordOpt
   lazy val bip39PasswordOpt: Option[String] = kmConf.bip39PasswordOpt
 
+  lazy val inputRegType: InputRegistrationType = {
+    val int = config.getInt(s"$moduleName.inputRegType")
+    InputRegistrationType.fromInt(int)
+  }
+
   lazy val inputScriptType: ScriptType = {
     val str = config.getString(s"$moduleName.inputScriptType")
     ScriptType.fromString(str)
@@ -105,8 +111,12 @@ case class VortexCoordinatorAppConfig(
     ScriptType.fromString(str)
   }
 
-  lazy val maxPeers: Int = {
-    config.getInt(s"$moduleName.maxPeers")
+  lazy val remixPeers: Int = {
+    config.getInt(s"$moduleName.remixPeers")
+  }
+
+  lazy val newPeers: Int = {
+    config.getInt(s"$moduleName.newPeers")
   }
 
   lazy val remixAmount: Satoshis = {

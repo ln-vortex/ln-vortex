@@ -1,5 +1,6 @@
 package com.lnvortex.core.gen
 
+import com.lnvortex.core.InputRegistrationType._
 import com.lnvortex.core._
 import org.bitcoins.core.protocol.script.EmptyScriptPubKey
 import org.bitcoins.core.protocol.transaction.OutputReference
@@ -7,6 +8,9 @@ import org.bitcoins.testkitcore.gen._
 import org.scalacheck.Gen
 
 object Generators {
+
+  def inputRegistrationType: Gen[InputRegistrationType] =
+    Gen.oneOf(AsyncInputRegistrationType, SynchronousInputRegistrationType)
 
   def askMixDetails: Gen[AskMixDetails] = {
     for {
@@ -20,12 +24,13 @@ object Generators {
     for {
       version <- NumberGenerator.uInt16
       roundId <- CryptoGenerators.doubleSha256Digest
+      regType <- inputRegistrationType
       amount <- CurrencyUnitGenerator.positiveSatoshis
       mixFee <- CurrencyUnitGenerator.positiveSatoshis
       pubkey <- CryptoGenerators.schnorrPublicKey
       time <- NumberGenerator.uInt64
     } yield {
-      MixDetails(version, roundId, amount, mixFee, pubkey, time)
+      MixDetails(version, roundId, regType, amount, mixFee, pubkey, time)
     }
   }
 

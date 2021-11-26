@@ -1,6 +1,7 @@
 package com.lnvortex.server.coordinator
 
 import akka.actor._
+import com.lnvortex.core.InputRegistrationType._
 import com.lnvortex.core.RoundStatus._
 import com.lnvortex.core._
 import com.lnvortex.server.VortexServerException._
@@ -40,6 +41,15 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
 
   require(bitcoind.instance.network == config.network,
           "Bitcoind on different network")
+
+  config.inputRegType match {
+    case AsyncInputRegistrationType =>
+      require(config.newPeers > 0)
+      require(config.remixPeers > 0)
+    case SynchronousInputRegistrationType =>
+      require(config.remixPeers > 0)
+      require(config.newPeers == 0)
+  }
 
   final val version = UInt16.zero
 
@@ -91,6 +101,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
     MixDetails(
       version = version,
       roundId = currentRoundId,
+      inputRegistrationType = config.inputRegType,
       amount = config.mixAmount,
       mixFee = config.mixFee,
       publicKey = publicKey,
@@ -226,12 +237,18 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       updated = roundDb.copy(status = RegisterOutputs)
       _ <- roundDAO.update(updated)
 
-      peerSigMap <- aliceDAO.getPeerIdSigMap(currentRoundId)
+      (newPeers, remixPeers) <- aliceDAO.getSortedAlices(currentRoundId)
     } yield {
       system.scheduler.scheduleOnce(config.outputRegistrationTime) {
         outputsRegisteredP.success(())
         ()
       }
+
+      val sortedNewPeers = newPeers.take(config.newPeers)
+      val sortedMixPeers = remixPeers.take(config.remixPeers)
+
+      val peerSigMap = (sortedNewPeers ++ sortedMixPeers).map(t =>
+        (t.peerId, t.blindOutputSigOpt.get))
 
       logger.info(s"Sending blinded sigs to ${peerSigMap.size} peers")
       peerSigMap.foreach { case (peerId, sig) =>
@@ -287,7 +304,8 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
         connectionHandlerMap.put(peerId, connectionHandler)
 
         aliceDAO.create(aliceDb).flatMap { db =>
-          if (connectionHandlerMap.values.size >= config.maxPeers) {
+          // fixme allow input registration for normal mix
+          if (connectionHandlerMap.values.size >= config.remixPeers) {
             beginInputRegistration().map(_ => db)
           } else Future.successful(db)
         }
@@ -332,72 +350,79 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
     val otherInputDbsF =
       roundDbF.flatMap(db => inputsDAO.findByRoundId(db.roundId))
 
-    val validInputsF = FutureUtil.foldLeftAsync(true, registerInputs.inputs) {
-      case (accum, inputRef) =>
-        if (accum) {
-          val outPoint = inputRef.outPoint
-          val output = inputRef.output
+    val init: Option[Int] = None
+    val validInputsAndConfsF =
+      FutureUtil.foldLeftAsync((true, init), registerInputs.inputs) {
+        case (accum, inputRef) =>
+          if (accum._1) {
+            val outPoint = inputRef.outPoint
+            val output = inputRef.output
 
-          val correctScriptType =
-            inputRef.output.scriptPubKey.scriptType == config.inputScriptType
+            val correctScriptType =
+              inputRef.output.scriptPubKey.scriptType == config.inputScriptType
 
-          for {
-            banDbOpt <- bannedUtxoDAO.read(outPoint)
-            notBanned = banDbOpt match {
-              case Some(banDb) =>
-                TimeUtil.now.isAfter(banDb.bannedUntil)
-              case None => true
+            for {
+              banDbOpt <- bannedUtxoDAO.read(outPoint)
+              notBanned = banDbOpt match {
+                case Some(banDb) =>
+                  TimeUtil.now.isAfter(banDb.bannedUntil)
+                case None => true
+              }
+
+              txResult <- bitcoind.getRawTransaction(outPoint.txIdBE)
+              txOutT = Try(txResult.vout(outPoint.vout.toInt))
+              isRealInput = txOutT match {
+                case Failure(_) => false
+                case Success(out) =>
+                  val spk = ScriptPubKey.fromAsmHex(out.scriptPubKey.hex)
+                  TransactionOutput(out.value, spk) == output
+              }
+              isConfirmed = txResult.confirmations.exists(_ > 0)
+              isRemix <- roundDAO.hasTxId(outPoint.txIdBE)
+              validConfs = isConfirmed || isRemix
+
+              validRemix =
+                if (isRemix) {
+                  // if we are remixing, can only have one input
+                  val singleInput = registerInputs.inputs.size == 1
+                  // make sure it wasn't a change output
+                  val isMixUtxo = output.value == config.remixAmount
+                  val noChange = registerInputs.changeSpkOpt.isEmpty
+
+                  singleInput && isMixUtxo && noChange
+                } else true
+
+              aliceDb <- aliceDbF
+              peerNonce = aliceDb match {
+                case Some(db) => db.nonce
+                case None =>
+                  throw new IllegalArgumentException(
+                    s"No alice found with ${peerId.hex}")
+              }
+              validProof = InputReference.verifyInputProof(inputRef, peerNonce)
+
+              otherInputs <- otherInputDbsF
+
+              uniqueSpk = !otherInputs
+                .map(_.output.scriptPubKey)
+                .contains(inputRef.output.scriptPubKey)
+
+            } yield {
+              val valid =
+                correctScriptType && notBanned && isRealInput && validProof && validConfs && validRemix && uniqueSpk
+
+              (valid, txResult.confirmations)
             }
-
-            txResult <- bitcoind.getRawTransaction(outPoint.txIdBE)
-            txOutT = Try(txResult.vout(outPoint.vout.toInt))
-            isRealInput = txOutT match {
-              case Failure(_) => false
-              case Success(out) =>
-                val spk = ScriptPubKey.fromAsmHex(out.scriptPubKey.hex)
-                TransactionOutput(out.value, spk) == output
-            }
-            isConfirmed = txResult.confirmations.exists(_ > 0)
-            isRemix <- roundDAO.hasTxId(outPoint.txIdBE)
-            validConfs = isConfirmed || isRemix
-
-            validRemix =
-              if (isRemix) {
-                // if we are remixing, can only have one input
-                val singleInput = registerInputs.inputs.size == 1
-                // make sure it wasn't a change output
-                val isMixUtxo = output.value == config.remixAmount
-                val noChange = registerInputs.changeSpkOpt.isEmpty
-
-                singleInput && isMixUtxo && noChange
-              } else true
-
-            aliceDb <- aliceDbF
-            peerNonce = aliceDb match {
-              case Some(db) => db.nonce
-              case None =>
-                throw new IllegalArgumentException(
-                  s"No alice found with ${peerId.hex}")
-            }
-            validProof = InputReference.verifyInputProof(inputRef, peerNonce)
-
-            otherInputs <- otherInputDbsF
-
-            uniqueSpk = !otherInputs
-              .map(_.output.scriptPubKey)
-              .contains(inputRef.output.scriptPubKey)
-
-          } yield correctScriptType && notBanned && isRealInput && validProof && validConfs && validRemix && uniqueSpk
-        } else Future.successful(false)
-    }
+          } else Future.successful((false, None))
+      }
 
     val f = for {
-      validInputs <- validInputsF
+      (validInputs, confsOpt) <- validInputsAndConfsF
       otherInputDbs <- otherInputDbsF
       roundDb <- roundDbF
-    } yield (validInputs, otherInputDbs, roundDb)
+    } yield (validInputs, confsOpt, otherInputDbs, roundDb)
 
-    f.flatMap { case (validInputs, otherInputDbs, roundDb) =>
+    f.flatMap { case (validInputs, confsOpt, otherInputDbs, roundDb) =>
       val uniqueChangeSpk = registerInputs.changeSpkOpt.forall { spk =>
         !otherInputDbs
           .map(_.output.scriptPubKey)
@@ -438,12 +463,13 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
           val inputDbs = registerInputs.inputs.map(
             RegisteredInputDbs.fromInputReference(_, currentRoundId, peerId))
 
-          val updated =
-            aliceDb.setOutputValues(numInputs = inputDbs.size,
-                                    blindedOutput =
-                                      registerInputs.blindedOutput,
-                                    changeSpkOpt = registerInputs.changeSpkOpt,
-                                    blindOutputSig = sig)
+          val updated = aliceDb.setRegisterInputValues(
+            remixConfirmations = confsOpt,
+            numInputs = inputDbs.size,
+            blindedOutput = registerInputs.blindedOutput,
+            changeSpkOpt = registerInputs.changeSpkOpt,
+            blindOutputSig = sig
+          )
 
           for {
             _ <- aliceDAO.update(updated)
@@ -451,9 +477,12 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
 
             _ = logger.info(s"Alice ${peerId.hex} inputs registered")
 
-            registered <- aliceDAO.numRegisteredForRound(currentRoundId)
+            (newRegistered, remixRegistered) <- aliceDAO.numRegisteredForRound(
+              currentRoundId)
             // check if we can to stop waiting for peers
-            _ = if (registered >= config.maxPeers) {
+            _ = if (
+              newRegistered >= config.newPeers && remixRegistered >= config.remixPeers
+            ) {
               inputsRegisteredP.success(())
             }
           } yield sig
@@ -527,10 +556,11 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
 
         _ <- outputsDAO.create(db)
 
-        registeredAlices <- aliceDAO.numRegisteredForRound(currentRoundId)
+        (newRegistered, remixRegistered) <- aliceDAO.numRegisteredForRound(
+          currentRoundId)
         outputs <- outputsDAO.findByRoundId(currentRoundId)
       } yield {
-        if (outputs.size >= registeredAlices) {
+        if (outputs.size >= (newRegistered + remixRegistered)) {
           outputsRegisteredP.success(())
         }
         ()

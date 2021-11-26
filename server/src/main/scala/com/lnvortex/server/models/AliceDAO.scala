@@ -60,23 +60,54 @@ case class AliceDAO()(implicit
     safeDatabase.runVec(query.transactionally)
   }
 
-  def numRegisteredForRound(roundId: DoubleSha256Digest): Future[Int] = {
-    val query = table
-      .filter(t => t.roundId === roundId && t.blindOutputSigOpt.isDefined)
+  /** @param roundId Id for round
+    * @return (new peers, remix peers)
+    */
+  def numRegisteredForRound(roundId: DoubleSha256Digest): Future[(Int, Int)] = {
+    val newPeersQuery = table
+      .filter(t =>
+        t.roundId === roundId && t.blindOutputSigOpt.isDefined && t.remixConfirmations.isEmpty)
       .map(_.peerId)
       .distinct
       .size
 
-    safeDatabase.run(query.result.transactionally)
+    val newPeersF = safeDatabase.run(newPeersQuery.result.transactionally)
+
+    val remixQuery = table
+      .filter(t =>
+        t.roundId === roundId && t.blindOutputSigOpt.isDefined && t.remixConfirmations.isDefined)
+      .map(_.peerId)
+      .distinct
+      .size
+
+    val remixF = safeDatabase.run(remixQuery.result.transactionally)
+
+    for {
+      newPeers <- newPeersF
+      remix <- remixF
+    } yield (newPeers, remix)
   }
 
-  def getPeerIdSigMap(roundId: DoubleSha256Digest): Future[
-    Vector[(Sha256Digest, FieldElement)]] = {
+  /** @param roundId id for the found
+    * @return (new peers, remix peers)
+    */
+  def getSortedAlices(roundId: DoubleSha256Digest): Future[
+    (Vector[AliceDb], Vector[AliceDb])] = {
     val query = table
       .filter(t => t.roundId === roundId && t.blindOutputSigOpt.isDefined)
-      .map(t => (t.peerId, t.blindOutputSigOpt.get))
 
-    safeDatabase.runVec(query.result.transactionally)
+    safeDatabase
+      .runVec(query.result.transactionally)
+      .map { dbs =>
+        val newPeers = dbs
+          .filter(_.remixConfirmations.isEmpty)
+
+        val remixPeers = dbs
+          .filter(_.remixConfirmations.isDefined)
+          .sortBy(_.remixConfirmations)
+
+        (newPeers, remixPeers)
+      }
   }
 
   def nextNonceIndex(): Future[Int] = {
@@ -106,6 +137,8 @@ case class AliceDAO()(implicit
 
     def nonce: Rep[SchnorrNonce] = column("nonce", O.Unique)
 
+    def remixConfirmations: Rep[Option[Int]] = column("remix_confirmations")
+
     def numInputs: Rep[Int] = column("num_inputs")
 
     def blindedOutputOpt: Rep[Option[FieldElement]] = column("blinded_output")
@@ -125,6 +158,7 @@ case class AliceDAO()(implicit
        chain,
        nonceIndex,
        nonce,
+       remixConfirmations,
        numInputs,
        blindedOutputOpt,
        changeSpkOpt,

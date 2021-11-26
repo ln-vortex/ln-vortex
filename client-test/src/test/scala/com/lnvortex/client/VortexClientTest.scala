@@ -3,6 +3,7 @@ package com.lnvortex.client
 import akka.testkit.TestActorRef
 import com.lnvortex.client.VortexClient.knownVersions
 import com.lnvortex.client.VortexClientException._
+import com.lnvortex.core.InputRegistrationType._
 import com.lnvortex.core._
 import com.lnvortex.core.crypto.BlindingTweaks
 import com.lnvortex.testkit.VortexClientFixture
@@ -21,6 +22,7 @@ class VortexClientTest extends VortexClientFixture {
   val dummyMix: MixDetails = MixDetails(
     version = UInt16.zero,
     roundId = DoubleSha256Digest.empty,
+    inputRegistrationType = SynchronousInputRegistrationType,
     amount = Satoshis(200000),
     mixFee = Satoshis.zero,
     publicKey = ECPublicKey.freshPublicKey.schnorrPublicKey,

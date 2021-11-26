@@ -132,6 +132,7 @@ object AskMixDetails extends VortexMessageFactory[AskMixDetails] {
 case class MixDetails(
     version: UInt16,
     roundId: DoubleSha256Digest,
+    inputRegistrationType: InputRegistrationType,
     amount: CurrencyUnit,
     mixFee: CurrencyUnit,
     publicKey: SchnorrPublicKey,
@@ -142,6 +143,7 @@ case class MixDetails(
   override val value: ByteVector = {
     version.bytes ++
       roundId.bytes ++
+      inputRegistrationType.bytes ++
       amount.satoshis.toUInt64.bytes ++
       mixFee.satoshis.toUInt64.bytes ++
       publicKey.bytes ++
@@ -159,6 +161,7 @@ object MixDetails extends VortexMessageFactory[MixDetails] {
 
     val version = iter.takeU16()
     val roundId = DoubleSha256Digest(iter.take(32))
+    val regType = InputRegistrationType.fromUInt16(iter.takeU16())
     val amount = iter.takeSats()
     val mixFee = iter.takeSats()
     val publicKey = SchnorrPublicKey(iter.take(32))
@@ -166,6 +169,7 @@ object MixDetails extends VortexMessageFactory[MixDetails] {
 
     MixDetails(version = version,
                roundId = roundId,
+               inputRegistrationType = regType,
                amount = amount,
                mixFee = mixFee,
                publicKey = publicKey,

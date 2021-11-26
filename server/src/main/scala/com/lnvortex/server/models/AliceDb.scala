@@ -13,6 +13,7 @@ case class AliceDb(
     chain: HDChainType,
     nonceIndex: Int,
     nonce: SchnorrNonce,
+    remixConfirmations: Option[Int],
     numInputs: Int,
     blindedOutputOpt: Option[FieldElement],
     changeSpkOpt: Option[ScriptPubKey],
@@ -30,15 +31,19 @@ case class AliceDb(
     BIP32Path(hardened)
   }
 
-  def setOutputValues(
+  def setRegisterInputValues(
+      remixConfirmations: Option[Int],
       numInputs: Int,
       blindedOutput: FieldElement,
       changeSpkOpt: Option[ScriptPubKey],
       blindOutputSig: FieldElement): AliceDb = {
-    copy(numInputs = numInputs,
-         blindedOutputOpt = Some(blindedOutput),
-         changeSpkOpt = changeSpkOpt,
-         blindOutputSigOpt = Some(blindOutputSig))
+    copy(
+      remixConfirmations = remixConfirmations,
+      numInputs = numInputs,
+      blindedOutputOpt = Some(blindedOutput),
+      changeSpkOpt = changeSpkOpt,
+      blindOutputSigOpt = Some(blindOutputSig)
+    )
   }
 
   def markSigned(): AliceDb = {
@@ -79,6 +84,7 @@ object AliceDbs {
       chain = HDChainType.fromInt(chain.index),
       nonceIndex = address.index,
       nonce = nonce,
+      remixConfirmations = None,
       numInputs = -1,
       blindedOutputOpt = None,
       changeSpkOpt = None,
