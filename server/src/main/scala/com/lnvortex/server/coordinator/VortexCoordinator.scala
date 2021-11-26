@@ -713,6 +713,9 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       // restart round with good alices
       newRound <- newRound(disconnect = false)
 
+      // change state so they can begin registering inputs
+      _ <- beginInputRegistration()
+
       // send messages
       _ <- FutureUtil.sequentially(signedPeerIds) { id =>
         val connectionHandler = oldMap(id)
@@ -721,9 +724,6 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
           connectionHandler ! RestartRoundMessage(mixDetails, nonceMsg)
         }
       }
-
-      // change state so they can begin registering inputs
-      _ <- beginInputRegistration()
     } yield ()
   }
 
