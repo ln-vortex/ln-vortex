@@ -57,7 +57,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
     MempoolSpaceProvider(FastestFeeTarget, config.network, None)
 
   private var feeRate: SatoshisPerVirtualByte =
-    SatoshisPerVirtualByte.fromLong(0)
+    SatoshisPerVirtualByte.fromLong(2)
 
   private var currentRoundId: DoubleSha256Digest = genRoundId()
 
