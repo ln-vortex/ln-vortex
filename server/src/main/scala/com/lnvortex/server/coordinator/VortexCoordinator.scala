@@ -401,14 +401,6 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       } else {
         val bannedUntil = TimeUtil.now.plusSeconds(3600) // 1 hour
 
-        val banDbs = registerInputs.inputs
-          .map(_.outPoint)
-          .map(outpoint =>
-            BannedUtxoDb(
-              outpoint,
-              bannedUntil,
-              s"Invalid inputs and proofs received in round ${roundDb.roundId.hex}"))
-
         val exception: Exception = if (!validInputs) {
           new InvalidInputsException("Alice gave invalid inputs")
         } else {
@@ -416,6 +408,14 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
             new IllegalArgumentException(
               "Alice registered with invalid inputs"))
         }
+
+        val banDbs = registerInputs.inputs
+          .map(_.outPoint)
+          .map(outpoint =>
+            BannedUtxoDb(
+              outpoint,
+              bannedUntil,
+              s"${exception.getMessage} in round ${roundDb.roundId.hex}"))
 
         bannedUtxoDAO
           .upsertAll(banDbs)
@@ -642,14 +642,6 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
             } else {
               val bannedUntil = TimeUtil.now.plusSeconds(86400) // 1 day
 
-              val dbs = inputs
-                .map(_.outPoint)
-                .map(outpoint =>
-                  BannedUtxoDb(
-                    outpoint,
-                    bannedUntil,
-                    s"Invalid psbt signature in round ${roundDb.roundId.hex}"))
-
               val exception: Exception = if (!sameTx) {
                 new DifferentTransactionException(
                   s"Received different transaction in psbt from peer: ${psbt.transaction.txIdBE.hex}")
@@ -663,6 +655,14 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
                 // this should be impossible
                 new RuntimeException("Received invalid signed psbt from peer")
               }
+
+              lazy val dbs = inputs
+                .map(_.outPoint)
+                .map(outpoint =>
+                  BannedUtxoDb(
+                    outpoint,
+                    bannedUntil,
+                    s"${exception.getMessage} round ${roundDb.roundId.hex}"))
 
               // only ban if the user's fault
               val ban = !validSigs || !sameTx

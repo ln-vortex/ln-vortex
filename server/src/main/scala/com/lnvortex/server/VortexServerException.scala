@@ -2,7 +2,7 @@ package com.lnvortex.server
 
 sealed abstract class VortexServerException(private val reason: String)
     extends Exception {
-  override def getMessage: String = s"Error: $reason"
+  override def getMessage: String = s"$reason"
 }
 
 object VortexServerException {
