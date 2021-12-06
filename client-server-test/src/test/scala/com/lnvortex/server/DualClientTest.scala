@@ -80,7 +80,7 @@ class DualClientTest
     }
   }
 
-  it must "open a channel" in { case (clientA, clientB, coordinator) =>
+  it must "open channels" in { case (clientA, clientB, coordinator) =>
     for {
       _ <- completeMixRound(peerIdA, peerIdB, clientA, clientB, coordinator)
 

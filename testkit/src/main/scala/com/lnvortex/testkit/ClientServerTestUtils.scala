@@ -135,7 +135,13 @@ trait ClientServerTestUtils {
     for {
       _ <- registerInputsAndOutputs(peerId, client, coordinator, peerLnd)
 
-      psbt <- coordinator.sendUnsignedPSBT()
+      // registering inputs and outputs will make it construct the unsigned psbt
+      _ <- TestAsyncUtil.awaitConditionF(
+        () => coordinator.currentRound().map(_.psbtOpt.isDefined),
+        interval = 100.milliseconds,
+        maxTries = 500)
+      psbt <- coordinator.currentRound().map(_.psbtOpt.get)
+
       signed <- client.validateAndSignPsbt(psbt)
     } yield signed
   }
@@ -154,7 +160,13 @@ trait ClientServerTestUtils {
                                     clientB,
                                     coordinator)
 
-      psbt <- coordinator.sendUnsignedPSBT()
+      // registering inputs and outputs will make it construct the unsigned psbt
+      _ <- TestAsyncUtil.awaitConditionF(
+        () => coordinator.currentRound().map(_.psbtOpt.isDefined),
+        interval = 100.milliseconds,
+        maxTries = 500)
+      psbt <- coordinator.currentRound().map(_.psbtOpt.get)
+
       signedA <- clientA.validateAndSignPsbt(psbt)
       signedB <- clientB.validateAndSignPsbt(psbt)
     } yield (signedA, signedB)
