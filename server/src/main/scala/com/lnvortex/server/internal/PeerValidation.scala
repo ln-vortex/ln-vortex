@@ -7,6 +7,7 @@ import com.lnvortex.server.coordinator.VortexCoordinator
 import com.lnvortex.server.models._
 import grizzled.slf4j.Logging
 import org.bitcoins.core.currency._
+import org.bitcoins.core.protocol.BitcoinAddress
 import org.bitcoins.core.protocol.script.ScriptPubKey
 import org.bitcoins.core.protocol.transaction.TransactionOutput
 import org.bitcoins.core.util.TimeUtil
@@ -20,7 +21,8 @@ trait PeerValidation extends Logging { self: VortexCoordinator =>
       inputRef: InputReference,
       isRemix: Boolean,
       aliceDbF: Future[Option[AliceDb]],
-      otherInputsF: Future[Vector[RegisteredInputDb]]): Future[Boolean] = {
+      otherInputsF: Future[Vector[RegisteredInputDb]]): Future[
+    Option[InvalidInputsException]] = {
     val outPoint = inputRef.outPoint
     val output = inputRef.output
 
@@ -57,9 +59,35 @@ trait PeerValidation extends Logging { self: VortexCoordinator =>
       otherInputs <- otherInputsF
       uniqueSpk = !otherInputs
         .map(_.output.scriptPubKey)
-        .contains(inputRef.output.scriptPubKey)
+        .contains(output.scriptPubKey)
 
-    } yield correctScriptType && notBanned && isRealInput && validProof && validConfs && uniqueSpk
+    } yield {
+      if (!correctScriptType) {
+        Some(new InvalidInputsException(
+          s"UTXO $outPoint has invalid script type, got ${inputRef.output.scriptPubKey.scriptType}"))
+      } else if (!notBanned) {
+        Some(new InvalidInputsException(s"UTXO $outPoint is currently banned"))
+      } else if (!isRealInput) {
+        Some(
+          new InvalidInputsException(
+            s"UTXO $outPoint given does not exist on the blockchain"))
+      } else if (!validProof) {
+        Some(
+          new InvalidInputsException(
+            s"UTXO $outPoint ownership proof was incorrect"))
+      } else if (!validConfs) {
+        Some(
+          new InvalidInputsException(
+            s"UTXO $outPoint does not have enough confirmations"))
+      } else if (!uniqueSpk) {
+        val address =
+          BitcoinAddress.fromScriptPubKey(output.scriptPubKey, config.network)
+
+        Some(
+          new InvalidInputsException(
+            s"$address has already been registered as an input or output"))
+      } else None
+    }
   }
 
   def validateAliceChange(

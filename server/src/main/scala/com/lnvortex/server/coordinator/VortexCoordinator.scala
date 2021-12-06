@@ -3,6 +3,7 @@ package com.lnvortex.server.coordinator
 import akka.actor._
 import com.lnvortex.core.RoundStatus._
 import com.lnvortex.core._
+import com.lnvortex.server.VortexServerException
 import com.lnvortex.server.VortexServerException._
 import com.lnvortex.server.config.VortexCoordinatorAppConfig
 import com.lnvortex.server.internal._
@@ -334,9 +335,10 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
     val otherInputDbsF =
       roundDbF.flatMap(db => inputsDAO.findByRoundId(db.roundId))
 
-    val validInputsF = FutureUtil.foldLeftAsync(true, registerInputs.inputs) {
+    val init: Option[InvalidInputsException] = None
+    val validInputsF = FutureUtil.foldLeftAsync(init, registerInputs.inputs) {
       case (accum, inputRef) =>
-        if (accum) {
+        if (accum.isEmpty) {
           for {
             isRemix <- roundDAO.hasTxId(inputRef.outPoint.txIdBE)
 
@@ -354,9 +356,11 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
             res <-
               if (validRemix)
                 validateAliceInput(inputRef, isRemix, aliceDbF, otherInputDbsF)
-              else Future.successful(false)
+              else
+                Future.successful(
+                  Some(new InvalidInputsException("Invalid utxo for remix")))
           } yield res
-        } else Future.successful(false)
+        } else Future.successful(accum)
     }
 
     val f = for {
@@ -365,63 +369,68 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       roundDb <- roundDbF
     } yield (validInputs, otherInputDbs, roundDb)
 
-    f.flatMap { case (validInputs, otherInputDbs, roundDb) =>
+    f.flatMap { case (inputsErrorOpt, otherInputDbs, roundDb) =>
       lazy val changeErrorOpt =
         validateAliceChange(roundDb, registerInputs, otherInputDbs)
 
-      if (validInputs && changeErrorOpt.isEmpty) {
-        // .get is safe, validInputs will be false
-        aliceDbF.map(_.get).flatMap { aliceDb =>
-          val sig =
-            km.createBlindSig(registerInputs.blindedOutput, aliceDb.noncePath)
+      // condense to one error option
+      val errorOpt: Option[VortexServerException] = inputsErrorOpt match {
+        case Some(value) => Some(value)
+        case None        => changeErrorOpt
+      }
 
-          val inputDbs = registerInputs.inputs.map(
-            RegisteredInputDbs.fromInputReference(_, currentRoundId, peerId))
+      errorOpt match {
+        case None =>
+          // .get is safe, validInputs will be false
+          aliceDbF.map(_.get).flatMap { aliceDb =>
+            val sig =
+              km.createBlindSig(registerInputs.blindedOutput, aliceDb.noncePath)
 
-          val updated =
-            aliceDb.setOutputValues(numInputs = inputDbs.size,
-                                    blindedOutput =
-                                      registerInputs.blindedOutput,
-                                    changeSpkOpt = registerInputs.changeSpkOpt,
-                                    blindOutputSig = sig)
+            val inputDbs = registerInputs.inputs.map(
+              RegisteredInputDbs.fromInputReference(_, currentRoundId, peerId))
 
-          for {
-            _ <- aliceDAO.update(updated)
-            _ <- inputsDAO.createAll(inputDbs)
+            val updated =
+              aliceDb.setOutputValues(
+                numInputs = inputDbs.size,
+                blindedOutput = registerInputs.blindedOutput,
+                changeSpkOpt = registerInputs.changeSpkOpt,
+                blindOutputSig = sig)
 
-            _ = logger.info(s"Alice ${peerId.hex} inputs registered")
+            for {
+              _ <- aliceDAO.update(updated)
+              _ <- inputsDAO.createAll(inputDbs)
 
-            registered <- aliceDAO.numRegisteredForRound(currentRoundId)
-            // check if we can to stop waiting for peers
-            _ = if (registered >= config.maxPeers) {
-              inputsRegisteredP.success(())
-            }
-          } yield sig
-        }
-      } else {
-        val bannedUntil = TimeUtil.now.plusSeconds(3600) // 1 hour
+              _ = logger.info(s"Alice ${peerId.hex} inputs registered")
 
-        val exception: Exception = if (!validInputs) {
-          new InvalidInputsException("Alice gave invalid inputs")
-        } else {
-          changeErrorOpt.getOrElse(
-            new IllegalArgumentException(
-              "Alice registered with invalid inputs"))
-        }
-
-        val banDbs = registerInputs.inputs
-          .map(_.outPoint)
-          .map(outpoint =>
-            BannedUtxoDb(
-              outpoint,
-              bannedUntil,
-              s"${exception.getMessage} in round ${roundDb.roundId.hex}"))
-
-        bannedUtxoDAO
-          .upsertAll(banDbs)
-          .flatMap(_ => Future.failed(exception))
+              registered <- aliceDAO.numRegisteredForRound(currentRoundId)
+              // check if we can to stop waiting for peers
+              _ = if (registered >= config.maxPeers) {
+                inputsRegisteredP.success(())
+              }
+            } yield sig
+          }
+        case Some(banError) =>
+          banInputs(registerInputs, banError, roundDb.roundId)
       }
     }
+  }
+
+  private def banInputs(
+      registerInputs: RegisterInputs,
+      banError: VortexServerException,
+      roundId: DoubleSha256Digest): Future[Nothing] = {
+    val bannedUntil = TimeUtil.now.plusSeconds(3600) // 1 hour
+
+    val banDbs = registerInputs.inputs
+      .map(_.outPoint)
+      .map(outpoint =>
+        BannedUtxoDb(outpoint,
+                     bannedUntil,
+                     s"${banError.getMessage} in round ${roundId.hex}"))
+
+    bannedUtxoDAO
+      .upsertAll(banDbs)
+      .flatMap(_ => Future.failed(banError))
   }
 
   private[server] def verifyAndRegisterBob(
