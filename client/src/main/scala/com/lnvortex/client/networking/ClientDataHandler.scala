@@ -47,11 +47,13 @@ class ClientDataHandler(
         vortexClient.storeNonce(schnorrNonce)
         Future.unit
       case AskInputs(roundId, inputFee, outputFee) =>
-        vortexClient.registerCoins(roundId, inputFee, outputFee)
+        vortexClient.registerCoins(roundId, inputFee, outputFee).map {
+          registerInputs =>
+            connectionHandler ! registerInputs
+        }
       case BlindedSig(blindOutputSig) =>
-        for {
-          _ <- vortexClient.processBlindOutputSig(blindOutputSig)
-        } yield ()
+        val msg = vortexClient.processBlindOutputSig(blindOutputSig)
+        vortexClient.sendOutputMessageAsBob(msg)
       case UnsignedPsbtMessage(psbt) =>
         for {
           signed <- vortexClient.validateAndSignPsbt(psbt)
