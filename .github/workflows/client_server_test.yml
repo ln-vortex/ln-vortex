@@ -1,4 +1,4 @@
-name: Run Tests
+name: Run Client & Server Tests Tests
 
 on:
   pull_request:
@@ -25,4 +25,4 @@ jobs:
             ~/.sbt
           key: ${{ runner.os }}-cache
       - name: Run tests
-        run: sbt downloadBitcoind downloadLnd downloadCLightning test
+        run: sbt downloadBitcoind downloadLnd coreTest/test clientTest/test serverTest/test clientServerTest/test
