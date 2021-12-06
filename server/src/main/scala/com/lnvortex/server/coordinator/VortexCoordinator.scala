@@ -632,7 +632,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
         roundDb.psbtOpt match {
           case Some(unsignedPsbt) =>
             val correctNumInputs = inputs.size == aliceDb.numInputs
-            val sameTx = unsignedPsbt.transaction == psbt.transaction
+            val sameTx = unsignedPsbt.transaction.txId == psbt.transaction.txId
             lazy val validSigs =
               Try(
                 inputs
