@@ -9,7 +9,7 @@ import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
 
 case class BannedUtxoDAO()(implicit
-    val ec: ExecutionContext,
+    override val ec: ExecutionContext,
     override val appConfig: VortexCoordinatorAppConfig)
     extends CRUD[BannedUtxoDb, TransactionOutPoint]
     with SlickUtil[BannedUtxoDb, TransactionOutPoint] {

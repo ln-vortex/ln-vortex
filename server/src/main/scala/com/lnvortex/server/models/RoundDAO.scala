@@ -14,7 +14,7 @@ import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
 
 case class RoundDAO()(implicit
-    val ec: ExecutionContext,
+    override val ec: ExecutionContext,
     override val appConfig: VortexCoordinatorAppConfig)
     extends CRUD[RoundDb, DoubleSha256Digest]
     with SlickUtil[RoundDb, DoubleSha256Digest] {

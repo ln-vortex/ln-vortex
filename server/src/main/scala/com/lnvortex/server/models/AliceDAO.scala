@@ -10,7 +10,7 @@ import slick.lifted.ProvenShape
 import scala.concurrent.{ExecutionContext, Future}
 
 case class AliceDAO()(implicit
-    val ec: ExecutionContext,
+    override val ec: ExecutionContext,
     override val appConfig: VortexCoordinatorAppConfig)
     extends CRUD[AliceDb, Sha256Digest]
     with SlickUtil[AliceDb, Sha256Digest] {

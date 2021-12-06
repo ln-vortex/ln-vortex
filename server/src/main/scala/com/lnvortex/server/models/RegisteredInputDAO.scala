@@ -11,7 +11,7 @@ import slick.lifted.{ForeignKeyQuery, ProvenShape}
 import scala.concurrent.{ExecutionContext, Future}
 
 case class RegisteredInputDAO()(implicit
-    val ec: ExecutionContext,
+    override val ec: ExecutionContext,
     override val appConfig: VortexCoordinatorAppConfig)
     extends CRUD[RegisteredInputDb, TransactionOutPoint]
     with SlickUtil[RegisteredInputDb, TransactionOutPoint] {
