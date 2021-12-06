@@ -14,6 +14,7 @@ import org.scalatest.FutureOutcome
 import scala.reflect.io.Directory
 
 trait DualClientFixture extends BitcoinSFixture with CachedBitcoindV21 {
+  def isNetworkingTest: Boolean
 
   override type FixtureParam = (
       VortexClient[LndVortexWallet],
@@ -56,6 +57,8 @@ trait DualClientFixture extends BitcoinSFixture with CachedBitcoindV21 {
             clientA.getCurrentRoundDetails.order > 0)
           _ <- TestAsyncUtil.awaitCondition(() =>
             clientB.getCurrentRoundDetails.order > 0)
+
+          _ = if (!isNetworkingTest) coordinator.connectionHandlerMap.clear()
         } yield (clientA, clientB, coordinator)
       },
       { case (clientA, clientB, coordinator) =>

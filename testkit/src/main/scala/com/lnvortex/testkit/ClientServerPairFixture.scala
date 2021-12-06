@@ -19,6 +19,8 @@ trait ClientServerPairFixture extends BitcoinSFixture with CachedBitcoindV21 {
   override type FixtureParam =
     (VortexClient[LndVortexWallet], VortexCoordinator, LndRpcClient)
 
+  def isNetworkingTest: Boolean
+
   override def withFixture(test: OneArgAsyncTest): FutureOutcome = {
     makeDependentFixture[(
         VortexClient[LndVortexWallet],
@@ -51,6 +53,9 @@ trait ClientServerPairFixture extends BitcoinSFixture with CachedBitcoindV21 {
           // wait for it to receive mix details
           _ <- TestAsyncUtil.awaitCondition(() =>
             client.getCurrentRoundDetails.order > 0)
+
+          // don't send message if not networking test
+          _ = if (!isNetworkingTest) coordinator.connectionHandlerMap.clear()
         } yield (client, coordinator, peerLnd)
       },
       { case (client, coordinator, peerLnd) =>

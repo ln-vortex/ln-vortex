@@ -90,13 +90,14 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
           logger.info(s"Got nonce from coordinator $nonce")
           nonce
         }
-      case NoDetails | _: ReceivedNonce | _: InputsScheduled |
-          _: InitializedRound =>
-        Future.failed(new RuntimeException("In incorrect state"))
+      case state @ (NoDetails | _: ReceivedNonce | _: InputsScheduled |
+          _: InitializedRound) =>
+        Future.failed(
+          new IllegalStateException(s"Cannot ask nonce at state $state"))
     }
   }
 
-  private[client] def storeNonce(nonce: SchnorrNonce): Unit = {
+  private[lnvortex] def storeNonce(nonce: SchnorrNonce): Unit = {
     roundDetails match {
       case state @ (NoDetails | _: ReceivedNonce | _: InitializedRound |
           _: InputsScheduled) =>
@@ -143,10 +144,10 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
     }
   }
 
-  private[client] def registerCoins(
+  private[lnvortex] def registerCoins(
       roundId: DoubleSha256Digest,
       inputFee: CurrencyUnit,
-      outputFee: CurrencyUnit): Future[Unit] = {
+      outputFee: CurrencyUnit): Future[RegisterInputs] = {
     roundDetails match {
       case state @ (NoDetails | _: KnownRound | _: ReceivedNonce |
           _: InitializedRound) =>
@@ -168,7 +169,6 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
         val needsChange = changeAmt > Policy.dustThreshold
 
         for {
-          handler <- handlerP.future
           inputProofs <- FutureUtil.sequentially(outputRefs)(
             vortexWallet.createInputProof(scheduled.nonce, _))
 
@@ -210,21 +210,20 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
 
           roundDetails = scheduled.nextStage(details, inputFee, outputFee)
 
-          handler ! RegisterInputs(inputRefs,
-                                   challenge,
-                                   changeAddrOpt.map(_.scriptPubKey))
+          RegisterInputs(inputRefs,
+                         challenge,
+                         changeAddrOpt.map(_.scriptPubKey))
         }
     }
   }
 
-  def processBlindOutputSig(blindOutputSig: FieldElement): Future[Unit] = {
+  def processBlindOutputSig(blindOutputSig: FieldElement): RegisterMixOutput = {
     logger.info("Got blind sig from coordinator, processing..")
     roundDetails match {
       case state @ (NoDetails | _: KnownRound | _: ReceivedNonce |
           _: InputsScheduled | _: MixOutputRegistered | _: PSBTSigned) =>
-        Future.failed(
-          new IllegalStateException(
-            s"At invalid state $state, cannot processBlindOutputSig"))
+        throw new IllegalStateException(
+          s"At invalid state $state, cannot processBlindOutputSig")
       case details: InputsRegistered =>
         val mixOutput = details.initDetails.mixOutput
         val publicKey = details.round.publicKey
@@ -238,17 +237,22 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
                                                     signerNonce = nonce,
                                                     blindingTweaks = tweaks,
                                                     message = challenge)
+        roundDetails = details.nextStage
 
-        val bobHandlerP = Promise[ActorRef]()
+        RegisterMixOutput(sig, mixOutput)
+    }
+  }
 
-        logger.info("Send channel output as Bob")
-        for {
-          _ <- P2PClient.connect(peer, this, Some(bobHandlerP))
-          bobHandler <- bobHandlerP.future
-        } yield {
-          roundDetails = details.nextStage
-          bobHandler ! RegisterMixOutput(sig, mixOutput)
-        }
+  private[client] def sendOutputMessageAsBob(
+      msg: RegisterMixOutput): Future[Unit] = {
+    val bobHandlerP = Promise[ActorRef]()
+
+    logger.info("Sending channel output as Bob")
+    for {
+      _ <- P2PClient.connect(peer, this, Some(bobHandlerP))
+      bobHandler <- bobHandlerP.future
+    } yield {
+      bobHandler ! msg
     }
   }
 

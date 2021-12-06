@@ -104,7 +104,9 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
 
   def getInputRegStartTime: Long = inputRegStartTime
 
-  private val connectionHandlerMap: mutable.Map[Sha256Digest, ActorRef] =
+  private[lnvortex] val connectionHandlerMap: mutable.Map[
+    Sha256Digest,
+    ActorRef] =
     mutable.Map.empty
 
   private var inputsRegisteredP: Promise[Unit] = Promise[Unit]()
@@ -192,7 +194,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
     }
   }
 
-  private[server] def beginInputRegistration(): Future[Unit] = {
+  private[lnvortex] def beginInputRegistration(): Future[AskInputs] = {
     logger.info("Starting input registration")
 
     val feeRateF = updateFeeRate()
@@ -213,12 +215,15 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
           ()
         }
       )
-      connectionHandlerMap.values.foreach(
-        _ ! AskInputs(currentRoundId, inputFee, outputFee))
+
+      val msg = AskInputs(currentRoundId, inputFee, outputFee)
+      connectionHandlerMap.values.foreach(_ ! msg)
+
+      msg
     }
   }
 
-  private[server] def beginOutputRegistration(): Future[Unit] = {
+  private[lnvortex] def beginOutputRegistration(): Future[Unit] = {
     logger.info("Starting output registration")
 
     beginOutputRegistrationCancellable.foreach(_.cancel())
@@ -238,20 +243,30 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
 
       logger.info(s"Sending blinded sigs to ${peerSigMap.size} peers")
       peerSigMap.foreach { case (peerId, sig) =>
-        connectionHandlerMap(peerId) ! BlindedSig(sig)
+        val sendT = Try(connectionHandlerMap(peerId) ! BlindedSig(sig))
+        sendT match {
+          case Failure(err) =>
+            logger.error(s"Error sending blinded sig to peer $peerId", err)
+          case Success(_) => ()
+        }
       }
     }
   }
 
-  private[server] def sendUnsignedPSBT(): Future[Unit] = {
+  private[lnvortex] def sendUnsignedPSBT(): Future[PSBT] = {
     logger.info("Sending unsigned PSBT to peers")
     for {
       addr <- bitcoind.getNewAddress(roundAddressLabel, AddressType.Bech32)
       psbt <- constructUnsignedPSBT(addr)
-    } yield connectionHandlerMap.values.foreach(_ ! UnsignedPsbtMessage(psbt))
+    } yield {
+      connectionHandlerMap.values.foreach(_ ! UnsignedPsbtMessage(psbt))
+
+      psbt
+    }
   }
 
-  private def onCompletedTransaction(tx: Transaction): Future[Unit] = {
+  private[lnvortex] def onCompletedTransaction(
+      tx: Transaction): Future[Unit] = {
     for {
       _ <- bitcoind.sendRawTransaction(tx)
       _ = logger.info(s"Broadcast transaction ${tx.txIdBE.hex}")
@@ -317,7 +332,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
     } yield ()
   }
 
-  private[server] def registerAlice(
+  private[lnvortex] def registerAlice(
       peerId: Sha256Digest,
       registerInputs: RegisterInputs): Future[FieldElement] = {
     logger.info(s"Alice ${peerId.hex} is registering inputs")
@@ -433,7 +448,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       .flatMap(_ => Future.failed(banError))
   }
 
-  private[server] def verifyAndRegisterBob(
+  private[lnvortex] def verifyAndRegisterBob(
       bob: RegisterMixOutput): Future[Unit] = {
     logger.info("A bob is registering an output")
 
@@ -594,7 +609,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
     }
   }
 
-  private[server] def registerPSBTSignatures(
+  private[lnvortex] def registerPSBTSignatures(
       peerId: Sha256Digest,
       psbt: PSBT): Future[Transaction] = {
     logger.info(s"${peerId.hex} is registering PSBT sigs")
