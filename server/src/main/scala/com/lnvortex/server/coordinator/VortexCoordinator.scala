@@ -668,7 +668,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
 
               val exception: Exception = if (!sameTx) {
                 new DifferentTransactionException(
-                  s"Received different transaction in psbt from peer: ${psbt.transaction.txIdBE.hex}")
+                  s"Received different transaction in psbt from peer, got ${psbt.transaction.hex}, expected ${unsignedPsbt.transaction.hex}")
               } else if (!validSigs) {
                 new InvalidPSBTSignaturesException(
                   "Received invalid psbt signature from peer")
