@@ -10,4 +10,4 @@ addSbtPlugin("org.scalameta" % "sbt-scalafmt" % "2.4.6")
 
 addSbtPlugin("net.bzzt" % "sbt-reproducible-builds" % "0.30")
 
-addSbtPlugin("com.thesamet" % "sbt-protoc" % "1.0.5")
+addSbtPlugin("com.thesamet" % "sbt-protoc" % "1.0.6")
