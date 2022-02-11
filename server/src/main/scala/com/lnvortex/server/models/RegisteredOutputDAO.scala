@@ -27,11 +27,6 @@ case class RegisteredOutputDAO()(implicit
     RoundDAO().table
   }
 
-  implicit val doubleSha256DigestMapper: BaseColumnType[DoubleSha256Digest] =
-    MappedColumnType.base[DoubleSha256Digest, String](
-      _.hex,
-      DoubleSha256Digest.fromHex)
-
   override def createAll(
       ts: Vector[RegisteredOutputDb]): Future[Vector[RegisteredOutputDb]] =
     createAllNoAutoInc(ts, safeDatabase)

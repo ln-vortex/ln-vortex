@@ -47,6 +47,11 @@ wixFeatures += WindowsFeature(
 lazy val root = project
   .in(file("."))
   .aggregate(
+    coordinatorCli,
+    coordinatorRpc,
+    cli,
+    config,
+    rpcServer,
     bitcoind,
     bitcoindTest,
     clightning,
@@ -64,6 +69,11 @@ lazy val root = project
     testkit
   )
   .dependsOn(
+    coordinatorCli,
+    coordinatorRpc,
+    cli,
+    config,
+    rpcServer,
     bitcoind,
     bitcoindTest,
     clightning,
@@ -85,6 +95,48 @@ lazy val root = project
     name := "ln-vortex",
     publish / skip := true
   )
+
+lazy val config = project
+  .in(file("app/config"))
+  .settings(CommonSettings.prodSettings: _*)
+  .settings(libraryDependencies ++= Deps.config)
+  .settings(name := "config")
+  .dependsOn(core)
+
+lazy val cli = project
+  .in(file("app/cli"))
+  .settings(CommonSettings.prodSettings: _*)
+  .settings(libraryDependencies ++= Deps.cli)
+  .settings(name := "cli")
+  .dependsOn(config)
+
+lazy val rpcServer = project
+  .in(file("app/rpc-server"))
+  .settings(CommonSettings.prodSettings: _*)
+  .settings(libraryDependencies ++= Deps.rpcServer)
+  .settings(name := "rpc-server")
+  .dependsOn(client, lnd, clightning, config)
+
+lazy val coordinatorConfig = project
+  .in(file("coordinator/config"))
+  .settings(CommonSettings.prodSettings: _*)
+  .settings(libraryDependencies ++= Deps.config)
+  .settings(name := "coordinator-config")
+  .dependsOn(core)
+
+lazy val coordinatorCli = project
+  .in(file("coordinator/cli"))
+  .settings(CommonSettings.prodSettings: _*)
+  .settings(libraryDependencies ++= Deps.cli)
+  .settings(name := "coordinator-cli")
+  .dependsOn(coordinatorConfig)
+
+lazy val coordinatorRpc = project
+  .in(file("coordinator/rpc-server"))
+  .settings(CommonSettings.prodSettings: _*)
+  .settings(libraryDependencies ++= Deps.rpcServer)
+  .settings(name := "coordinator-rpc-server")
+  .dependsOn(server, coordinatorConfig)
 
 lazy val lnd = project
   .in(file("lnd"))
@@ -196,7 +248,7 @@ TaskKeys.downloadLnd := {
     Files.createDirectories(binaryDir)
   }
 
-  val version = "0.14.1-beta"
+  val version = "0.14.2-beta"
 
   val (platform, suffix) =
     if (Properties.isLinux) ("linux-amd64", "tar.gz")
@@ -229,11 +281,11 @@ TaskKeys.downloadLnd := {
 
     val expectedHash =
       if (Properties.isLinux)
-        "7034e4aea3f404a9bbb1d157653741eb0e020c3d3272f854d3e2cefa0070f24a"
+        "7e0f290716e3c246305e176310a9a49aaafc9c243adc829631094a409cfd0ef1"
       else if (Properties.isMac)
-        "046409faf7e5049d6ddfdbe2a556fa0b5e6cc651bccce039c6f736b72390ad1d"
+        "c9f9bab9209a329407c4ba42b7b177b5e9edcab936e0a6c84593b09369ef43c5"
       else if (Properties.isWin)
-        "661d0538ca04c4f890d3d9a72717916f41350e810ae06f884e7ed97b38bf783f"
+        "c0060c000b11f440c5cc1675ec23820a67eae2cca7a881d430b78109d707b543"
       else sys.error(s"Unsupported OS: ${Properties.osName}")
 
     if (hash.equalsIgnoreCase(expectedHash)) {

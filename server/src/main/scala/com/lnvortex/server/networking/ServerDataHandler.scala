@@ -44,11 +44,13 @@ class ServerDataHandler(
       message: ClientVortexMessage): Future[Unit] = {
     message match {
       case AskMixDetails(network) =>
-        if (coordinator.config.network == network) {
+        val currentNetwork = coordinator.config.network
+        if (currentNetwork == network) {
           connectionHandler ! coordinator.mixDetails
           Future.unit
         } else {
-          logger.warn(s"Received AskMixDetails for different network $network")
+          logger.warn(
+            s"Received AskMixDetails for different network $network, current network $currentNetwork")
           Future.unit
         }
       case askNonce: AskNonce =>

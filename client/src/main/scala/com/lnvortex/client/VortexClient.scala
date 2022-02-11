@@ -123,6 +123,29 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
   }
 
   def queueCoins(
+      outPoints: Vector[TransactionOutPoint],
+      nodeUri: NodeUri): Future[Unit] = {
+    listCoins.map { utxos =>
+      val coins = utxos
+        .filter(u => outPoints.contains(u.outPoint))
+        .map(_.outputReference)
+      queueCoins(coins, nodeUri)
+    }
+  }
+
+  def queueCoins(
+      outPoints: Vector[TransactionOutPoint],
+      nodeId: NodeId,
+      peerAddrOpt: Option[InetSocketAddress]): Future[Unit] = {
+    listCoins.map { utxos =>
+      val coins = utxos
+        .filter(u => outPoints.contains(u.outPoint))
+        .map(_.outputReference)
+      queueCoins(coins, nodeId, peerAddrOpt)
+    }
+  }
+
+  def queueCoins(
       outputRefs: Vector[OutputReference],
       nodeUri: NodeUri): Unit = {
     queueCoins(outputRefs, nodeUri.nodeId, Some(nodeUri.socketAddress))

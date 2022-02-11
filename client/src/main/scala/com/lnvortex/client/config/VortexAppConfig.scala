@@ -16,21 +16,20 @@ import scala.util.Properties
 /** Configuration for Ln Vortex
   *
   * @param directory The data directory of the wallet
-  * @param conf      Optional sequence of configuration overrides
+  * @param configOverrides Optional sequence of configuration overrides
   */
 case class VortexAppConfig(
     private val directory: Path,
-    private val conf: Config*)(implicit system: ActorSystem)
+    override val configOverrides: Vector[Config])(implicit system: ActorSystem)
     extends AppConfig
     with Logging {
   import system.dispatcher
 
-  override val configOverrides: List[Config] = conf.toList
   override val moduleName: String = VortexAppConfig.moduleName
   override type ConfigType = VortexAppConfig
 
-  override def newConfigOfType(configs: Seq[Config]): VortexAppConfig =
-    VortexAppConfig(directory, configs: _*)
+  override def newConfigOfType(configs: Vector[Config]): VortexAppConfig =
+    VortexAppConfig(directory, configs ++ configs)
 
   override val baseDatadir: Path = directory
 
@@ -39,10 +38,15 @@ case class VortexAppConfig(
   override def stop(): Future[Unit] = Future.unit
 
   lazy val torConf: TorAppConfig =
-    TorAppConfig(directory, None, conf: _*)
+    TorAppConfig(directory, None, configOverrides)
 
-  lazy val socks5ProxyParams: Option[Socks5ProxyParams] =
-    torConf.socks5ProxyParams
+  lazy val socks5ProxyParams: Option[Socks5ProxyParams] = {
+    val host = coordinatorAddress.getHostString
+    println(host)
+    if (host == "localhost" || host == "127.0.0.1") {
+      None
+    } else torConf.socks5ProxyParams
+  }
 
   lazy val torParams: Option[TorParams] = torConf.torParams
 
@@ -64,6 +68,7 @@ object VortexAppConfig
   }
 
   override def fromDatadir(datadir: Path, confs: Vector[Config])(implicit
-      ec: ActorSystem): VortexAppConfig =
-    VortexAppConfig(datadir, confs: _*)
+      ec: ActorSystem): VortexAppConfig = {
+    VortexAppConfig(datadir, confs)
+  }
 }

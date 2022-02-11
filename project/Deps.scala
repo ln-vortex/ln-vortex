@@ -26,7 +26,16 @@ object Deps {
 
     val scalaFxV = "16.0.0-R25"
     val javaFxV = "17-ea+8"
-    val bitcoinsV = "1.8.0-87-3cd57d37-SNAPSHOT"
+
+    val bitcoinsV = "1.8.0-162-142612f0-SNAPSHOT"
+
+    val scoptV = "4.0.1"
+
+    val sttpV = "1.7.2"
+
+    val codehausV = "3.1.6"
+
+    val microPickleV = "1.4.4"
 
     val grizzledSlf4jV = "1.3.4"
   }
@@ -44,6 +53,18 @@ object Deps {
 
     val akkaSlf4j =
       "com.typesafe.akka" %% "akka-slf4j" % V.akkaStreamV withSources () withJavadoc ()
+
+    val sttp =
+      "com.softwaremill.sttp" %% "core" % V.sttpV withSources () withJavadoc ()
+
+    val micoPickle =
+      "com.lihaoyi" %% "upickle" % V.microPickleV withSources () withJavadoc ()
+
+    val scopt =
+      "com.github.scopt" %% "scopt" % V.scoptV withSources () withJavadoc ()
+
+    val codehaus =
+      "org.codehaus.janino" % "janino" % V.codehausV withSources () withJavadoc ()
 
     val grizzledSlf4j =
       "org.clapper" %% "grizzled-slf4j" % V.grizzledSlf4jV withSources () withJavadoc ()
@@ -74,6 +95,9 @@ object Deps {
 
     val bitcoinsFeeProvider =
       "org.bitcoin-s" %% "bitcoin-s-fee-provider" % V.bitcoinsV withSources () withJavadoc ()
+
+    val bitcoinsAppCommons =
+      "org.bitcoin-s" %% "bitcoin-s-app-commons" % V.bitcoinsV withSources () withJavadoc ()
 
     val bitcoinsDbCommons =
       "org.bitcoin-s" %% "bitcoin-s-db-commons" % V.bitcoinsV withSources () withJavadoc ()
@@ -110,6 +134,27 @@ object Deps {
                                javaFxSwing,
                                javaFxWeb)
   }
+
+  val config: List[ModuleID] = List(Compile.bitcoinsAppCommons)
+
+  val cli: List[ModuleID] = List(
+    Compile.grizzledSlf4j,
+    Compile.sttp,
+    Compile.micoPickle,
+    Compile.scopt,
+    //we can remove this dependency when this is fixed
+    //https://github.com/oracle/graal/issues/1943
+    //see https://github.com/bitcoin-s/bitcoin-s/issues/1100
+    Compile.codehaus
+  )
+
+  val rpcServer: List[ModuleID] =
+    List(
+      Compile.akkaHttp,
+      Compile.akkaSlf4j,
+      Compile.micoPickle,
+      Compile.grizzledSlf4j
+    )
 
   val core: List[ModuleID] = List(
     Compile.bitcoinsCore,

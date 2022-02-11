@@ -20,7 +20,7 @@ trait LnVortexTestUtils {
     .envOrNone("TOR")
     .isDefined
 
-  def getTestConfigs(config: Config*)(implicit
+  def getTestConfigs(config: Vector[Config] = Vector.empty)(implicit
       system: ActorSystem): (VortexAppConfig, VortexCoordinatorAppConfig) = {
     val listenPort = RpcUtil.randomPort
     val dir = tmpDir()
@@ -45,8 +45,8 @@ trait LnVortexTestUtils {
       """.stripMargin
     }
 
-    val clientConf = VortexAppConfig(dir, overrideConf +: config: _*)
-    val serverConf = VortexCoordinatorAppConfig(dir, overrideConf +: config: _*)
+    val clientConf = VortexAppConfig(dir, overrideConf +: config)
+    val serverConf = VortexCoordinatorAppConfig(dir, overrideConf +: config)
 
     (clientConf, serverConf)
   }

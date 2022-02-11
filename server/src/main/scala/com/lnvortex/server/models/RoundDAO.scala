@@ -30,11 +30,6 @@ case class RoundDAO()(implicit
   implicit val psbtMapper: BaseColumnType[PSBT] =
     MappedColumnType.base[PSBT, String](_.base64, PSBT.fromBase64)
 
-  implicit val doubleSha256DigestMapper: BaseColumnType[DoubleSha256Digest] =
-    MappedColumnType.base[DoubleSha256Digest, String](
-      _.hex,
-      DoubleSha256Digest.fromHex)
-
   import mappers._
 
   override val table: TableQuery[RoundTable] = TableQuery[RoundTable]
