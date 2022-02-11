@@ -1,30 +1,30 @@
-name: Tor Tests
-
-on:
-  pull_request:
-  push:
-    branches: [ master, main ]
-    tags: [ "*" ]
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    timeout-minutes: 120
-    env:
-      TOR: "1"
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-      - name: Setup Scala
-        uses: olafurpg/setup-scala@v10
-        with:
-          java-version: zulu@1.11
-      - name: Cache
-        uses: actions/cache@v2
-        with:
-          path: |
-            ~/.ivy2/cache
-            ~/.sbt
-          key: ${{ runner.os }}-cache
-      - name: Run tor tests
-        run: sbt downloadBitcoind downloadLnd downloadCLightning clientServerTest/test
+#name: Tor Tests
+#
+#on:
+#  pull_request:
+#  push:
+#    branches: [ master, main ]
+#    tags: [ "*" ]
+#
+#jobs:
+#  test:
+#    runs-on: ubuntu-latest
+#    timeout-minutes: 120
+#    env:
+#      TOR: "1"
+#    steps:
+#      - name: Checkout
+#        uses: actions/checkout@v2
+#      - name: Setup Scala
+#        uses: olafurpg/setup-scala@v10
+#        with:
+#          java-version: zulu@1.11
+#      - name: Cache
+#        uses: actions/cache@v2
+#        with:
+#          path: |
+#            ~/.ivy2/cache
+#            ~/.sbt
+#          key: ${{ runner.os }}-cache
+#      - name: Run tor tests
+#        run: sbt downloadBitcoind downloadLnd downloadCLightning clientServerTest/test
