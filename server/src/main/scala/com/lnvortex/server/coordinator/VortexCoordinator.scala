@@ -779,9 +779,10 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
   }
 
   override def start(): Future[Unit] = {
+    val f = serverBindF
     for {
       _ <- newRound()
-      _ <- serverBindF
+      _ <- f
     } yield ()
   }
 

@@ -138,7 +138,6 @@ object Deps {
   val config: List[ModuleID] = List(Compile.bitcoinsAppCommons)
 
   val cli: List[ModuleID] = List(
-    Compile.grizzledSlf4j,
     Compile.sttp,
     Compile.micoPickle,
     Compile.scopt,

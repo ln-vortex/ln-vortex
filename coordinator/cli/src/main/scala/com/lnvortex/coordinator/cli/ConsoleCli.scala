@@ -41,7 +41,7 @@ object ConsoleCli {
       note(sys.props("line.separator") + "Commands:"),
       cmd("getinfo")
         .action((_, conf) => conf.copy(command = GetInfo))
-        .text(s"Returns basic info about the oracle"),
+        .text(s"Returns basic info about the coordinator"),
       checkConfig {
         case CliConfig(NoCommand, _, _, _, _) =>
           failure("You need to provide a command!")
