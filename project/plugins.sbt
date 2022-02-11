@@ -11,3 +11,11 @@ addSbtPlugin("org.scalameta" % "sbt-scalafmt" % "2.4.6")
 addSbtPlugin("net.bzzt" % "sbt-reproducible-builds" % "0.30")
 
 addSbtPlugin("com.thesamet" % "sbt-protoc" % "1.0.5")
+
+addSbtPlugin("com.typesafe.play" % "sbt-plugin" % "2.8.8")
+
+addSbtPlugin("org.scalameta" % "sbt-native-image" % "0.3.2")
+
+addSbtPlugin("com.typesafe.sbt" % "sbt-web" % "1.4.4")
+
+addSbtPlugin("com.typesafe.sbt" % "sbt-digest" % "1.1.3")

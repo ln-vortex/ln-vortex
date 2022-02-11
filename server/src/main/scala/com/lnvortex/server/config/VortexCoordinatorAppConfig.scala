@@ -29,14 +29,13 @@ import scala.util.Properties
   */
 case class VortexCoordinatorAppConfig(
     private val directory: Path,
-    private val conf: Config*)(implicit system: ActorSystem)
+    override val configOverrides: Vector[Config])(implicit system: ActorSystem)
     extends DbAppConfig
     with JdbcProfileComponent[VortexCoordinatorAppConfig]
     with DbManagement
     with Logging {
   import system.dispatcher
 
-  override val configOverrides: List[Config] = conf.toList
   override val moduleName: String = VortexCoordinatorAppConfig.moduleName
   override type ConfigType = VortexCoordinatorAppConfig
 
@@ -45,8 +44,8 @@ case class VortexCoordinatorAppConfig(
   import profile.api._
 
   override def newConfigOfType(
-      configs: Seq[Config]): VortexCoordinatorAppConfig =
-    VortexCoordinatorAppConfig(directory, configs: _*)
+      configs: Vector[Config]): VortexCoordinatorAppConfig =
+    VortexCoordinatorAppConfig(directory, configs ++ configOverrides)
 
   override val baseDatadir: Path = directory
 
@@ -68,10 +67,10 @@ case class VortexCoordinatorAppConfig(
   override def stop(): Future[Unit] = Future.unit
 
   lazy val torConf: TorAppConfig =
-    TorAppConfig(directory, None, conf: _*)
+    TorAppConfig(directory, None, configOverrides)
 
   lazy val kmConf: KeyManagerAppConfig =
-    KeyManagerAppConfig(directory, conf: _*)
+    KeyManagerAppConfig(directory, configOverrides)
 
   lazy val socks5ProxyParams: Option[Socks5ProxyParams] =
     torConf.socks5ProxyParams
@@ -180,5 +179,5 @@ object VortexCoordinatorAppConfig
 
   override def fromDatadir(datadir: Path, confs: Vector[Config])(implicit
       ec: ActorSystem): VortexCoordinatorAppConfig =
-    VortexCoordinatorAppConfig(datadir, confs: _*)
+    VortexCoordinatorAppConfig(datadir, confs)
 }

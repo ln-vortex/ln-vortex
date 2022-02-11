@@ -21,11 +21,6 @@ case class AliceDAO()(implicit
 
   import mappers._
 
-  implicit val doubleSha256DigestMapper: BaseColumnType[DoubleSha256Digest] =
-    MappedColumnType.base[DoubleSha256Digest, String](
-      _.hex,
-      DoubleSha256Digest.fromHex)
-
   override val table: TableQuery[AliceTable] = TableQuery[AliceTable]
 
   override def createAll(ts: Vector[AliceDb]): Future[Vector[AliceDb]] =

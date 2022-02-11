@@ -32,8 +32,8 @@ class CoordinatorKeyManager()(implicit
   private val pubKeyPath = BIP32Path.fromHardenedString(
     s"m/${CoordinatorKeyManager.PURPOSE.constant}'/0'/0'")
 
-  private val nonceCounter: AtomicInteger = {
-    val startingIndex = Await.result(aliceDAO.nextNonceIndex(), 5.seconds)
+  private lazy val nonceCounter: AtomicInteger = {
+    val startingIndex = Await.result(aliceDAO.nextNonceIndex(), 25.seconds)
     new AtomicInteger(startingIndex)
   }
 

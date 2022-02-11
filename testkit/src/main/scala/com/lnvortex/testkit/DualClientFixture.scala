@@ -42,7 +42,7 @@ trait DualClientFixture extends BitcoinSFixture with CachedBitcoindV21 {
 
           config = ConfigFactory.parseString(
             s"""vortex.coordinator = "$host:${addr.getPort}" """)
-          clientConfig = getTestConfigs(config)._1
+          clientConfig = getTestConfigs(Vector(config))._1
 
           (lndA, lndB) <- LndTestUtils.createNodePair(bitcoind)
           clientA = VortexClient(LndVortexWallet(lndA))(system, clientConfig)

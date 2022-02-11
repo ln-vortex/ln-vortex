@@ -752,7 +752,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
   }
 
   private def updateFeeRate(): Future[SatoshisPerVirtualByte] = {
-    feeProvider.getFeeRate.map { res =>
+    feeProvider.getFeeRate().map { res =>
       feeRate = res
       res
     }
