@@ -42,7 +42,6 @@ case class VortexAppConfig(
 
   lazy val socks5ProxyParams: Option[Socks5ProxyParams] = {
     val host = coordinatorAddress.getHostString
-    println(host)
     if (host == "localhost" || host == "127.0.0.1") {
       None
     } else torConf.socks5ProxyParams
