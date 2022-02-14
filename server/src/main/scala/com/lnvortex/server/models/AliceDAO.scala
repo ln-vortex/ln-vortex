@@ -34,44 +34,70 @@ case class AliceDAO()(implicit
       ts: Vector[AliceDb]): Query[AliceTable, AliceDb, Seq] =
     findByPrimaryKeys(ts.map(_.peerId))
 
-  def findByNonce(nonce: SchnorrNonce): Future[Option[AliceDb]] = {
-    val query = table.filter(_.nonce === nonce).result
+  def findByNonceAction(nonce: SchnorrNonce): DBIOAction[
+    Option[AliceDb],
+    NoStream,
+    Effect.Read] = {
+    table.filter(_.nonce === nonce).result.map(_.headOption)
+  }
 
-    safeDatabase.runVec(query).map(_.headOption)
+  def findByNonce(nonce: SchnorrNonce): Future[Option[AliceDb]] = {
+    safeDatabase.run(findByNonceAction(nonce))
+  }
+
+  def findByRoundIdAction(roundId: DoubleSha256Digest): DBIOAction[
+    Vector[AliceDb],
+    NoStream,
+    Effect.Read] = {
+    table.filter(_.roundId === roundId).result.map(_.toVector)
   }
 
   def findByRoundId(roundId: DoubleSha256Digest): Future[Vector[AliceDb]] = {
-    val query = table.filter(_.roundId === roundId).result
+    safeDatabase.run(findByRoundIdAction(roundId))
+  }
 
-    safeDatabase.runVec(query)
+  def findRegisteredForRoundAction(roundId: DoubleSha256Digest): DBIOAction[
+    Vector[AliceDb],
+    NoStream,
+    Effect.Read] = {
+    table
+      .filter(t => t.roundId === roundId && t.blindOutputSigOpt.isDefined)
+      .result
+      .map(_.toVector)
   }
 
   def findRegisteredForRound(
       roundId: DoubleSha256Digest): Future[Vector[AliceDb]] = {
-    val query = table
-      .filter(t => t.roundId === roundId && t.blindOutputSigOpt.isDefined)
-      .result
-
-    safeDatabase.runVec(query.transactionally)
+    safeDatabase.run(findRegisteredForRoundAction(roundId))
   }
 
-  def numRegisteredForRound(roundId: DoubleSha256Digest): Future[Int] = {
-    val query = table
+  def numRegisteredForRoundAction(roundId: DoubleSha256Digest): DBIOAction[
+    Int,
+    profile.api.NoStream,
+    Effect.Read] = {
+    table
       .filter(t => t.roundId === roundId && t.blindOutputSigOpt.isDefined)
       .map(_.peerId)
       .distinct
       .size
-
-    safeDatabase.run(query.result.transactionally)
+      .result
   }
 
-  def getPeerIdSigMap(roundId: DoubleSha256Digest): Future[
-    Vector[(Sha256Digest, FieldElement)]] = {
-    val query = table
+  def numRegisteredForRound(roundId: DoubleSha256Digest): Future[Int] = {
+    val action = numRegisteredForRoundAction(roundId)
+
+    safeDatabase.run(action)
+  }
+
+  def getPeerIdSigMapAction(roundId: DoubleSha256Digest): DBIOAction[
+    Vector[(Sha256Digest, FieldElement)],
+    NoStream,
+    Effect.Read] = {
+    table
       .filter(t => t.roundId === roundId && t.blindOutputSigOpt.isDefined)
       .map(t => (t.peerId, t.blindOutputSigOpt.get))
-
-    safeDatabase.runVec(query.result.transactionally)
+      .result
+      .map(_.toVector)
   }
 
   def nextNonceIndex(): Future[Int] = {

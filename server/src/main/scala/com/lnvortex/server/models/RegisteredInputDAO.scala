@@ -53,44 +53,63 @@ case class RegisteredInputDAO()(implicit
     Seq] =
     findByPrimaryKeys(ts.map(_.outPoint))
 
+  def findByRoundIdAction(roundId: DoubleSha256Digest): DBIOAction[
+    Vector[RegisteredInputDb],
+    NoStream,
+    Effect.Read] = {
+    table.filter(_.roundId === roundId).result.map(_.toVector)
+  }
+
   def findByRoundId(
       roundId: DoubleSha256Digest): Future[Vector[RegisteredInputDb]] = {
-    val query = table.filter(_.roundId === roundId).result
+    safeDatabase.run(findByRoundIdAction(roundId))
+  }
 
-    safeDatabase.runVec(query)
+  def findByPeerIdAction(
+      peerId: Sha256Digest,
+      roundId: DoubleSha256Digest): DBIOAction[
+    Vector[RegisteredInputDb],
+    NoStream,
+    Effect.Read] = {
+    table
+      .filter(t => t.peerId === peerId && t.roundId === roundId)
+      .result
+      .map(_.toVector)
   }
 
   def findByPeerId(
       peerId: Sha256Digest,
       roundId: DoubleSha256Digest): Future[Vector[RegisteredInputDb]] = {
-    val query =
-      table.filter(t => t.peerId === peerId && t.roundId === roundId).result
-
-    safeDatabase.runVec(query)
+    safeDatabase.run(findByPeerIdAction(peerId, roundId))
   }
 
-  def findByPeerIds(
+  def findByPeerIdsAction(
       peerIds: Vector[Sha256Digest],
-      roundId: DoubleSha256Digest): Future[Vector[RegisteredInputDb]] = {
-    val query =
-      table.filter(t => t.peerId.inSet(peerIds) && t.roundId === roundId).result
+      roundId: DoubleSha256Digest): DBIOAction[
+    Vector[RegisteredInputDb],
+    NoStream,
+    Effect.Read] = {
+    table
+      .filter(t => t.peerId.inSet(peerIds) && t.roundId === roundId)
+      .result
+      .map(_.toVector)
+  }
 
-    safeDatabase.runVec(query)
+  def deleteByPeerIdAction(
+      peerId: Sha256Digest,
+      roundId: DoubleSha256Digest): DBIOAction[Int, NoStream, Effect.Write] = {
+    table.filter(t => t.peerId === peerId && t.roundId === roundId).delete
   }
 
   def deleteByPeerId(
       peerId: Sha256Digest,
       roundId: DoubleSha256Digest): Future[Int] = {
-    val query =
-      table.filter(t => t.peerId === peerId && t.roundId === roundId).delete
-
-    safeDatabase.run(query)
+    safeDatabase.run(deleteByPeerIdAction(peerId, roundId))
   }
 
-  def deleteByRoundId(roundId: DoubleSha256Digest): Future[Int] = {
-    val query = table.filter(_.roundId === roundId).delete
-
-    safeDatabase.run(query)
+  def deleteByRoundIdAction(
+      roundId: DoubleSha256Digest): DBIOAction[Int, NoStream, Effect.Write] = {
+    table.filter(_.roundId === roundId).delete
   }
 
   class RegisteredInputsTable(tag: Tag)

@@ -25,7 +25,7 @@ import scala.util.Properties
 /** Configuration for Ln Vortex
   *
   * @param directory The data directory of the wallet
-  * @param conf      Optional sequence of configuration overrides
+  * @param configOverrides Optional sequence of configuration overrides
   */
 case class VortexCoordinatorAppConfig(
     private val directory: Path,
@@ -45,7 +45,7 @@ case class VortexCoordinatorAppConfig(
 
   override def newConfigOfType(
       configs: Vector[Config]): VortexCoordinatorAppConfig =
-    VortexCoordinatorAppConfig(directory, configs ++ configOverrides)
+    VortexCoordinatorAppConfig(directory, configs)
 
   override val baseDatadir: Path = directory
 

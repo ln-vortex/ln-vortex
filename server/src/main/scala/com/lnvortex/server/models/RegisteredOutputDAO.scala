@@ -41,17 +41,21 @@ case class RegisteredOutputDAO()(implicit
     Seq] =
     findByPrimaryKeys(ts.map(_.output))
 
-  def findByRoundId(
-      roundId: DoubleSha256Digest): Future[Vector[RegisteredOutputDb]] = {
-    val query = table.filter(_.roundId === roundId).result
-
-    safeDatabase.runVec(query)
+  def findByRoundIdAction(roundId: DoubleSha256Digest): DBIOAction[
+    Vector[RegisteredOutputDb],
+    NoStream,
+    Effect.Read] = {
+    table.filter(_.roundId === roundId).result.map(_.toVector)
   }
 
-  def deleteByRoundId(roundId: DoubleSha256Digest): Future[Int] = {
-    val query = table.filter(_.roundId === roundId).delete
+  def findByRoundId(
+      roundId: DoubleSha256Digest): Future[Vector[RegisteredOutputDb]] = {
+    safeDatabase.run(findByRoundIdAction(roundId))
+  }
 
-    safeDatabase.run(query)
+  def deleteByRoundIdAction(
+      roundId: DoubleSha256Digest): DBIOAction[Int, NoStream, Effect.Write] = {
+    table.filter(_.roundId === roundId).delete
   }
 
   class RegisteredOutputTable(tag: Tag)

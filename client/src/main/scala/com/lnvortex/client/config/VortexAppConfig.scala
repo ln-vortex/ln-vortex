@@ -29,7 +29,7 @@ case class VortexAppConfig(
   override type ConfigType = VortexAppConfig
 
   override def newConfigOfType(configs: Vector[Config]): VortexAppConfig =
-    VortexAppConfig(directory, configs ++ configs)
+    VortexAppConfig(directory, configs)
 
   override val baseDatadir: Path = directory
 
@@ -67,7 +67,6 @@ object VortexAppConfig
   }
 
   override def fromDatadir(datadir: Path, confs: Vector[Config])(implicit
-      ec: ActorSystem): VortexAppConfig = {
+      ec: ActorSystem): VortexAppConfig =
     VortexAppConfig(datadir, confs)
-  }
 }
