@@ -26,6 +26,7 @@ import org.bitcoins.crypto._
 import org.bitcoins.feeprovider.MempoolSpaceProvider
 import org.bitcoins.feeprovider.MempoolSpaceTarget.FastestFeeTarget
 import org.bitcoins.rpc.client.common.BitcoindRpcClient
+import slick.dbio._
 
 import java.net.InetSocketAddress
 import java.time.Instant
@@ -51,6 +52,8 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
   private[server] val inputsDAO = RegisteredInputDAO()
   private[server] val outputsDAO = RegisteredOutputDAO()
   private[server] val roundDAO = RoundDAO()
+
+  private val safeDatabase = aliceDAO.safeDatabase
 
   private[this] val km = new CoordinatorKeyManager()
 
@@ -118,11 +121,11 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
   private var completedTxP: Promise[Transaction] = Promise[Transaction]()
 
   def newRound(disconnect: Boolean = true): Future[RoundDb] = {
+    val feeRateF = updateFeeRate()
     // generate new round id
     currentRoundId = genRoundId()
 
     logger.info(s"Creating new Round! ${currentRoundId.hex}")
-    val feeRateF = updateFeeRate()
 
     // reset promises
     inputsRegisteredP = Promise[Unit]()
@@ -194,6 +197,22 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
     }
   }
 
+  def currentRoundAction(): DBIOAction[RoundDb, NoStream, Effect.Read] = {
+    getRoundAction(currentRoundId)
+  }
+
+  def getRoundAction(roundId: DoubleSha256Digest): DBIOAction[
+    RoundDb,
+    NoStream,
+    Effect.Read] = {
+    roundDAO.findByPrimaryKeyAction(roundId).map {
+      case Some(db) => db
+      case None =>
+        throw new RuntimeException(
+          s"Could not find a round db for roundId $currentRoundId")
+    }
+  }
+
   private[lnvortex] def beginInputRegistration(): Future[AskInputs] = {
     logger.info("Starting input registration")
 
@@ -229,12 +248,12 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
     beginOutputRegistrationCancellable.foreach(_.cancel())
     beginOutputRegistrationCancellable = None
 
-    for {
-      roundDb <- currentRound()
+    val action = for {
+      roundDb <- currentRoundAction()
       updated = roundDb.copy(status = RegisterOutputs)
-      _ <- roundDAO.update(updated)
+      _ <- roundDAO.updateAction(updated)
 
-      peerSigMap <- aliceDAO.getPeerIdSigMap(currentRoundId)
+      peerSigMap <- aliceDAO.getPeerIdSigMapAction(currentRoundId)
     } yield {
       system.scheduler.scheduleOnce(config.outputRegistrationTime) {
         outputsRegisteredP.success(())
@@ -251,6 +270,8 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
         }
       }
     }
+
+    safeDatabase.run(action)
   }
 
   private[lnvortex] def sendUnsignedPSBT(): Future[PSBT] = {
@@ -279,14 +300,17 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       profitOpt = addrOpt.map(_.amount)
       profit = profitOpt.getOrElse(Satoshis.zero)
 
-      roundDb <- currentRound()
-      updatedRoundDb = roundDb.completeRound(tx, profit)
+      action = currentRoundAction().flatMap { roundDb =>
+        val updatedRoundDb = roundDb.completeRound(tx, profit)
+        roundDAO.updateAction(updatedRoundDb)
+      }
 
-      _ <- roundDAO.update(updatedRoundDb)
+      _ <- safeDatabase.run(action)
       _ <- newRound()
     } yield ()
   }
 
+  // todo make this use DBIO actions
   def getNonce(
       peerId: Sha256Digest,
       connectionHandler: ActorRef,
@@ -317,8 +341,8 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       roundId: DoubleSha256Digest): Future[Unit] = {
     require(roundId == currentRoundId,
             "Attempted to cancel a previous registration")
-    for {
-      aliceDbOpt <- aliceDAO.findByNonce(nonce)
+    val action = for {
+      aliceDbOpt <- aliceDAO.findByNonceAction(nonce)
       aliceDb = aliceDbOpt match {
         case Some(db) => db
         case None =>
@@ -326,10 +350,12 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
             s"No alice found with nonce $nonce")
       }
       updated = aliceDb.unregister()
-      _ <- aliceDAO.update(updated)
-      _ <- inputsDAO.deleteByPeerId(updated.peerId, updated.roundId)
+      _ <- aliceDAO.updateAction(updated)
+      _ <- inputsDAO.deleteByPeerIdAction(updated.peerId, updated.roundId)
       _ = signedPMap.remove(updated.peerId)
     } yield ()
+
+    safeDatabase.run(action)
   }
 
   private[lnvortex] def registerAlice(
@@ -389,10 +415,8 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
         validateAliceChange(roundDb, registerInputs, otherInputDbs)
 
       // condense to one error option
-      val errorOpt: Option[VortexServerException] = inputsErrorOpt match {
-        case Some(value) => Some(value)
-        case None        => changeErrorOpt
-      }
+      val errorOpt: Option[VortexServerException] =
+        inputsErrorOpt.orElse(changeErrorOpt)
 
       errorOpt match {
         case None =>
@@ -411,18 +435,19 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
                 changeSpkOpt = registerInputs.changeSpkOpt,
                 blindOutputSig = sig)
 
-            for {
-              _ <- aliceDAO.update(updated)
-              _ <- inputsDAO.createAll(inputDbs)
+            val action = for {
+              _ <- aliceDAO.updateAction(updated)
+              _ <- inputsDAO.createAllAction(inputDbs)
 
               _ = logger.info(s"Alice ${peerId.hex} inputs registered")
 
-              registered <- aliceDAO.numRegisteredForRound(currentRoundId)
+              registered <- aliceDAO.numRegisteredForRoundAction(currentRoundId)
               // check if we can to stop waiting for peers
               _ = if (registered >= config.maxPeers) {
                 inputsRegisteredP.success(())
               }
             } yield sig
+            safeDatabase.run(action)
           }
         case Some(banError) =>
           banInputs(registerInputs, banError, roundDb.roundId)
@@ -458,8 +483,8 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
     // todo verify address has never been in any tx
     if (validSpk && validSig) {
       val db = RegisteredOutputDb(bob.output, bob.sig, currentRoundId)
-      for {
-        round <- currentRound()
+      val action = for {
+        round <- currentRoundAction()
         _ = {
           if (round.status != RegisterOutputs)
             throw new IllegalStateException(
@@ -469,29 +494,31 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
               s"Output given is incorrect amount, got ${bob.output.value} expected ${round.amount}")
         }
 
-        aliceDbs <- aliceDAO.findByRoundId(round.roundId)
-        inputDbs <- inputsDAO.findByRoundId(round.roundId)
+        aliceDbs <- aliceDAO.findByRoundIdAction(round.roundId)
+        inputDbs <- inputsDAO.findByRoundIdAction(round.roundId)
         spks = inputDbs.map(_.output.scriptPubKey) ++ aliceDbs.flatMap(
           _.changeSpkOpt)
         bobAddr = BitcoinAddress.fromScriptPubKey(bob.output.scriptPubKey,
                                                   config.network)
         _ <-
           if (spks.contains(bob.output.scriptPubKey)) {
-            Future.failed(
+            DBIO.failed(
               new InvalidMixOutputScriptPubKeyException(
                 s"$bobAddr already registered as an input"))
-          } else Future.unit
+          } else DBIO.successful(())
 
-        _ <- outputsDAO.create(db)
+        _ <- outputsDAO.createAction(db)
 
-        registeredAlices <- aliceDAO.numRegisteredForRound(currentRoundId)
-        outputs <- outputsDAO.findByRoundId(currentRoundId)
+        registeredAlices <- aliceDAO.numRegisteredForRoundAction(currentRoundId)
+        outputs <- outputsDAO.findByRoundIdAction(currentRoundId)
       } yield {
         if (outputs.size >= registeredAlices) {
           outputsRegisteredP.success(())
         }
         ()
       }
+
+      safeDatabase.run(action)
     } else { // error
       val exception: Exception = if (!validSig) {
         new InvalidOutputSignatureException(
@@ -534,79 +561,82 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
 
   private[coordinator] def constructUnsignedPSBT(
       mixAddr: BitcoinAddress): Future[PSBT] = {
-    val dbsF = for {
-      aliceDbs <- aliceDAO.findRegisteredForRound(currentRoundId)
-      inputDbs <- inputsDAO.findByRoundId(currentRoundId)
-      outputDbs <- outputsDAO.findByRoundId(currentRoundId)
-      roundDb <- currentRound()
+    val dbsAction = for {
+      aliceDbs <- aliceDAO.findRegisteredForRoundAction(currentRoundId)
+      inputDbs <- inputsDAO.findByRoundIdAction(currentRoundId)
+      outputDbs <- outputsDAO.findByRoundIdAction(currentRoundId)
+      roundDb <- currentRoundAction()
     } yield (aliceDbs, inputDbs, outputDbs, roundDb)
 
-    dbsF.flatMap { case (aliceDbs, inputDbs, outputDbs, roundDb) =>
-      val txBuilder = RawTxBuilder().setFinalizer(
-        FilterDustFinalizer.andThen(ShuffleFinalizer))
+    val action = dbsAction.flatMap {
+      case (aliceDbs, inputDbs, outputDbs, roundDb) =>
+        val txBuilder = RawTxBuilder().setFinalizer(
+          FilterDustFinalizer.andThen(ShuffleFinalizer))
 
-      val inputAmountByPeerId = inputDbs
-        .groupBy(_.peerId)
-        .map { case (peerId, dbs) =>
-          val amt = dbs.map(_.output.value).sum
-          (peerId, amt)
+        val inputAmountByPeerId = inputDbs
+          .groupBy(_.peerId)
+          .map { case (peerId, dbs) =>
+            val amt = dbs.map(_.output.value).sum
+            (peerId, amt)
+          }
+
+        val changeOutputResults = aliceDbs.map { db =>
+          calculateChangeOutput(roundDb = roundDb,
+                                numInputs = db.numInputs,
+                                inputAmount = inputAmountByPeerId(db.peerId),
+                                changeSpkOpt = db.changeSpkOpt)
         }
 
-      val changeOutputResults = aliceDbs.map { db =>
-        calculateChangeOutput(roundDb = roundDb,
-                              numInputs = db.numInputs,
-                              inputAmount = inputAmountByPeerId(db.peerId),
-                              changeSpkOpt = db.changeSpkOpt)
-      }
+        val (changeOutputs, excess) = changeOutputResults.foldLeft(
+          (Vector.empty[TransactionOutput], CurrencyUnits.zero)) {
+          case ((outputs, amt), either) =>
+            either match {
+              case Left(extraFee)      => (outputs, amt + extraFee)
+              case Right(changeOutput) => (outputs :+ changeOutput, amt)
+            }
+        }
 
-      val (changeOutputs, excess) = changeOutputResults.foldLeft(
-        (Vector.empty[TransactionOutput], CurrencyUnits.zero)) {
-        case ((outputs, amt), either) =>
-          either match {
-            case Left(extraFee)      => (outputs, amt + extraFee)
-            case Right(changeOutput) => (outputs :+ changeOutput, amt)
-          }
-      }
+        // add inputs
+        txBuilder ++= inputDbs.map(_.transactionInput)
 
-      // add inputs
-      txBuilder ++= inputDbs.map(_.transactionInput)
+        // add outputs
+        val mixFee = excess + (Satoshis(aliceDbs.size) * config.mixFee)
+        val mixFeeOutput = TransactionOutput(mixFee, mixAddr.scriptPubKey)
+        val mixOutputs = outputDbs.map(_.output)
+        val outputsToAdd = mixOutputs ++ changeOutputs :+ mixFeeOutput
 
-      // add outputs
-      val mixFee = excess + (Satoshis(aliceDbs.size) * config.mixFee)
-      val mixFeeOutput = TransactionOutput(mixFee, mixAddr.scriptPubKey)
-      val mixOutputs = outputDbs.map(_.output)
-      val outputsToAdd = mixOutputs ++ changeOutputs :+ mixFeeOutput
+        txBuilder ++= outputsToAdd
 
-      txBuilder ++= outputsToAdd
+        val transaction = txBuilder.buildTx()
 
-      val transaction = txBuilder.buildTx()
+        val outPoints = transaction.inputs.map(_.previousOutput)
 
-      val outPoints = transaction.inputs.map(_.previousOutput)
+        val unsigned = PSBT.fromUnsignedTx(transaction)
 
-      val unsigned = PSBT.fromUnsignedTx(transaction)
+        val psbt = outPoints.zipWithIndex.foldLeft(unsigned) {
+          case (psbt, (outPoint, idx)) =>
+            val prevOut = inputDbs.find(_.outPoint == outPoint).get.output
+            psbt.addWitnessUTXOToInput(prevOut, idx)
+        }
 
-      val psbt = outPoints.zipWithIndex.foldLeft(unsigned) {
-        case (psbt, (outPoint, idx)) =>
-          val prevOut = inputDbs.find(_.outPoint == outPoint).get.output
-          psbt.addWitnessUTXOToInput(prevOut, idx)
-      }
+        val updatedRound =
+          roundDb.copy(psbtOpt = Some(psbt), status = SigningPhase)
+        val updatedInputs = inputDbs.map { db =>
+          val index = outPoints.indexOf(db.outPoint)
+          db.copy(indexOpt = Some(index))
+        }
 
-      val updatedRound =
-        roundDb.copy(psbtOpt = Some(psbt), status = SigningPhase)
-      val updatedInputs = inputDbs.map { db =>
-        val index = outPoints.indexOf(db.outPoint)
-        db.copy(indexOpt = Some(index))
-      }
+        inputDbs.map(_.peerId).distinct.foreach { peerId =>
+          signedPMap.put(peerId, Promise[PSBT]())
+        }
 
-      inputDbs.map(_.peerId).distinct.foreach { peerId =>
-        signedPMap.put(peerId, Promise[PSBT]())
-      }
-
-      for {
-        _ <- inputsDAO.updateAll(updatedInputs)
-        _ <- roundDAO.update(updatedRound)
-      } yield psbt
+        for {
+          _ <- inputsDAO.updateAllAction(updatedInputs)
+          _ <- roundDAO.updateAction(updatedRound)
+        } yield psbt
     }
+
+    safeDatabase.run(action)
   }
 
   private[lnvortex] def registerPSBTSignatures(
@@ -614,13 +644,13 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       psbt: PSBT): Future[Transaction] = {
     logger.info(s"${peerId.hex} is registering PSBT sigs")
 
-    val dbsF = for {
-      roundDb <- currentRound()
-      aliceDbOpt <- aliceDAO.read(peerId)
-      inputs <- inputsDAO.findByPeerId(peerId, currentRoundId)
+    val action = for {
+      roundDb <- currentRoundAction()
+      aliceDbOpt <- aliceDAO.findByPrimaryKeyAction(peerId)
+      inputs <- inputsDAO.findByPeerIdAction(peerId, currentRoundId)
     } yield (roundDb, aliceDbOpt, inputs)
 
-    dbsF.flatMap {
+    safeDatabase.run(action).flatMap {
       case (_, None, _) =>
         Future.failed(
           new RuntimeException(s"No alice found with id ${peerId.hex}"))
@@ -709,29 +739,34 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
   }
 
   def reconcileRound(): Future[Unit] = {
-    for {
+    val action = for {
       // cancel round
-      round <- currentRound()
+      round <- currentRoundAction()
       updated = round.copy(status = Canceled)
-      _ <- roundDAO.update(updated)
+      _ <- roundDAO.updateAction(updated)
 
       // get alices
-      alices <- aliceDAO.findRegisteredForRound(round.roundId)
+      alices <- aliceDAO.findRegisteredForRoundAction(round.roundId)
       unsignedPeerIds = alices.filterNot(_.signed).map(_.peerId)
       signedPeerIds = alices.filter(_.signed).map(_.peerId)
 
       // ban inputs that didn't sign
-      inputsToBan <- inputsDAO.findByPeerIds(unsignedPeerIds, round.roundId)
+      inputsToBan <- inputsDAO.findByPeerIdsAction(unsignedPeerIds,
+                                                   round.roundId)
       bannedUntil = TimeUtil.now.plusSeconds(86400) // 1 day
       banReason = s"Alice never signed in round ${round.roundId.hex}"
       banDbs = inputsToBan.map(db =>
         BannedUtxoDb(db.outPoint, bannedUntil, banReason))
-      _ <- bannedUtxoDAO.upsertAll(banDbs)
+      _ <- bannedUtxoDAO.upsertAllAction(banDbs)
 
       // delete previous inputs and outputs so they can registered again
-      _ <- inputsDAO.deleteByRoundId(round.roundId)
-      _ <- outputsDAO.deleteByRoundId(round.roundId)
+      _ <- inputsDAO.deleteByRoundIdAction(round.roundId)
+      _ <- outputsDAO.deleteByRoundIdAction(round.roundId)
 
+    } yield signedPeerIds
+
+    for {
+      signedPeerIds <- safeDatabase.run(action)
       // save connectionHandlerMap because newRound() will clear it
       oldMap = connectionHandlerMap
       // restart round with good alices
