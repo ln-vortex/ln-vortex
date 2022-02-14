@@ -33,7 +33,11 @@ class CoordinatorKeyManager()(implicit
     s"m/${CoordinatorKeyManager.PURPOSE.constant}'/0'/0'")
 
   private lazy val nonceCounter: AtomicInteger = {
-    val startingIndex = Await.result(aliceDAO.nextNonceIndex(), 25.seconds)
+    val f = aliceDAO.nextNonceIndex()
+    f.failed.foreach { e: Throwable =>
+      e.printStackTrace()
+    }
+    val startingIndex = Await.result(f, 10.seconds)
     new AtomicInteger(startingIndex)
   }
 

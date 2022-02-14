@@ -49,7 +49,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
       }
   }
 
-  it must "register inputs" in { coordinator =>
+  it must "successfully register inputs" in { coordinator =>
     val bitcoind = coordinator.bitcoind
     for {
       aliceDb <- coordinator.getNonce(Sha256Digest.empty,
