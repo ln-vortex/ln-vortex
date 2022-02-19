@@ -72,7 +72,7 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
     } yield handler ! AskMixDetails(vortexWallet.network)
   }
 
-  def listCoins: Future[Vector[UnspentCoin]] = vortexWallet.listCoins
+  def listCoins(): Future[Vector[UnspentCoin]] = vortexWallet.listCoins()
 
   def askNonce(): Future[SchnorrNonce] = {
     logger.info("Asking nonce from coordinator")
@@ -125,7 +125,7 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
   def queueCoins(
       outPoints: Vector[TransactionOutPoint],
       nodeUri: NodeUri): Future[Unit] = {
-    listCoins.map { utxos =>
+    listCoins().map { utxos =>
       val coins = utxos
         .filter(u => outPoints.contains(u.outPoint))
         .map(_.outputReference)
@@ -137,7 +137,7 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
       outPoints: Vector[TransactionOutPoint],
       nodeId: NodeId,
       peerAddrOpt: Option[InetSocketAddress]): Future[Unit] = {
-    listCoins.map { utxos =>
+    listCoins().map { utxos =>
       val coins = utxos
         .filter(u => outPoints.contains(u.outPoint))
         .map(_.outputReference)
@@ -200,7 +200,7 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
           }
 
           changeAddrOpt <-
-            if (needsChange) vortexWallet.getChangeAddress.map(Some(_))
+            if (needsChange) vortexWallet.getChangeAddress().map(Some(_))
             else FutureUtil.none
 
           channelDetails <- vortexWallet.initChannelOpen(

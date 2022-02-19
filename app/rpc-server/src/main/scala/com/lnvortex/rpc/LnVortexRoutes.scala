@@ -18,7 +18,7 @@ case class LnVortexRoutes(client: VortexClient[VortexWalletApi])(implicit
   override def handleCommand: PartialFunction[ServerCommand, Route] = {
     case ServerCommand("listutxos", _) =>
       complete {
-        client.listCoins.map { utxos =>
+        client.listCoins().map { utxos =>
           val json = upickle.default.writeJs(utxos)
           RpcServer.httpSuccess(json)
         }
@@ -26,7 +26,7 @@ case class LnVortexRoutes(client: VortexClient[VortexWalletApi])(implicit
 
     case ServerCommand("getbalance", _) =>
       complete {
-        client.listCoins.map { utxos =>
+        client.listCoins().map { utxos =>
           val balance = utxos.map(_.amount).sum.satoshis
           RpcServer.httpSuccess(balance.toLong)
         }

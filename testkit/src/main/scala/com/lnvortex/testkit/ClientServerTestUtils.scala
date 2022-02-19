@@ -41,7 +41,7 @@ trait ClientServerTestUtils {
       nodeId <- peerLnd.nodeId
       _ <- getNonce(peerId, client, coordinator)
       // don't select all coins
-      utxos <- client.listCoins.map(_.tail)
+      utxos <- client.listCoins().map(_.tail)
       _ = client.queueCoins(utxos.map(_.outputReference), nodeId, None)
       msg <- coordinator.beginInputRegistration()
 
@@ -66,11 +66,11 @@ trait ClientServerTestUtils {
       _ <- getNonce(peerIdB, clientB, coordinator)
 
       // don't select all coins
-      utxos <- clientA.listCoins.map(_.tail)
+      utxos <- clientA.listCoins().map(_.tail)
       _ = clientA.queueCoins(utxos.map(_.outputReference), nodeIdB, None)
 
       // don't select all coins
-      utxos <- clientB.listCoins.map(_.tail)
+      utxos <- clientB.listCoins().map(_.tail)
       _ = clientB.queueCoins(utxos.map(_.outputReference), nodeIdA, None)
 
       msg <- coordinator.beginInputRegistration()

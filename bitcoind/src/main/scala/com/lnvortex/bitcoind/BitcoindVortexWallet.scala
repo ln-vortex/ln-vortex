@@ -25,21 +25,21 @@ case class BitcoindVortexWallet(
     extends VortexWalletApi {
   import system.dispatcher
 
-  override def network: BitcoinNetwork = bitcoind.instance.network match {
+  override val network: BitcoinNetwork = bitcoind.instance.network match {
     case network: BitcoinNetwork => network
   }
 
-  override def getNewAddress: Future[BitcoinAddress] =
+  override def getNewAddress(): Future[BitcoinAddress] =
     bitcoind.getNewAddress(walletNameOpt)
 
-  override def getChangeAddress: Future[BitcoinAddress] = {
+  override def getChangeAddress(): Future[BitcoinAddress] = {
     walletNameOpt match {
       case Some(walletName) => bitcoind.getRawChangeAddress(walletName)
       case None             => bitcoind.getRawChangeAddress
     }
   }
 
-  override def listCoins: Future[Vector[UnspentCoin]] = {
+  override def listCoins(): Future[Vector[UnspentCoin]] = {
     val utxosF = walletNameOpt match {
       case Some(walletName) => bitcoind.listUnspent(walletName)
       case None             => bitcoind.listUnspent

@@ -21,7 +21,7 @@ class ClientServerPairNetworkingTest
       roundId = coordinator.getCurrentRoundId
 
       // don't select all coins
-      utxos <- client.listCoins.map(_.tail)
+      utxos <- client.listCoins().map(_.tail)
       _ = client.queueCoins(utxos.map(_.outputReference), nodeId, None)
 
       _ <- coordinator.beginInputRegistration()

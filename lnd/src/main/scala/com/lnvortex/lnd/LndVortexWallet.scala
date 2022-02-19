@@ -28,7 +28,7 @@ case class LndVortexWallet(lndRpcClient: LndRpcClient)(implicit
 
   private val channelOpener = LndChannelOpener(lndRpcClient)
 
-  override def network: BitcoinNetwork = lndRpcClient.instance match {
+  override lazy val network: BitcoinNetwork = lndRpcClient.instance match {
     case local: LndInstanceLocal => local.network
     case _: LndInstanceRemote =>
       val networkF = lndRpcClient.getInfo
@@ -38,13 +38,13 @@ case class LndVortexWallet(lndRpcClient: LndRpcClient)(implicit
       Await.result(networkF, 15.seconds)
   }
 
-  override def getNewAddress: Future[BitcoinAddress] =
+  override def getNewAddress(): Future[BitcoinAddress] =
     lndRpcClient.getNewAddress
 
-  override def getChangeAddress: Future[BitcoinAddress] =
+  override def getChangeAddress(): Future[BitcoinAddress] =
     lndRpcClient.getNewAddress
 
-  override def listCoins: Future[Vector[UnspentCoin]] = {
+  override def listCoins(): Future[Vector[UnspentCoin]] = {
     lndRpcClient.listUnspent.map(_.map { utxo =>
       UnspentCoin(utxo.address,
                   utxo.amount,

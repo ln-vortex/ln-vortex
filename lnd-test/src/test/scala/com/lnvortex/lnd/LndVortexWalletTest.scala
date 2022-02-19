@@ -15,9 +15,9 @@ class LndVortexWalletTest extends LndVortexWalletFixture {
 
   it must "correctly sign a psbt" in { wallet =>
     for {
-      utxos <- wallet.listCoins
+      utxos <- wallet.listCoins()
       refs = utxos.map(_.outputReference)
-      addr <- wallet.getNewAddress
+      addr <- wallet.getNewAddress()
 
       inputs = utxos
         .map(_.outPoint)
@@ -42,7 +42,7 @@ class LndVortexWalletTest extends LndVortexWalletFixture {
     val nonce: SchnorrNonce = ECPublicKey.freshPublicKey.schnorrNonce
 
     for {
-      utxos <- wallet.listCoins
+      utxos <- wallet.listCoins()
       outRefs = utxos.map(_.outputReference)
       proofFs = outRefs.map(wallet.createInputProof(nonce, _))
       proofs <- Future.sequence(proofFs)

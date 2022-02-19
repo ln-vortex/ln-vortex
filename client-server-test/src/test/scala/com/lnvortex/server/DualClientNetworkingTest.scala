@@ -22,9 +22,9 @@ class DualClientNetworkingTest extends DualClientFixture with EmbeddedPg {
       _ <- clientB.askNonce()
       _ <- coordinator.beginInputRegistration()
       // don't select all coins
-      utxosA <- clientA.listCoins.map(_.tail)
+      utxosA <- clientA.listCoins().map(_.tail)
       _ = clientA.queueCoins(utxosA.map(_.outputReference), nodeIdB, None)
-      utxosB <- clientB.listCoins.map(_.tail)
+      utxosB <- clientB.listCoins().map(_.tail)
       _ = clientB.queueCoins(utxosB.map(_.outputReference), nodeIdA, None)
       _ <- coordinator.beginInputRegistration()
       // wait until outputs are registered

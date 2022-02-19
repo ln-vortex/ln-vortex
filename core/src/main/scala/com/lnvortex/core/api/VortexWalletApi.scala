@@ -19,11 +19,11 @@ abstract class VortexWalletApi extends StartStopAsync[Unit] {
 
   def network: BitcoinNetwork
 
-  def getNewAddress: Future[BitcoinAddress]
+  def getNewAddress(): Future[BitcoinAddress]
 
-  def getChangeAddress: Future[BitcoinAddress]
+  def getChangeAddress(): Future[BitcoinAddress]
 
-  def listCoins: Future[Vector[UnspentCoin]]
+  def listCoins(): Future[Vector[UnspentCoin]]
 
   /** Creates a proof of ownership for the input and then locks it
     *

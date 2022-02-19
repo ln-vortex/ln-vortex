@@ -29,13 +29,13 @@ case class CLightningVortexWallet(clightning: CLightningRpcClient)(implicit
   override lazy val network: BitcoinNetwork =
     clightning.instance.network
 
-  override def getNewAddress: Future[BitcoinAddress] =
+  override def getNewAddress(): Future[BitcoinAddress] =
     clightning.getNewAddress(AddressType.SegWit)
 
-  override def getChangeAddress: Future[BitcoinAddress] =
+  override def getChangeAddress(): Future[BitcoinAddress] =
     clightning.getNewAddress(AddressType.SegWit)
 
-  override def listCoins: Future[Vector[UnspentCoin]] = {
+  override def listCoins(): Future[Vector[UnspentCoin]] = {
     val outsF = clightning.listFunds
     outsF.map(_.outputs.map { out =>
       UnspentCoin(address = out.address.get,
