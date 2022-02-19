@@ -1,7 +1,7 @@
 package com.lnvortex.bitcoind
 
 import akka.actor.ActorSystem
-import com.lnvortex.core.api.{OutputDetails, VortexWalletApi}
+import com.lnvortex.core.api._
 import com.lnvortex.core.{InputReference, UnspentCoin}
 import org.bitcoins.commons.jsonmodels.bitcoind.RpcOpts.LockUnspentOutputParameter
 import org.bitcoins.core.config.BitcoinNetwork
@@ -130,4 +130,13 @@ case class BitcoindVortexWallet(
   override def start(): Future[Unit] = bitcoind.start().map(_ => ())
 
   override def stop(): Future[Unit] = Future.unit
+
+  override def listTransactions(): Future[Vector[TransactionDetails]] = {
+    // todo
+    Future.successful(Vector.empty)
+  }
+
+  override def listChannels(): Future[Vector[ChannelDetails]] = Future.failed(
+    new UnsupportedOperationException("Bitcoind is not a lightning wallet"))
+
 }

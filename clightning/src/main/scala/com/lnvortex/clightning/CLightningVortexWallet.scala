@@ -2,7 +2,7 @@ package com.lnvortex.clightning
 
 import akka.actor.ActorSystem
 import com.bitcoins.clightning.rpc.CLightningRpcClient
-import com.lnvortex.core.api.{OutputDetails, VortexWalletApi}
+import com.lnvortex.core.api._
 import com.lnvortex.core.{InputReference, UnspentCoin}
 import org.bitcoins.core.config._
 import org.bitcoins.core.currency._
@@ -110,4 +110,48 @@ case class CLightningVortexWallet(clightning: CLightningRpcClient)(implicit
   override def start(): Future[Unit] = Future.unit
 
   override def stop(): Future[Unit] = Future.unit
+
+  override def listTransactions(): Future[Vector[TransactionDetails]] = {
+    val txsF = clightning.listTransactions()
+    val blockHeightF = clightning.getInfo.map(_.blockheight)
+
+    for {
+      blockHeight <- blockHeightF
+      txs <- txsF
+    } yield {
+      txs.map { tx =>
+        val confs =
+          if (tx.blockheight == 0) 0
+          else blockHeight - tx.blockheight + 1
+
+        TransactionDetails(txId = tx.hash,
+                           tx = tx.rawtx,
+                           numConfirmations = confs,
+                           blockHeight = tx.blockheight,
+                           label = "")
+      }
+    }
+  }
+
+  override def listChannels(): Future[Vector[ChannelDetails]] = {
+    val channelsF = clightning.listChannels()
+    val nodeIdF = clightning.nodeId
+
+    for {
+      channels <- channelsF
+      nodeId <- nodeIdF
+    } yield {
+      channels.map { channel =>
+        val remote =
+          if (channel.source == nodeId) channel.destination
+          else channel.source
+
+        ChannelDetails(remotePubkey = remote,
+                       shortChannelId = channel.short_channel_id,
+                       public = channel.public,
+                       amount = channel.satoshis,
+                       active = channel.active)
+      }
+    }
+  }
 }

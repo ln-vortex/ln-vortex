@@ -52,6 +52,12 @@ object ConsoleCli {
       cmd("listutxos")
         .action((_, conf) => conf.copy(command = ListUtxos))
         .text("List wallet's utxos"),
+      cmd("listtransactions")
+        .action((_, conf) => conf.copy(command = ListTransactions))
+        .text("List wallet's transactions"),
+      cmd("listchannels")
+        .action((_, conf) => conf.copy(command = ListChannels))
+        .text("List lightning wallet's channels"),
       cmd("getbalance")
         .action((_, conf) => conf.copy(command = GetBalance))
         .text("Get wallet balance"),
@@ -120,9 +126,11 @@ object ConsoleCli {
     }
 
     val requestParam: RequestParam = command match {
-      case GetInfo    => RequestParam("getinfo")
-      case ListUtxos  => RequestParam("listutxos")
-      case GetBalance => RequestParam("getbalance")
+      case GetInfo          => RequestParam("getinfo")
+      case ListUtxos        => RequestParam("listutxos")
+      case ListTransactions => RequestParam("listtransactions")
+      case ListChannels     => RequestParam("listchannels")
+      case GetBalance       => RequestParam("getbalance")
       case QueueCoins(outpoints, nodeId, peerAddrOpt) =>
         RequestParam("queuecoins",
                      Vector(up.writeJs(outpoints),
@@ -250,6 +258,10 @@ object CliCommand {
   case object GetBalance extends CliCommand
 
   case object ListUtxos extends CliCommand
+
+  case object ListTransactions extends CliCommand
+
+  case object ListChannels extends CliCommand
 
   case class QueueCoins(
       outpoints: Vector[TransactionOutPoint],

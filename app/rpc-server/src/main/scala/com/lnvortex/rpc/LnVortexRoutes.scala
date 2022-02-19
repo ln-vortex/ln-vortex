@@ -6,7 +6,7 @@ import akka.http.scaladsl.server._
 import com.lnvortex.client.VortexClient
 import com.lnvortex.config.Picklers._
 import com.lnvortex.core.api.VortexWalletApi
-import ujson.Null
+import ujson._
 
 import scala.concurrent._
 
@@ -29,6 +29,20 @@ case class LnVortexRoutes(client: VortexClient[VortexWalletApi])(implicit
         client.listCoins().map { utxos =>
           val balance = utxos.map(_.amount).sum.satoshis
           RpcServer.httpSuccess(balance.toLong)
+        }
+      }
+
+    case ServerCommand("listtransactions", _) =>
+      complete {
+        client.vortexWallet.listTransactions().map { txs =>
+          RpcServer.httpSuccess(txs)
+        }
+      }
+
+    case ServerCommand("listchannels", _) =>
+      complete {
+        client.vortexWallet.listChannels().map { channels =>
+          RpcServer.httpSuccess(channels)
         }
       }
 

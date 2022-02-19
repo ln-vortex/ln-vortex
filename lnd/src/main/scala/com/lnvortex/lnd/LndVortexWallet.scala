@@ -1,11 +1,13 @@
 package com.lnvortex.lnd
 
 import akka.actor.ActorSystem
-import com.lnvortex.core.api.{OutputDetails, VortexWalletApi}
+import com.lnvortex.core.api._
 import com.lnvortex.core.{InputReference, UnspentCoin}
 import org.bitcoins.core.config.{BitcoinNetwork, BitcoinNetworks}
-import org.bitcoins.core.currency.CurrencyUnit
+import org.bitcoins.core.currency.{CurrencyUnit, Satoshis}
+import org.bitcoins.core.number.UInt64
 import org.bitcoins.core.protocol.BitcoinAddress
+import org.bitcoins.core.protocol.ln.channel.ShortChannelId
 import org.bitcoins.core.protocol.ln.node.NodeId
 import org.bitcoins.core.protocol.script.ScriptWitness
 import org.bitcoins.core.protocol.transaction._
@@ -115,4 +117,30 @@ case class LndVortexWallet(lndRpcClient: LndRpcClient)(implicit
   override def start(): Future[Unit] = Future.unit
 
   override def stop(): Future[Unit] = lndRpcClient.stop().map(_ => ())
+
+  override def listTransactions(): Future[Vector[TransactionDetails]] = {
+    lndRpcClient
+      .getTransactions(startHeight = 0)
+      .map(_.map { tx =>
+        TransactionDetails(txId = tx.txId,
+                           tx = tx.tx,
+                           numConfirmations = tx.numConfirmations,
+                           blockHeight = tx.blockHeight,
+                           label = tx.label)
+      })
+  }
+
+  override def listChannels(): Future[Vector[ChannelDetails]] = {
+    lndRpcClient
+      .listChannels()
+      .map(_.map { channel =>
+        ChannelDetails(
+          remotePubkey = NodeId(channel.remotePubkey),
+          shortChannelId = ShortChannelId(UInt64(channel.chanId)),
+          public = !channel.`private`,
+          amount = Satoshis(channel.capacity),
+          active = channel.active
+        )
+      })
+  }
 }
