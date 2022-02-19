@@ -3,8 +3,8 @@ package com.lnvortex.rpc
 import akka.actor.ActorSystem
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server._
-import com.lnvortex.config.Picklers._
 import com.lnvortex.client.VortexClient
+import com.lnvortex.config.Picklers._
 import com.lnvortex.core.api.VortexWalletApi
 import ujson.Null
 
@@ -23,6 +23,15 @@ case class LnVortexRoutes(client: VortexClient[VortexWalletApi])(implicit
           RpcServer.httpSuccess(json)
         }
       }
+
+    case ServerCommand("getbalance", _) =>
+      complete {
+        client.listCoins.map { utxos =>
+          val balance = utxos.map(_.amount).sum.satoshis
+          RpcServer.httpSuccess(balance.toLong)
+        }
+      }
+
     case ServerCommand("queuecoins", arr) =>
       withValidServerCommand(QueueCoins.fromJsArr(arr)) {
         case QueueCoins(outpoints, nodeId, peerAddrOpt) =>
