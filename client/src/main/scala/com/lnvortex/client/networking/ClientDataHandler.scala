@@ -6,8 +6,12 @@ import com.lnvortex.client.VortexClient
 import com.lnvortex.core._
 import com.lnvortex.core.api.VortexWalletApi
 import grizzled.slf4j.Logging
+import org.bitcoins.crypto.{CryptoUtil, ECPrivateKey}
+import scodec.bits.ByteVector
 
+import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent._
+import scala.concurrent.duration.DurationInt
 
 class ClientDataHandler(
     vortexClient: VortexClient[VortexWalletApi],
@@ -20,7 +24,23 @@ class ClientDataHandler(
     val _ = context.watch(connectionHandler)
   }
 
+  val lastPing = new AtomicReference(ByteVector.empty.toArray)
+
+  context.system.scheduler.scheduleAtFixedRate(0.seconds, 60.seconds) { () =>
+    val hash = CryptoUtil.sha256(ECPrivateKey.freshPrivateKey.bytes)
+    val ping = PingTLV(hash.bytes)
+    lastPing.set(hash.bytes.toArray)
+    connectionHandler ! ping
+  }
+
   override def receive: Receive = LoggingReceive {
+    case ping: PingTLV =>
+      val pong = PongTLV.forIgnored(ping.ignored)
+      connectionHandler ! pong
+    case pongTLV: PongTLV =>
+      if (!(pongTLV.ignored.toArray sameElements lastPing.get())) {
+        logger.error("Received invalid pong message")
+      }
     case serverMessage: ServerVortexMessage =>
       logger.info(s"Received VortexMessage ${serverMessage.typeName}")
       val f: Future[Unit] = handleVortexMessage(serverMessage)
