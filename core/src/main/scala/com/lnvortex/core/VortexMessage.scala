@@ -37,6 +37,8 @@ object VortexMessage extends Factory[VortexMessage] with Logging {
 
   val allFactories: Vector[VortexMessageFactory[VortexMessage]] =
     Vector(
+      PingTLV,
+      PongTLV,
       AskMixDetails,
       MixDetails,
       AskNonce,
@@ -105,6 +107,56 @@ object UnknownVortexMessage extends Factory[UnknownVortexMessage] {
 
     UnknownVortexMessage(tpe, value)
   }
+}
+
+case class PingTLV(numPongBytes: UInt16, ignored: ByteVector)
+    extends VortexMessage {
+  override val tpe: BigSizeUInt = PingTLV.tpe
+
+  override val value: ByteVector = {
+    numPongBytes.bytes ++ u16Prefix(ignored)
+  }
+}
+
+object PingTLV extends VortexMessageFactory[PingTLV] {
+  override val tpe: BigSizeUInt = BigSizeUInt(18)
+
+  override def fromTLVValue(value: ByteVector): PingTLV = {
+    val iter = ValueIterator(value)
+
+    val numPongBytes = iter.takeU16()
+    val ignored = iter.takeU16Prefixed(iter.take)
+
+    PingTLV(numPongBytes, ignored)
+  }
+
+  override val typeName: String = "PingTLV"
+}
+
+case class PongTLV(ignored: ByteVector) extends VortexMessage {
+  override val tpe: BigSizeUInt = PongTLV.tpe
+
+  override val value: ByteVector = {
+    u16Prefix(ignored)
+  }
+}
+
+object PongTLV extends VortexMessageFactory[PongTLV] {
+  override val tpe: BigSizeUInt = BigSizeUInt(19)
+
+  override def fromTLVValue(value: ByteVector): PongTLV = {
+    val iter = ValueIterator(value)
+
+    val ignored = iter.takeU16Prefixed(iter.take)
+
+    PongTLV.forIgnored(ignored)
+  }
+
+  def forIgnored(ignored: ByteVector): PongTLV = {
+    new PongTLV(ignored)
+  }
+
+  override val typeName: String = "PongTLV"
 }
 
 case class AskMixDetails(network: BitcoinNetwork) extends ClientVortexMessage {
