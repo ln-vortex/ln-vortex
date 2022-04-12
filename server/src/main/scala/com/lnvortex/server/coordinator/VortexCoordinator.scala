@@ -55,9 +55,9 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
 
   private val safeDatabase = aliceDAO.safeDatabase
 
-  private[this] val km = new CoordinatorKeyManager()
+  private[this] lazy val km = new CoordinatorKeyManager()
 
-  val publicKey: SchnorrPublicKey = km.publicKey
+  lazy val publicKey: SchnorrPublicKey = km.publicKey
 
   private val feeProvider: MempoolSpaceProvider =
     MempoolSpaceProvider(FastestFeeTarget, config.network, None)
