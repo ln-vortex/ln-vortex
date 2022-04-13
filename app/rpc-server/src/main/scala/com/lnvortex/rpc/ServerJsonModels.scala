@@ -33,11 +33,13 @@ object QueueCoins extends ServerJsonModels {
           QueueCoins(outpoints, nodeId, peerOpt)
         }
       case Nil =>
-        Failure(new IllegalArgumentException("Missing tournament id argument"))
+        Failure(
+          new IllegalArgumentException(
+            "Missing outpoints and nodeId arguments"))
       case other =>
         Failure(
           new IllegalArgumentException(
-            s"Bad number of arguments: ${other.length}. Expected: 1"))
+            s"Bad number of arguments: ${other.length}. Expected: 2 or 3"))
     }
   }
 }
