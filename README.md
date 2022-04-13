@@ -12,17 +12,45 @@ LnVortex is compatible with `lnd` version v0.14.0-beta.
 
 ## Building from source
 
-To get started you will need Java, Scala, and some other nice tools installed, luckily the Scala team has an easy setup
-process!
+### Scala/Java
 
-Simply follow the instructions in [this short blog](https://www.scala-lang.org/2020/06/29/one-click-install.html) to get
-started.
+You can choose to install the Scala toolchain with sdkman or coursier.
 
-After having these installed you simply need to clone the repo, then run with `sbt gui/run`.
+#### Sdkman
+
+You can install sdkman [here](https://sdkman.io/install)
+
+Next you can install `java` and `sbt` with
+
+```
+sdk install java # not always needed
+sdk install sbt
+```
+
+#### Coursier
+
+If you don't like `curl`, you can use OS specific package managers to install coursier [here](https://get-coursier.io/docs/2.0.0-RC2/cli-overview.html#installation)
+
+> ln-vortex requires java9+ for development environments. If you do not have java9+ installed, you will not be able to build ln-vortex.
+[You will run into this error if you are on java8 or lower](https://github.com/bitcoin-s/bitcoin-s/issues/3298)
+
+If you follow the coursier route, [you can switch to a java11 version by running](https://get-coursier.io/docs/2.0.0-RC6-15/cli-java.html)
+
+```
+cs java --jvm adopt:11 --setup
+```
 
 ### macOS install
 
 ```
 brew install scala
 brew install sbt
+```
+
+### Running the client
+
+Running the client can simply be done by running
+
+```
+sbt rpcServer/run
 ```
