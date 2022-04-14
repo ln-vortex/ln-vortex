@@ -45,7 +45,7 @@ class CoordinatorKeyManager()(implicit
 
   private def nextNoncePath(): BIP32Path = {
     val purpose = HDPurposes.Legacy
-    val coin = HDCoin(purpose, HDCoinType.Bitcoin)
+    val coin = HDCoin(purpose, coinType)
     val account = HDAccount(coin, 0)
     val hdChain = HDChain(HDChainType.External, account)
     val path = HDAddress(hdChain, nonceCounter.getAndIncrement()).toPath
