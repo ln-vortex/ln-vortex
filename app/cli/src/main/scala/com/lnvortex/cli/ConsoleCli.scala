@@ -5,7 +5,10 @@ import com.lnvortex.cli.CliReaders._
 import com.lnvortex.cli.ConsoleCli.serverConfig
 import com.lnvortex.config.Picklers._
 import com.lnvortex.config._
-import org.bitcoins.commons.serializers.Picklers._
+import org.bitcoins.commons.serializers.Picklers.{
+  transactionOutPointPickler => _,
+  _
+}
 import org.bitcoins.core.protocol.ln.node.NodeId
 import org.bitcoins.core.protocol.transaction._
 import org.bitcoins.crypto.ECPublicKey
@@ -132,10 +135,16 @@ object ConsoleCli {
       case ListChannels     => RequestParam("listchannels")
       case GetBalance       => RequestParam("getbalance")
       case QueueCoins(outpoints, nodeId, peerAddrOpt) =>
-        RequestParam("queuecoins",
-                     Vector(up.writeJs(outpoints),
-                            up.writeJs(nodeId),
-                            up.writeJs(peerAddrOpt)))
+        peerAddrOpt match {
+          case Some(peerAddr) =>
+            RequestParam("queuecoins",
+                         Vector(up.writeJs(outpoints),
+                                up.writeJs(nodeId),
+                                up.writeJs(peerAddr)))
+          case None =>
+            RequestParam("queuecoins",
+                         Vector(up.writeJs(outpoints), up.writeJs(nodeId)))
+        }
       case GetVersion =>
         // skip sending to server and just return version number of cli
         return Success(getClass.getPackage.getImplementationVersion)
