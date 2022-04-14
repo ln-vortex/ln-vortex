@@ -16,9 +16,7 @@ import scodec.bits.ByteVector
 sealed trait VortexMessage extends NetworkElement with TLVUtil {
   def tpe: BigSizeUInt
 
-  def length: BigSizeUInt = {
-    BigSizeUInt.calcFor(value)
-  }
+  def length: BigSizeUInt = BigSizeUInt.calcFor(value)
 
   def value: ByteVector
 
