@@ -1,5 +1,7 @@
 package com.lnvortex.rpc
 
+import com.lnvortex.config.Picklers._
+import org.bitcoins.commons.serializers.Picklers.inetSocketAddress
 import org.bitcoins.commons.jsonmodels.bitcoind.RpcOpts._
 import org.bitcoins.core.api.wallet.CoinSelectionAlgo
 import org.bitcoins.core.protocol.BitcoinAddress
@@ -8,6 +10,8 @@ import org.bitcoins.core.protocol.transaction._
 import org.bitcoins.core.psbt.PSBT
 import org.bitcoins.core.util.TimeUtil
 import ujson._
+import upickle.{default => up}
+import upickle.default._
 
 import java.net.InetSocketAddress
 import java.time.Instant
@@ -17,9 +21,19 @@ import scala.util.control.NonFatal
 case class QueueCoins(
     outpoints: Vector[TransactionOutPoint],
     nodeId: NodeId,
-    peerAddrOpt: Option[InetSocketAddress])
+    peerAddr: Option[InetSocketAddress])
 
 object QueueCoins extends ServerJsonModels {
+
+  implicit val queueCoinsRW: Reader[QueueCoins] =
+    reader[ujson.Obj].map[QueueCoins](json =>
+      QueueCoins(
+        up.read[Vector[TransactionOutPoint]](json("outpoints")),
+        up.read[NodeId](json("nodeId")),
+        if (json.obj.contains("peerAddr")) {
+          Option(up.read[InetSocketAddress](json("peerAddr")))
+        } else None
+      ))
 
   def fromJsArr(jsArr: ujson.Arr): Try[QueueCoins] = {
     jsArr.arr.toList match {
@@ -41,6 +55,10 @@ object QueueCoins extends ServerJsonModels {
           new IllegalArgumentException(
             s"Bad number of arguments: ${other.length}. Expected: 2 or 3"))
     }
+  }
+
+  def fromJsObj(obj: ujson.Obj): Try[QueueCoins] = {
+    Try(upickle.default.read[QueueCoins](obj))
   }
 }
 

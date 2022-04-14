@@ -3,9 +3,13 @@ package com.lnvortex.config
 import com.lnvortex.core._
 import org.bitcoins.core.protocol.ln.node._
 import com.lnvortex.core.api._
-import org.bitcoins.commons.serializers.Picklers._
+import org.bitcoins.commons.serializers.Picklers.{
+  transactionOutPointPickler => _,
+  _
+}
 import org.bitcoins.core.currency._
 import org.bitcoins.core.protocol.ln.channel.ShortChannelId
+import org.bitcoins.core.protocol.transaction._
 import upickle.default._
 
 object Picklers {
@@ -17,6 +21,11 @@ object Picklers {
   implicit val ShortChannelIdRW: ReadWriter[ShortChannelId] = {
     readwriter[String].bimap(_.toHumanReadableString,
                              ShortChannelId.fromHumanReadableString)
+  }
+
+  implicit val TransactionOutPointRW: ReadWriter[TransactionOutPoint] = {
+    readwriter[String].bimap(_.toHumanReadableString,
+                             TransactionOutPoint.fromString)
   }
 
   implicit val unspentCoinRW: ReadWriter[UnspentCoin] = macroRW[UnspentCoin]

@@ -26,7 +26,7 @@ case class RpcServer(
 
   /** Handles all server commands by throwing a MethodNotFound */
   private val catchAllHandler: PartialFunction[ServerCommand, StandardRoute] = {
-    case ServerCommand(name, _) => throw HttpError.MethodNotFound(name)
+    case ServerCommand(_, name, _) => throw HttpError.MethodNotFound(name)
   }
 
   def authenticator(credentials: Credentials): Option[Done] =
@@ -39,14 +39,14 @@ case class RpcServer(
     }
 
   /** HTTP directive that handles both exceptions and rejections */
-  private def withErrorHandling(route: Route): Route = {
-
+  private def withErrorHandling(route: Route, id: Long): Route = {
     val rejectionHandler =
       RejectionHandler
         .newBuilder()
         .handleNotFound {
           complete {
             RpcServer.httpError(
+              id,
               """Resource not found. Hint: all RPC calls are made against root ('/')""",
               StatusCodes.BadRequest)
           }
@@ -56,11 +56,12 @@ case class RpcServer(
     val exceptionHandler = ExceptionHandler {
       case HttpError.MethodNotFound(method) =>
         complete(
-          RpcServer.httpError(s"'$method' is not a valid method",
+          RpcServer.httpError(id,
+                              s"'$method' is not a valid method",
                               StatusCodes.BadRequest))
       case err: Throwable =>
         logger.info(s"Unhandled error in server:", err)
-        complete(RpcServer.httpError(s"Request failed: ${err.getMessage}"))
+        complete(RpcServer.httpError(id, s"Request failed: ${err.getMessage}"))
     }
 
     handleRejections(rejectionHandler) {
@@ -75,17 +76,18 @@ case class RpcServer(
     DebuggingDirectives.logRequestResult(
       ("http-rpc-server", Logging.DebugLevel)) {
       authenticateBasic("auth", authenticator) { _ =>
-        withErrorHandling {
-          pathSingleSlash {
-            post {
-              entity(as[ServerCommand]) { cmd =>
+        pathSingleSlash {
+          entity(as[ServerCommand]) { cmd =>
+            withErrorHandling(
+              {
                 val init = PartialFunction.empty[ServerCommand, Route]
                 val handler = handlers.foldLeft(init) { case (accum, curr) =>
                   accum.orElse(curr.handleCommand)
                 }
                 handler.orElse(catchAllHandler).apply(cmd)
-              }
-            }
+              },
+              cmd.id
+            )
           }
         }
       }
@@ -107,11 +109,13 @@ object RpcServer {
 
   // TODO id parameter
   case class Response(
+      id: Long,
       result: Option[ujson.Value] = None,
       error: Option[String] = None) {
 
     def toJsonMap: Map[String, ujson.Value] = {
       Map(
+        "id" -> ujson.Num(id.toDouble),
         "result" -> (result match {
           case None      => ujson.Null
           case Some(res) => res
@@ -125,32 +129,31 @@ object RpcServer {
   }
 
   /** Creates a HTTP response with the given body as a JSON response */
-  def httpSuccess[T](body: T)(implicit
+  def httpSuccess[T](id: Long, body: T)(implicit
       writer: up.Writer[T]): HttpEntity.Strict = {
-    val response = Response(result = Some(up.writeJs(body)))
+    val response = Response(id, result = Some(up.writeJs(body)))
     HttpEntity(
       ContentTypes.`application/json`,
       up.write(response.toJsonMap)
     )
   }
 
-  def httpSuccessOption[T](bodyOpt: Option[T])(implicit
+  def httpSuccessOption[T](id: Long, bodyOpt: Option[T])(implicit
       writer: up.Writer[T]): HttpEntity.Strict = {
-    val response = Response(result = bodyOpt.map(body => up.writeJs(body)))
+    val response = Response(id, result = bodyOpt.map(body => up.writeJs(body)))
     HttpEntity(
       ContentTypes.`application/json`,
       up.write(response.toJsonMap)
     )
   }
 
-  def httpBadRequest(ex: Throwable): HttpResponse = {
-    httpBadRequest(ex.getMessage)
+  def httpBadRequest(id: Long, ex: Throwable): HttpResponse = {
+    httpBadRequest(id, ex.getMessage)
   }
 
-  def httpBadRequest(msg: String): HttpResponse = {
-
+  def httpBadRequest(id: Long, msg: String): HttpResponse = {
     val entity = {
-      val response = Response(error = Some(msg))
+      val response = Response(id, error = Some(msg))
       HttpEntity(
         ContentTypes.`application/json`,
         up.write(response.toJsonMap)
@@ -160,11 +163,11 @@ object RpcServer {
   }
 
   def httpError(
+      id: Long,
       msg: String,
       status: StatusCode = StatusCodes.InternalServerError): HttpResponse = {
-
     val entity = {
-      val response = Response(error = Some(msg))
+      val response = Response(id, error = Some(msg))
       HttpEntity(
         ContentTypes.`application/json`,
         up.write(response.toJsonMap)

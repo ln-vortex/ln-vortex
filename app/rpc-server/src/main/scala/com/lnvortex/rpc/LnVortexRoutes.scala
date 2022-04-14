@@ -16,42 +16,42 @@ case class LnVortexRoutes(client: VortexClient[VortexWalletApi])(implicit
   implicit val ec: ExecutionContext = system.dispatcher
 
   override def handleCommand: PartialFunction[ServerCommand, Route] = {
-    case ServerCommand("listutxos", _) =>
+    case ServerCommand(id, "listutxos", _) =>
       complete {
         client.listCoins().map { utxos =>
           val json = upickle.default.writeJs(utxos)
-          RpcServer.httpSuccess(json)
+          RpcServer.httpSuccess(id, json)
         }
       }
 
-    case ServerCommand("getbalance", _) =>
+    case ServerCommand(id, "getbalance", _) =>
       complete {
         client.listCoins().map { utxos =>
           val balance = utxos.map(_.amount).sum.satoshis
-          RpcServer.httpSuccess(balance.toLong)
+          RpcServer.httpSuccess(id, balance.toLong)
         }
       }
 
-    case ServerCommand("listtransactions", _) =>
+    case ServerCommand(id, "listtransactions", _) =>
       complete {
         client.vortexWallet.listTransactions().map { txs =>
-          RpcServer.httpSuccess(txs)
+          RpcServer.httpSuccess(id, txs)
         }
       }
 
-    case ServerCommand("listchannels", _) =>
+    case ServerCommand(id, "listchannels", _) =>
       complete {
         client.vortexWallet.listChannels().map { channels =>
-          RpcServer.httpSuccess(channels)
+          RpcServer.httpSuccess(id, channels)
         }
       }
 
-    case ServerCommand("queuecoins", arr) =>
-      withValidServerCommand(QueueCoins.fromJsArr(arr)) {
+    case ServerCommand(id, "queuecoins", obj) =>
+      withValidServerCommand(QueueCoins.fromJsObj(obj)) {
         case QueueCoins(outpoints, nodeId, peerAddrOpt) =>
           complete {
             client.queueCoins(outpoints, nodeId, peerAddrOpt).map { _ =>
-              RpcServer.httpSuccess(Null)
+              RpcServer.httpSuccess(id, Null)
             }
           }
       }
