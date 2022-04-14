@@ -8,6 +8,19 @@ import org.scalacheck.Gen
 
 object Generators {
 
+  def ping: Gen[PingTLV] = {
+    for {
+      u16 <- NumberGenerator.uInt16
+      bytes <- NumberGenerator.bytevector
+    } yield PingTLV(u16, bytes)
+  }
+
+  def pong: Gen[PongTLV] = {
+    for {
+      ping <- ping
+    } yield PongTLV.forIgnored(ping.ignored)
+  }
+
   def askMixDetails: Gen[AskMixDetails] = {
     for {
       network <- ChainParamsGenerator.bitcoinNetworkParams

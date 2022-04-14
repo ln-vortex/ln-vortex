@@ -10,6 +10,20 @@ class VortexMessageSerializationTest extends BitcoinSUnitTest {
     assert(allTypes.distinct == allTypes)
   }
 
+  "Ping" must "have serialization symmetry" in {
+    forAll(Generators.ping) { msg =>
+      assert(PingTLV(msg.bytes) == msg)
+      assert(VortexMessage(msg.bytes) == msg)
+    }
+  }
+
+  "Pong" must "have serialization symmetry" in {
+    forAll(Generators.pong) { msg =>
+      assert(PongTLV(msg.bytes) == msg)
+      assert(VortexMessage(msg.bytes) == msg)
+    }
+  }
+
   "AskMixDetails" must "have serialization symmetry" in {
     forAll(Generators.askMixDetails) { msg =>
       assert(AskMixDetails(msg.bytes) == msg)
