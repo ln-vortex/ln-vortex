@@ -29,8 +29,10 @@ class CoordinatorKeyManager()(implicit
                                         config.aesPasswordOpt,
                                         config.bip39PasswordOpt)
 
+  private val coinType = HDCoinType.fromNetwork(config.network)
+
   private val pubKeyPath = BIP32Path.fromHardenedString(
-    s"m/${CoordinatorKeyManager.PURPOSE.constant}'/0'/0'")
+    s"m/${CoordinatorKeyManager.PURPOSE.constant}'/${coinType.toInt}'/0'")
 
   private lazy val nonceCounter: AtomicInteger = {
     val f = aliceDAO.nextNonceIndex()
