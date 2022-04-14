@@ -75,7 +75,7 @@ case class LnVortexAppConfig(
 object LnVortexAppConfig
     extends AppConfigFactoryBase[LnVortexAppConfig, ActorSystem] {
 
-  override val moduleName: String = "ln-vortex"
+  override val moduleName: String = "vortex"
 
   final val DEFAULT_DATADIR: Path =
     Paths.get(Properties.userHome, ".ln-vortex")
