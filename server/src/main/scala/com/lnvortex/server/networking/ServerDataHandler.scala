@@ -10,7 +10,6 @@ import scodec.bits.ByteVector
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent._
-import scala.concurrent.duration.DurationInt
 
 class ServerDataHandler(
     coordinator: VortexCoordinator,
@@ -27,13 +26,6 @@ class ServerDataHandler(
   }
 
   val lastPing = new AtomicReference(ByteVector.empty.toArray)
-
-  context.system.scheduler.scheduleAtFixedRate(0.seconds, 60.seconds) { () =>
-    val hash = CryptoUtil.sha256(ECPrivateKey.freshPrivateKey.bytes)
-    val ping = PingTLV(hash.bytes)
-    lastPing.set(hash.bytes.toArray)
-    connectionHandler ! ping
-  }
 
   override def receive: Receive = LoggingReceive {
     case ping: PingTLV =>

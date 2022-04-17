@@ -107,14 +107,14 @@ lazy val cli = project
   .in(file("app/cli"))
   .settings(CommonSettings.prodSettings: _*)
   .settings(libraryDependencies ++= Deps.cli)
-  .settings(name := "cli")
+  .settings(name := "vortex-cli")
   .dependsOn(config)
 
 lazy val rpcServer = project
   .in(file("app/rpc-server"))
   .settings(CommonSettings.prodSettings: _*)
   .settings(libraryDependencies ++= Deps.rpcServer)
-  .settings(name := "rpc-server")
+  .settings(name := "vortexd")
   .dependsOn(client, lnd, clightning, config)
 
 lazy val coordinatorConfig = project

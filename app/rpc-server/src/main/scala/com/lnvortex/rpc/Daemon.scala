@@ -40,7 +40,7 @@ object Daemon extends App with Logging {
 
     _ = logger.info("Starting rpc server")
     _ <- server.start()
-    _ = logger.info("Ln Vortex Client started!")
+    _ = logger.info(s"Ln Vortex Client started on network ${config.network}!")
   } yield ()
 
   f.failed.foreach { ex =>

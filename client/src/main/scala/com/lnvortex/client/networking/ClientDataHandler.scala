@@ -6,7 +6,7 @@ import com.lnvortex.client.VortexClient
 import com.lnvortex.core._
 import com.lnvortex.core.api.VortexWalletApi
 import grizzled.slf4j.Logging
-import org.bitcoins.crypto.{CryptoUtil, ECPrivateKey}
+import org.bitcoins.crypto._
 import scodec.bits.ByteVector
 
 import java.util.concurrent.atomic.AtomicReference
@@ -26,7 +26,7 @@ class ClientDataHandler(
 
   val lastPing = new AtomicReference(ByteVector.empty.toArray)
 
-  context.system.scheduler.scheduleAtFixedRate(0.seconds, 60.seconds) { () =>
+  context.system.scheduler.scheduleAtFixedRate(30.seconds, 60.seconds) { () =>
     val hash = CryptoUtil.sha256(ECPrivateKey.freshPrivateKey.bytes)
     val ping = PingTLV(hash.bytes)
     lastPing.set(hash.bytes.toArray)

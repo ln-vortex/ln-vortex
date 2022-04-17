@@ -15,7 +15,6 @@ import org.bitcoins.core.psbt.PSBT
 import org.bitcoins.crypto.{DoubleSha256DigestBE, SchnorrNonce}
 import org.bitcoins.lnd.rpc.LndRpcClient
 import org.bitcoins.lnd.rpc.LndUtils._
-import org.bitcoins.lnd.rpc.config.{LndInstanceLocal, LndInstanceRemote}
 import scodec.bits.ByteVector
 import walletrpc.LabelTransactionRequest
 
@@ -30,14 +29,12 @@ case class LndVortexWallet(lndRpcClient: LndRpcClient)(implicit
 
   private val channelOpener = LndChannelOpener(lndRpcClient)
 
-  override lazy val network: BitcoinNetwork = lndRpcClient.instance match {
-    case local: LndInstanceLocal => local.network
-    case _: LndInstanceRemote =>
-      val networkF = lndRpcClient.getInfo
-        .map(_.chains.head.network)
-        .map(BitcoinNetworks.fromString)
+  override lazy val network: BitcoinNetwork = {
+    val networkF = lndRpcClient.getInfo
+      .map(_.chains.head.network)
+      .map(BitcoinNetworks.fromString)
 
-      Await.result(networkF, 15.seconds)
+    Await.result(networkF, 15.seconds)
   }
 
   override def getNewAddress(): Future[BitcoinAddress] =
