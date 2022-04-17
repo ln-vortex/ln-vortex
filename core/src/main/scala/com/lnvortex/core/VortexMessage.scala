@@ -107,51 +107,35 @@ object UnknownVortexMessage extends Factory[UnknownVortexMessage] {
   }
 }
 
-case class PingTLV(numPongBytes: UInt16, ignored: ByteVector)
-    extends VortexMessage {
+case class PingTLV() extends VortexMessage {
   override val tpe: BigSizeUInt = PingTLV.tpe
 
-  override val value: ByteVector = {
-    numPongBytes.bytes ++ u16Prefix(ignored)
-  }
+  override val value: ByteVector = ByteVector.empty
 }
 
 object PingTLV extends VortexMessageFactory[PingTLV] {
   override val tpe: BigSizeUInt = BigSizeUInt(18)
 
   override def fromTLVValue(value: ByteVector): PingTLV = {
-    val iter = ValueIterator(value)
-
-    val numPongBytes = iter.takeU16()
-    val ignored = iter.takeU16Prefixed(iter.take)
-
-    PingTLV(numPongBytes, ignored)
+    require(value.isEmpty, "PingTLV must be empty")
+    PingTLV()
   }
 
   override val typeName: String = "PingTLV"
 }
 
-case class PongTLV(ignored: ByteVector) extends VortexMessage {
+case class PongTLV() extends VortexMessage {
   override val tpe: BigSizeUInt = PongTLV.tpe
 
-  override val value: ByteVector = {
-    u16Prefix(ignored)
-  }
+  override val value: ByteVector = ByteVector.empty
 }
 
 object PongTLV extends VortexMessageFactory[PongTLV] {
   override val tpe: BigSizeUInt = BigSizeUInt(19)
 
   override def fromTLVValue(value: ByteVector): PongTLV = {
-    val iter = ValueIterator(value)
-
-    val ignored = iter.takeU16Prefixed(iter.take)
-
-    PongTLV.forIgnored(ignored)
-  }
-
-  def forIgnored(ignored: ByteVector): PongTLV = {
-    new PongTLV(ignored)
+    require(value.isEmpty, "PongTLV must be empty")
+    PongTLV()
   }
 
   override val typeName: String = "PongTLV"

@@ -28,13 +28,10 @@ class ServerDataHandler(
   val lastPing = new AtomicReference(ByteVector.empty.toArray)
 
   override def receive: Receive = LoggingReceive {
-    case ping: PingTLV =>
-      val pong = PongTLV.forIgnored(ping.ignored)
+    case _: PingTLV =>
+      val pong = PongTLV()
       connectionHandler ! pong
-    case pongTLV: PongTLV =>
-      if (!(pongTLV.ignored.toArray sameElements lastPing.get())) {
-        logger.error("Received invalid pong message")
-      }
+    case _: PongTLV => ()
     case clientMessage: ClientVortexMessage =>
       logger.debug(s"Received VortexMessage ${clientMessage.typeName}")
       val f: Future[Unit] = handleVortexMessage(clientMessage)

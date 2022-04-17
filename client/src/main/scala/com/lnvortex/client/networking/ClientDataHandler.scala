@@ -28,19 +28,16 @@ class ClientDataHandler(
 
   context.system.scheduler.scheduleAtFixedRate(30.seconds, 60.seconds) { () =>
     val hash = CryptoUtil.sha256(ECPrivateKey.freshPrivateKey.bytes)
-    val ping = PingTLV(hash.bytes)
+    val ping = PingTLV()
     lastPing.set(hash.bytes.toArray)
     connectionHandler ! ping
   }
 
   override def receive: Receive = LoggingReceive {
-    case ping: PingTLV =>
-      val pong = PongTLV.forIgnored(ping.ignored)
+    case _: PingTLV =>
+      val pong = PongTLV()
       connectionHandler ! pong
-    case pongTLV: PongTLV =>
-      if (!(pongTLV.ignored.toArray sameElements lastPing.get())) {
-        logger.error("Received invalid pong message")
-      }
+    case _: PongTLV => ()
     case serverMessage: ServerVortexMessage =>
       logger.info(s"Received VortexMessage ${serverMessage.typeName}")
       val f: Future[Unit] = handleVortexMessage(serverMessage)
