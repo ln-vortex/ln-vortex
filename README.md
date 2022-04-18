@@ -1,14 +1,11 @@
 # LnVortex
 
-[![Build Status](https://github.com/benthecarman/ln-vortex/actions/workflows/compile.yml/badge.svg)](https://github.com/benthecarman/ln-vortex/actions)
-[![Tests Passing](https://github.com/benthecarman/ln-vortex/actions/workflows/test.yml/badge.svg)](https://github.com/benthecarman/ln-vortex/actions)
-
 LnVortex is a tool to allow users to open lightning channels in a coinjoin when
-using [lnd](https://github.com/lightningnetwork/lnd).
+using [lnd](https://github.com/lightningnetwork/lnd) and [Core Lightning](https://github.com/ElementsProject/lightning)
 
 ## Compatibility
 
-LnVortex is compatible with `lnd` version v0.14.0-beta.
+LnVortex is compatible with `lnd` version v0.14.2-beta and core lightning version v0.10.2.
 
 ## Building from source
 
