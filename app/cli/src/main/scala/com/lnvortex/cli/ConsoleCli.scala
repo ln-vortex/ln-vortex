@@ -20,6 +20,7 @@ import java.net.InetSocketAddress
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util._
+import System.err.{println => printerr}
 
 object ConsoleCli {
 
@@ -106,7 +107,9 @@ object ConsoleCli {
                               rpcPortOpt = Some(serverConfig.rpcPort))
 
     val config = OParser.parse(parser, args, cliConfig) match {
-      case None       => sys.exit(1)
+      case None =>
+        printerr("Error parsing config")
+        sys.exit(1)
       case Some(conf) => conf
     }
 
@@ -114,7 +117,6 @@ object ConsoleCli {
   }
 
   def exec(command: CliCommand, config: CliConfig): Try[String] = {
-    import System.err.{println => printerr}
 
     /** Prints the given message to stderr if debug is set */
     def debug(message: Any): Unit = {
@@ -220,7 +222,7 @@ object ConsoleCli {
     }.flatten
   }
 
-  def host = "localhost"
+  val host = "127.0.0.1"
 
   case class RequestParam(
       method: String,

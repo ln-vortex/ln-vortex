@@ -24,7 +24,6 @@ case class LnVortexRoutes(client: VortexClient[VortexWalletApi])(implicit
         }
       }
 
-    // todo no commands are working
     case ServerCommand(id, "getinfo", _) =>
       complete {
         val json = Obj(
