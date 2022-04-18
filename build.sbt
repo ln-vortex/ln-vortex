@@ -11,7 +11,7 @@ name := "LnVortex"
 
 version := "1.0"
 
-scalaVersion := "2.13.7"
+scalaVersion := "2.13.8"
 
 resolvers += Resolver.sonatypeRepo("snapshots")
 
