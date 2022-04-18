@@ -5,7 +5,7 @@ LnVortex runs a JSON RPC server. For this:
 - All responses return a json object containing a `result` or an `error`, these can both be json objects.
 - All requests must have an id that is either a `string` or a `number`
 - All requests must have a `method` that is a `string`
-- When a request has parameters is must be a json object as a `params` field.
+- When a request has parameters it must have a `params` field that is a json object.
 
 Example request:
 
@@ -35,7 +35,7 @@ None
 
 #### Response
 
-- network: String - [MainNet, Testnet3, RegTest, Signet]
+- network: String - [MainNet, TestNet3, RegTest, SigNet]
 
 
 ### List UTXOs
