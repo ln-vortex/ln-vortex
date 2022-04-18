@@ -25,22 +25,28 @@ object Daemon extends App with Logging {
 
   logger.info("Starting...")
 
+  val configStartF = serverConfig.start()
+
+  val server = RpcServer(
+    handlers = Vector(LnVortexRoutes(client)),
+    rpcBindOpt = serverConfig.rpcBind,
+    rpcPort = serverConfig.rpcPort,
+    rpcUser = serverConfig.rpcUsername,
+    rpcPassword = serverConfig.rpcPassword
+  )
+
+  val rpcStartF = configStartF.flatMap { _ =>
+    logger.info("Starting rpc server")
+    server.start().map { _ =>
+      logger.info(s"Ln Vortex Client started on network ${config.network}!")
+    }
+  }
+
+  val clientF = configStartF.flatMap(_ => client.start())
+
   val f = for {
-    _ <- serverConfig.start()
-    _ <- client.start()
-
-    routes = LnVortexRoutes(client)
-    server = RpcServer(
-      handlers = Vector(routes),
-      rpcBindOpt = serverConfig.rpcBind,
-      rpcPort = serverConfig.rpcPort,
-      rpcUser = serverConfig.rpcUsername,
-      rpcPassword = serverConfig.rpcPassword
-    )
-
-    _ = logger.info("Starting rpc server")
-    _ <- server.start()
-    _ = logger.info(s"Ln Vortex Client started on network ${config.network}!")
+    _ <- clientF
+    _ <- rpcStartF
   } yield ()
 
   f.failed.foreach { ex =>

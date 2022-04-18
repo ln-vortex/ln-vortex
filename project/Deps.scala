@@ -37,6 +37,8 @@ object Deps {
 
     val microPickleV = "1.5.0"
 
+    val logback = "1.2.11"
+    val slf4j = "1.7.36"
     val grizzledSlf4jV = "1.3.4"
   }
 
@@ -68,6 +70,15 @@ object Deps {
 
     val grizzledSlf4j =
       "org.clapper" %% "grizzled-slf4j" % V.grizzledSlf4jV withSources () withJavadoc ()
+
+    val slf4jApi =
+      "org.slf4j" % "slf4j-api" % V.slf4j % "provided" withSources () withJavadoc ()
+
+    val slf4jSimple =
+      "org.slf4j" % "slf4j-simple" % V.slf4j % "provided" withSources () withJavadoc ()
+
+    val logback =
+      "ch.qos.logback" % "logback-classic" % V.logback withSources () withJavadoc ()
 
     val bitcoinsCore =
       "org.bitcoin-s" %% "bitcoin-s-core" % V.bitcoinsV withSources () withJavadoc ()
@@ -101,39 +112,13 @@ object Deps {
 
     val bitcoinsDbCommons =
       "org.bitcoin-s" %% "bitcoin-s-db-commons" % V.bitcoinsV withSources () withJavadoc ()
-
-    val scalaFx =
-      "org.scalafx" %% "scalafx" % Deps.V.scalaFxV withSources () withJavadoc ()
-
-    lazy val javaFxBase =
-      "org.openjfx" % s"javafx-base" % V.javaFxV classifier osName withSources () withJavadoc ()
-
-    lazy val javaFxControls =
-      "org.openjfx" % s"javafx-controls" % V.javaFxV classifier osName withSources () withJavadoc ()
-
-    lazy val javaFxFxml =
-      "org.openjfx" % s"javafx-fxml" % V.javaFxV classifier osName withSources () withJavadoc ()
-
-    lazy val javaFxGraphics =
-      "org.openjfx" % s"javafx-graphics" % V.javaFxV classifier osName withSources () withJavadoc ()
-
-    lazy val javaFxMedia =
-      "org.openjfx" % s"javafx-media" % V.javaFxV classifier osName withSources () withJavadoc ()
-
-    lazy val javaFxSwing =
-      "org.openjfx" % s"javafx-swing" % V.javaFxV classifier osName withSources () withJavadoc ()
-
-    lazy val javaFxWeb =
-      "org.openjfx" % s"javafx-web" % V.javaFxV classifier osName withSources () withJavadoc ()
-
-    lazy val javaFxDeps = List(javaFxBase,
-                               javaFxControls,
-                               javaFxFxml,
-                               javaFxGraphics,
-                               javaFxMedia,
-                               javaFxSwing,
-                               javaFxWeb)
   }
+
+  val logging: List[ModuleID] =
+    List(Compile.logback,
+         Compile.slf4jSimple,
+         Compile.slf4jApi,
+         Compile.grizzledSlf4j)
 
   val config: List[ModuleID] = List(Compile.bitcoinsAppCommons)
 
@@ -151,35 +136,30 @@ object Deps {
     List(
       Compile.akkaHttp,
       Compile.akkaSlf4j,
-      Compile.micoPickle,
-      Compile.grizzledSlf4j
-    )
+      Compile.micoPickle
+    ) ++ logging
 
   val core: List[ModuleID] = List(
-    Compile.bitcoinsCore,
-    Compile.grizzledSlf4j
-  )
+    Compile.bitcoinsCore
+  ) ++ logging
 
-  val lndBackend: List[ModuleID] =
-    List(Compile.bitcoinsLnd, Compile.grizzledSlf4j)
+  val lndBackend: List[ModuleID] = List(Compile.bitcoinsLnd) ++ logging
 
   val bitcoindBackend: List[ModuleID] =
-    List(Compile.bitcoinsBitcoindRpc, Compile.grizzledSlf4j)
+    List(Compile.bitcoinsBitcoindRpc) ++ logging
 
   val cLightningBackend: List[ModuleID] =
     List(Compile.bitcoinsCLightning,
-         Compile.grizzledSlf4j,
          Compile.akkaActor,
-         Compile.bitcoinsCore)
+         Compile.bitcoinsCore) ++ logging
 
   val client: List[ModuleID] = List(
     Compile.bitcoinsTor,
     Compile.akkaActor,
     Compile.akkaHttp,
     Compile.akkaStream,
-    Compile.akkaSlf4j,
-    Compile.grizzledSlf4j
-  )
+    Compile.akkaSlf4j
+  ) ++ logging
 
   val backend: List[ModuleID] = List(
     Compile.bitcoinsTor,
@@ -187,9 +167,8 @@ object Deps {
     Compile.akkaActor,
     Compile.akkaHttp,
     Compile.akkaStream,
-    Compile.akkaSlf4j,
-    Compile.grizzledSlf4j
-  )
+    Compile.akkaSlf4j
+  ) ++ logging
 
   val server: List[ModuleID] =
     List(Compile.bitcoinsKeyManager,
@@ -200,7 +179,4 @@ object Deps {
 
   val clientServerTest: List[ModuleID] =
     List(Compile.bitcoinsTestkit, Compile.bitcoinsBitcoindRpc) ++ backend
-
-  val gui: List[ModuleID] =
-    List(Compile.scalaFx, Compile.grizzledSlf4j) ++ Compile.javaFxDeps
 }

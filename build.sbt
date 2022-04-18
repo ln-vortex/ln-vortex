@@ -65,7 +65,6 @@ lazy val root = project
     lndTest,
     server,
     serverTest,
-    gui,
     testkit
   )
   .dependsOn(
@@ -87,7 +86,6 @@ lazy val root = project
     lndTest,
     server,
     serverTest,
-    gui,
     testkit
   )
   .settings(CommonSettings.settings: _*)
@@ -230,12 +228,6 @@ lazy val testkit = project
   .settings(CommonSettings.testSettings: _*)
   .settings(name := "testkit", libraryDependencies ++= Deps.clientServerTest)
   .dependsOn(core, client, server, coreTest, lnd, clightning)
-
-lazy val gui = project
-  .in(file("gui"))
-  .settings(CommonSettings.settings: _*)
-  .settings(name := "gui", libraryDependencies ++= Deps.gui)
-  .dependsOn(client)
 
 TaskKeys.downloadLnd := {
   val logger = streams.value.log
