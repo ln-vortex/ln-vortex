@@ -81,6 +81,7 @@ case class RpcServer(
             extractMethod { method =>
               withErrorHandling(
                 {
+                  logger.trace(s"Received rpc call ($cmd)!")
                   if (method == HttpMethods.GET || method == HttpMethods.POST) {
                     val init = PartialFunction.empty[ServerCommand, Route]
                     val handler = handlers.foldLeft(init) {
@@ -114,7 +115,6 @@ case class RpcServer(
 
 object RpcServer {
 
-  // TODO id parameter
   case class Response(
       id: Long,
       result: Option[ujson.Value] = None,
