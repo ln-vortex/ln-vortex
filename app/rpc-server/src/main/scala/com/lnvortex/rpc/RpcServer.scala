@@ -10,6 +10,7 @@ import akka.http.scaladsl.server._
 import akka.http.scaladsl.server.directives.{Credentials, DebuggingDirectives}
 import de.heikoseeberger.akkahttpupickle.UpickleSupport._
 import grizzled.slf4j.Logging
+import ujson._
 import upickle.{default => up}
 
 import scala.concurrent.Future
@@ -39,7 +40,9 @@ case class RpcServer(
     }
 
   /** HTTP directive that handles both exceptions and rejections */
-  private def withErrorHandling(route: Route, id: Long): Route = {
+  private def withErrorHandling(
+      route: Route,
+      id: Either[String, Long]): Route = {
     val rejectionHandler =
       RejectionHandler
         .newBuilder()
@@ -78,16 +81,24 @@ case class RpcServer(
       authenticateBasic("auth", authenticator) { _ =>
         pathSingleSlash {
           entity(as[ServerCommand]) { cmd =>
-            withErrorHandling(
-              {
-                val init = PartialFunction.empty[ServerCommand, Route]
-                val handler = handlers.foldLeft(init) { case (accum, curr) =>
-                  accum.orElse(curr.handleCommand)
-                }
-                handler.orElse(catchAllHandler).apply(cmd)
-              },
-              cmd.id
-            )
+            extractMethod { method =>
+              withErrorHandling(
+                {
+                  logger.trace(s"Received rpc call ($cmd)!")
+                  if (method == HttpMethods.GET || method == HttpMethods.POST) {
+                    val init = PartialFunction.empty[ServerCommand, Route]
+                    val handler = handlers.foldLeft(init) {
+                      case (accum, curr) =>
+                        accum.orElse(curr.handleCommand)
+                    }
+                    handler.orElse(catchAllHandler).apply(cmd)
+                  } else
+                    throw new RuntimeException(
+                      s"Invalid http method ${method.value}")
+                },
+                cmd.id
+              )
+            }
           }
         }
       }
@@ -107,15 +118,19 @@ case class RpcServer(
 
 object RpcServer {
 
-  // TODO id parameter
   case class Response(
-      id: Long,
+      id: Either[String, Long],
       result: Option[ujson.Value] = None,
       error: Option[String] = None) {
 
+    lazy val idJs: Value with Serializable = id match {
+      case Left(value)  => Str(value)
+      case Right(value) => Num(value.toDouble)
+    }
+
     def toJsonMap: Map[String, ujson.Value] = {
       Map(
-        "id" -> ujson.Num(id.toDouble),
+        "id" -> idJs,
         "result" -> (result match {
           case None      => ujson.Null
           case Some(res) => res
@@ -129,7 +144,7 @@ object RpcServer {
   }
 
   /** Creates a HTTP response with the given body as a JSON response */
-  def httpSuccess[T](id: Long, body: T)(implicit
+  def httpSuccess[T](id: Either[String, Long], body: T)(implicit
       writer: up.Writer[T]): HttpEntity.Strict = {
     val response = Response(id, result = Some(up.writeJs(body)))
     HttpEntity(
@@ -138,8 +153,8 @@ object RpcServer {
     )
   }
 
-  def httpSuccessOption[T](id: Long, bodyOpt: Option[T])(implicit
-      writer: up.Writer[T]): HttpEntity.Strict = {
+  def httpSuccessOption[T](id: Either[String, Long], bodyOpt: Option[T])(
+      implicit writer: up.Writer[T]): HttpEntity.Strict = {
     val response = Response(id, result = bodyOpt.map(body => up.writeJs(body)))
     HttpEntity(
       ContentTypes.`application/json`,
@@ -147,11 +162,11 @@ object RpcServer {
     )
   }
 
-  def httpBadRequest(id: Long, ex: Throwable): HttpResponse = {
+  def httpBadRequest(id: Either[String, Long], ex: Throwable): HttpResponse = {
     httpBadRequest(id, ex.getMessage)
   }
 
-  def httpBadRequest(id: Long, msg: String): HttpResponse = {
+  def httpBadRequest(id: Either[String, Long], msg: String): HttpResponse = {
     val entity = {
       val response = Response(id, error = Some(msg))
       HttpEntity(
@@ -163,7 +178,7 @@ object RpcServer {
   }
 
   def httpError(
-      id: Long,
+      id: Either[String, Long],
       msg: String,
       status: StatusCode = StatusCodes.InternalServerError): HttpResponse = {
     val entity = {

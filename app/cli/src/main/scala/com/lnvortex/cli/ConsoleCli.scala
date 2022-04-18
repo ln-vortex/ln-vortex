@@ -20,6 +20,7 @@ import java.net.InetSocketAddress
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util._
+import System.err.{println => printerr}
 
 object ConsoleCli {
 
@@ -106,7 +107,9 @@ object ConsoleCli {
                               rpcPortOpt = Some(serverConfig.rpcPort))
 
     val config = OParser.parse(parser, args, cliConfig) match {
-      case None       => sys.exit(1)
+      case None =>
+        printerr("Error parsing config")
+        sys.exit(1)
       case Some(conf) => conf
     }
 
@@ -114,7 +117,6 @@ object ConsoleCli {
   }
 
   def exec(command: CliCommand, config: CliConfig): Try[String] = {
-    import System.err.{println => printerr}
 
     /** Prints the given message to stderr if debug is set */
     def debug(message: Any): Unit = {
@@ -134,18 +136,8 @@ object ConsoleCli {
       case ListTransactions => RequestParam("listtransactions")
       case ListChannels     => RequestParam("listchannels")
       case GetBalance       => RequestParam("getbalance")
-      case QueueCoins(outpoints, nodeId, peerAddrOpt) =>
-        peerAddrOpt match {
-          case Some(peerAddr) =>
-            RequestParam("queuecoins",
-                         Vector(up.writeJs(outpoints),
-                                up.writeJs(nodeId),
-                                up.writeJs(peerAddr)))
-          case None =>
-            RequestParam("queuecoins",
-                         Vector(up.writeJs(outpoints), up.writeJs(nodeId)))
-        }
-      case GetVersion =>
+      case qc: QueueCoins   => RequestParam("queuecoins", Some(qc.json))
+      case GetVersion       =>
         // skip sending to server and just return version number of cli
         return Success(getClass.getPackage.getImplementationVersion)
       case NoCommand => throw new RuntimeException("Attempted to use NoCommand")
@@ -220,17 +212,15 @@ object ConsoleCli {
     }.flatten
   }
 
-  def host = "localhost"
+  val host = "127.0.0.1"
 
-  case class RequestParam(
-      method: String,
-      params: Seq[ujson.Value.Value] = Nil) {
+  case class RequestParam(method: String, params: Option[ujson.Obj] = None) {
 
     lazy val toJsonMap: Map[String, ujson.Value] = {
-      if (params.isEmpty)
-        Map("method" -> method)
-      else
-        Map("method" -> method, "params" -> params)
+      params match {
+        case Some(params) => Map("method" -> method, "params" -> params)
+        case None         => Map("method" -> method)
+      }
     }
   }
 }
@@ -276,6 +266,22 @@ object CliCommand {
       outpoints: Vector[TransactionOutPoint],
       nodeId: NodeId,
       peerAddrOpt: Option[InetSocketAddress])
-      extends CliCommand
+      extends CliCommand {
 
+    val json: Obj = {
+      peerAddrOpt match {
+        case Some(peerAddr) =>
+          Obj(
+            "outpoints" -> up.writeJs(outpoints),
+            "nodeId" -> up.writeJs(nodeId),
+            "peerAddr" -> up.writeJs(peerAddr)
+          )
+        case None =>
+          Obj(
+            "outpoints" -> up.writeJs(outpoints),
+            "nodeId" -> up.writeJs(nodeId)
+          )
+      }
+    }
+  }
 }

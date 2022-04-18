@@ -53,5 +53,4 @@ object Daemon extends App with Logging {
     ex.printStackTrace()
     logger.error("Error", ex)
   }
-
 }

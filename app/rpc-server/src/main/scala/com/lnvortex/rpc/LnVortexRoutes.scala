@@ -24,6 +24,15 @@ case class LnVortexRoutes(client: VortexClient[VortexWalletApi])(implicit
         }
       }
 
+    case ServerCommand(id, "getinfo", _) =>
+      complete {
+        val json = Obj(
+          "network" -> Str(client.vortexWallet.network.toString)
+        )
+
+        RpcServer.httpSuccess(id, json)
+      }
+
     case ServerCommand(id, "getbalance", _) =>
       complete {
         client.listCoins().map { utxos =>
