@@ -2,9 +2,6 @@ name: Compile Check
 
 on:
   pull_request:
-  push:
-    branches: [ master, main ]
-    tags: [ "*" ]
 
 jobs:
   linux:

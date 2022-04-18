@@ -2,9 +2,6 @@ name: Run Client & Server Tests Tests
 
 on:
   pull_request:
-  push:
-    branches: [ master, main ]
-    tags: [ "*" ]
 
 jobs:
   test:

@@ -2,9 +2,6 @@
 #
 #on:
 #  pull_request:
-#  push:
-#    branches: [ master, main ]
-#    tags: [ "*" ]
 #
 #jobs:
 #  test:
