@@ -78,16 +78,23 @@ case class RpcServer(
       authenticateBasic("auth", authenticator) { _ =>
         pathSingleSlash {
           entity(as[ServerCommand]) { cmd =>
-            withErrorHandling(
-              {
-                val init = PartialFunction.empty[ServerCommand, Route]
-                val handler = handlers.foldLeft(init) { case (accum, curr) =>
-                  accum.orElse(curr.handleCommand)
-                }
-                handler.orElse(catchAllHandler).apply(cmd)
-              },
-              cmd.id
-            )
+            extractMethod { method =>
+              withErrorHandling(
+                {
+                  if (method == HttpMethods.GET || method == HttpMethods.POST) {
+                    val init = PartialFunction.empty[ServerCommand, Route]
+                    val handler = handlers.foldLeft(init) {
+                      case (accum, curr) =>
+                        accum.orElse(curr.handleCommand)
+                    }
+                    handler.orElse(catchAllHandler).apply(cmd)
+                  } else
+                    throw new RuntimeException(
+                      s"Invalid http method ${method.value}")
+                },
+                cmd.id
+              )
+            }
           }
         }
       }
