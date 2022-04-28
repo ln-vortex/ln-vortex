@@ -55,7 +55,6 @@ list of utxos:
 - outPoint: String - The transaction outpoint in format `txid:vout`
 - confirmed: Boolean - if the transaction is confirmed or not
 
-
 ### Get Balance
 
 method: `getbalance`
@@ -67,7 +66,6 @@ None
 #### Response
 
 balance in satoshis
-
 
 ### List Transactions
 
@@ -87,7 +85,6 @@ list of transactions:
 - blockHeight: Number
 - label: String
 
-
 ### List Channels
 
 method: `listchannels`
@@ -105,7 +102,6 @@ list of channels:
 - public: Boolean - If this is a public or private channel
 - amount: Number - Size of channel in satoshis
 - active: Boolean - if the channel is currently active
-
 
 ### Queue Coins
 
