@@ -2,6 +2,7 @@ package com.lnvortex.testkit
 
 import com.lnvortex.lnd.LndVortexWallet
 import org.bitcoins.core.currency.Bitcoins
+import org.bitcoins.core.number.UInt32
 import org.bitcoins.testkit.async.TestAsyncUtil
 import org.bitcoins.testkit.fixtures.BitcoinSFixture
 import org.bitcoins.testkit.lnd.LndRpcTestClient
@@ -37,7 +38,7 @@ trait LndVortexWalletFixture extends BitcoinSFixture with CachedBitcoindV21 {
           _ <- TestAsyncUtil.awaitConditionF(() =>
             lnd.getInfo.map(_.syncedToChain))
           _ <- TestAsyncUtil.awaitConditionF(() =>
-            lnd.getInfo.map(_.blockHeight == height))
+            lnd.getInfo.map(_.blockHeight == UInt32(height)))
           // Await funded
           _ <- TestAsyncUtil.awaitConditionF(() =>
             lnd.walletBalance().map(_.balance == Bitcoins(6)))
