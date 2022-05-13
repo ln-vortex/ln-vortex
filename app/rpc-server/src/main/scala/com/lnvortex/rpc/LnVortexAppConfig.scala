@@ -58,8 +58,16 @@ case class LnVortexAppConfig(
   private lazy val lndBinary: File =
     Paths.get(config.getString(s"$moduleName.lnd.binary")).toFile
 
-  private lazy val lndInstance: LndInstance =
-    LndInstanceLocal.fromDataDir(lndDataDir.toFile)
+  private lazy val lndInstance: LndInstance = {
+    val dir = lndDataDir.toFile
+    require(dir.exists, s"${dir.getPath} does not exist!")
+    require(dir.isDirectory, s"${dir.getPath} is not a directory!")
+
+    val confFile = dir.toPath.resolve("lnd.conf").toFile
+    val config = LndConfig(confFile, dir)
+
+    config.lndInstanceRemote
+  }
 
   lazy val lndRpcClient: LndRpcClient =
     LndRpcClient(lndInstance, Some(lndBinary))

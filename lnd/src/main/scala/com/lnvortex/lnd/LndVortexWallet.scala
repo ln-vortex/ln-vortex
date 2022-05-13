@@ -5,7 +5,6 @@ import com.lnvortex.core.api._
 import com.lnvortex.core.{InputReference, UnspentCoin}
 import org.bitcoins.core.config.{BitcoinNetwork, BitcoinNetworks}
 import org.bitcoins.core.currency.{CurrencyUnit, Satoshis}
-import org.bitcoins.core.number.UInt64
 import org.bitcoins.core.protocol.BitcoinAddress
 import org.bitcoins.core.protocol.ln.channel.ShortChannelId
 import org.bitcoins.core.protocol.ln.node.NodeId
@@ -133,7 +132,7 @@ case class LndVortexWallet(lndRpcClient: LndRpcClient)(implicit
       .map(_.map { channel =>
         ChannelDetails(
           remotePubkey = NodeId(channel.remotePubkey),
-          shortChannelId = ShortChannelId(UInt64(channel.chanId)),
+          shortChannelId = ShortChannelId(channel.chanId),
           public = !channel.`private`,
           amount = Satoshis(channel.capacity),
           active = channel.active
