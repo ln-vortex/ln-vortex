@@ -18,7 +18,7 @@ import org.bitcoins.lnd.rpc.config._
 import java.io.File
 import java.nio.file.{Path, Paths}
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.Properties
+import scala.util.{Properties, Try}
 
 case class LnVortexAppConfig(
     private val directory: Path,
@@ -70,7 +70,7 @@ case class LnVortexAppConfig(
   }
 
   lazy val lndRpcClient: LndRpcClient =
-    LndRpcClient(lndInstance, Some(lndBinary))
+    new LndRpcClient(lndInstance, Try(lndBinary).toOption)
 
   private lazy val clightningDataDir: Path =
     Paths.get(config.getString(s"$moduleName.clightning.datadir"))
