@@ -4,7 +4,7 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server._
 import com.lnvortex.client.VortexClient
-import com.lnvortex.config.Picklers._
+import com.lnvortex.config.VortexPicklers._
 import com.lnvortex.core.api.VortexWalletApi
 import ujson._
 

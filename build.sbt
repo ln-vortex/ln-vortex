@@ -51,6 +51,7 @@ lazy val root = project
     coordinatorRpc,
     cli,
     config,
+    configTest,
     rpcServer,
     bitcoind,
     bitcoindTest,
@@ -72,6 +73,7 @@ lazy val root = project
     coordinatorRpc,
     cli,
     config,
+    configTest,
     rpcServer,
     bitcoind,
     bitcoindTest,
@@ -100,6 +102,13 @@ lazy val config = project
   .settings(libraryDependencies ++= Deps.config)
   .settings(name := "config")
   .dependsOn(core)
+
+lazy val configTest = project
+  .in(file("app/config-test"))
+  .settings(CommonSettings.testSettings: _*)
+  .settings(libraryDependencies ++= Deps.config)
+  .settings(name := "config-test")
+  .dependsOn(config, testkit)
 
 lazy val cli = project
   .in(file("app/cli"))

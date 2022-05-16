@@ -8,6 +8,17 @@ import org.scalacheck.Gen
 
 object Generators {
 
+  def unspentCoin: Gen[UnspentCoin] = {
+    for {
+      addr <- AddressGenerator.bitcoinAddress
+      amt <- CurrencyUnitGenerator.positiveSatoshis
+      outpoint <- TransactionGenerators.outPoint
+      confirmed <- NumberGenerator.bool
+    } yield {
+      UnspentCoin(addr, amt, outpoint, confirmed)
+    }
+  }
+
   def askMixDetails: Gen[AskMixDetails] = {
     for {
       network <- ChainParamsGenerator.bitcoinNetworkParams

@@ -1,6 +1,6 @@
 package com.lnvortex.rpc
 
-import com.lnvortex.config.Picklers._
+import com.lnvortex.config.VortexPicklers._
 import org.bitcoins.commons.serializers.Picklers.inetSocketAddress
 import org.bitcoins.commons.jsonmodels.bitcoind.RpcOpts._
 import org.bitcoins.core.api.wallet.CoinSelectionAlgo

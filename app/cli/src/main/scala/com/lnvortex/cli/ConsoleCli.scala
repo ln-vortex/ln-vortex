@@ -3,7 +3,7 @@ package com.lnvortex.cli
 import com.lnvortex.cli.CliCommand._
 import com.lnvortex.cli.CliReaders._
 import com.lnvortex.cli.ConsoleCli.serverConfig
-import com.lnvortex.config.Picklers._
+import com.lnvortex.config.VortexPicklers._
 import com.lnvortex.config._
 import org.bitcoins.commons.serializers.Picklers.{
   transactionOutPointPickler => _,

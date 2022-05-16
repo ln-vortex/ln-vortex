@@ -35,7 +35,7 @@ object Deps {
 
     val codehausV = "3.1.7"
 
-    val microPickleV = "2.0.0"
+    val microPickleV = "1.3.8"
 
     val logback = "1.2.11"
     val slf4j = "1.7.36"
