@@ -12,7 +12,7 @@ import org.bitcoins.core.protocol.ln.channel.ShortChannelId
 import org.bitcoins.core.protocol.transaction._
 import upickle.default._
 
-object Picklers {
+object VortexPicklers {
 
   implicit val currencyUnitRW: ReadWriter[CurrencyUnit] = {
     readwriter[Long].bimap(_.satoshis.toLong, Satoshis(_))
