@@ -6,7 +6,7 @@ import akka.http.scaladsl.server._
 import com.lnvortex.client.VortexClient
 import com.lnvortex.config.VortexPicklers._
 import com.lnvortex.core.api.VortexWalletApi
-import ujson._
+import play.api.libs.json._
 
 import scala.concurrent._
 
@@ -19,16 +19,16 @@ case class LnVortexRoutes(client: VortexClient[VortexWalletApi])(implicit
     case ServerCommand(id, "listutxos", _) =>
       complete {
         client.listCoins().map { utxos =>
-          val json = upickle.default.writeJs(utxos)
-          RpcServer.httpSuccess(id, json)
+          RpcServer.httpSuccess(id, utxos)
         }
       }
 
     case ServerCommand(id, "getinfo", _) =>
       complete {
-        val json = Obj(
-          "network" -> Str(client.vortexWallet.network.toString)
-        )
+        val json = JsObject(
+          Vector(
+            "network" -> JsString(client.vortexWallet.network.toString)
+          ))
 
         RpcServer.httpSuccess(id, json)
       }
@@ -55,12 +55,18 @@ case class LnVortexRoutes(client: VortexClient[VortexWalletApi])(implicit
         }
       }
 
+    case ServerCommand(id, "getstatus", _) =>
+      complete {
+        val details = client.getCurrentRoundDetails
+        RpcServer.httpSuccess(id, details)
+      }
+
     case ServerCommand(id, "queuecoins", obj) =>
       withValidServerCommand(QueueCoins.fromJsObj(obj)) {
         case QueueCoins(outpoints, nodeId, peerAddrOpt) =>
           complete {
             client.queueCoins(outpoints, nodeId, peerAddrOpt).map { _ =>
-              RpcServer.httpSuccess(id, Null)
+              RpcServer.httpSuccess(id, JsNull)
             }
           }
       }

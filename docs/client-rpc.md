@@ -37,6 +37,26 @@ None
 
 - network: String - [MainNet, TestNet3, RegTest, SigNet]
 
+### Get Status
+
+method: `getstatus`
+
+#### Params
+
+None
+
+#### Response
+
+- status: String - [NoDetails, KnownRound, ReceivedNonce, InputsScheduled, InputsRegistered, MixOutputRegistered, PSBTSigned]
+- round: Round - Available for all statuses besides `NoDetails`
+
+Round:
+- version: Number
+- roundId: String - id for the round
+- amount: Number - Denomination for the round
+- mixFee: Number - Fee in satoshis for the round
+- publicKey: String - Coordinator's public key
+- time: Number - When the round with execute, in epoch seconds
 
 ### List UTXOs
 

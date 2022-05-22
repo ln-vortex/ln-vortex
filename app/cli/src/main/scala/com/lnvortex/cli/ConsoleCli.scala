@@ -53,6 +53,9 @@ object ConsoleCli {
       cmd("getinfo")
         .action((_, conf) => conf.copy(command = GetInfo))
         .text(s"Returns basic info about the oracle"),
+      cmd("getstatus")
+        .action((_, conf) => conf.copy(command = GetStatus))
+        .text(s"Get current status of the current round"),
       cmd("listutxos")
         .action((_, conf) => conf.copy(command = ListUtxos))
         .text("List wallet's utxos"),
@@ -132,6 +135,7 @@ object ConsoleCli {
 
     val requestParam: RequestParam = command match {
       case GetInfo          => RequestParam("getinfo")
+      case GetStatus        => RequestParam("getstatus")
       case ListUtxos        => RequestParam("listutxos")
       case ListTransactions => RequestParam("listtransactions")
       case ListChannels     => RequestParam("listchannels")
@@ -253,6 +257,8 @@ object CliCommand {
   case object GetVersion extends CliCommand
 
   case object GetInfo extends CliCommand
+
+  case object GetStatus extends CliCommand
 
   case object GetBalance extends CliCommand
 

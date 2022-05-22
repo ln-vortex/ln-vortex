@@ -10,8 +10,7 @@ import akka.http.scaladsl.server._
 import akka.http.scaladsl.server.directives.{Credentials, DebuggingDirectives}
 import de.heikoseeberger.akkahttpupickle.UpickleSupport._
 import grizzled.slf4j.Logging
-import ujson._
-import upickle.{default => up}
+import play.api.libs.json._
 
 import scala.concurrent.Future
 
@@ -120,45 +119,46 @@ object RpcServer {
 
   case class Response(
       id: Either[String, Long],
-      result: Option[ujson.Value] = None,
+      result: Option[JsValue] = None,
       error: Option[String] = None) {
 
-    lazy val idJs: Value with Serializable = id match {
-      case Left(value)  => Str(value)
-      case Right(value) => Num(value.toDouble)
+    lazy val idJs: JsValue with Serializable = id match {
+      case Left(value)  => JsString(value)
+      case Right(value) => JsNumber(value.toDouble)
     }
 
-    def toJsonMap: Map[String, ujson.Value] = {
-      Map(
+    def toJsObject: JsObject = JsObject(
+      Vector(
         "id" -> idJs,
         "result" -> (result match {
-          case None      => ujson.Null
+          case None      => JsNull
           case Some(res) => res
         }),
         "error" -> (error match {
-          case None      => ujson.Null
-          case Some(err) => err
+          case None      => JsNull
+          case Some(err) => JsString(err)
         })
       )
-    }
+    )
   }
 
   /** Creates a HTTP response with the given body as a JSON response */
   def httpSuccess[T](id: Either[String, Long], body: T)(implicit
-      writer: up.Writer[T]): HttpEntity.Strict = {
-    val response = Response(id, result = Some(up.writeJs(body)))
+      writer: Writes[T]): HttpEntity.Strict = {
+    val response = Response(id, result = Some(writer.writes(body)))
     HttpEntity(
       ContentTypes.`application/json`,
-      up.write(response.toJsonMap)
+      response.toJsObject.toString
     )
   }
 
   def httpSuccessOption[T](id: Either[String, Long], bodyOpt: Option[T])(
-      implicit writer: up.Writer[T]): HttpEntity.Strict = {
-    val response = Response(id, result = bodyOpt.map(body => up.writeJs(body)))
+      implicit writer: Writes[T]): HttpEntity.Strict = {
+    val response =
+      Response(id, result = bodyOpt.map(body => writer.writes(body)))
     HttpEntity(
       ContentTypes.`application/json`,
-      up.write(response.toJsonMap)
+      response.toJsObject.toString
     )
   }
 
@@ -171,7 +171,7 @@ object RpcServer {
       val response = Response(id, error = Some(msg))
       HttpEntity(
         ContentTypes.`application/json`,
-        up.write(response.toJsonMap)
+        response.toJsObject.toString
       )
     }
     HttpResponse(status = StatusCodes.BadRequest, entity = entity)
@@ -185,7 +185,7 @@ object RpcServer {
       val response = Response(id, error = Some(msg))
       HttpEntity(
         ContentTypes.`application/json`,
-        up.write(response.toJsonMap)
+        response.toJsObject.toString
       )
     }
 

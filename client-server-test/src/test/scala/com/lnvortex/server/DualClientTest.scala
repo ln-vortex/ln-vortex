@@ -1,7 +1,7 @@
 package com.lnvortex.server
 
 import akka.testkit.TestActorRef
-import com.lnvortex.client.RoundDetails.getInitDetailsOpt
+import com.lnvortex.core.RoundDetails.getInitDetailsOpt
 import com.lnvortex.testkit._
 import org.bitcoins.crypto.Sha256Digest
 import org.bitcoins.testkit.EmbeddedPg
