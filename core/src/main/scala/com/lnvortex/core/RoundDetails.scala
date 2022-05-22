@@ -1,22 +1,23 @@
-package com.lnvortex.client
+package com.lnvortex.core
 
-import com.lnvortex.core.MixDetails
 import org.bitcoins.core.currency.{CurrencyUnit, Satoshis}
 import org.bitcoins.core.number.UInt32
 import org.bitcoins.core.policy.Policy
 import org.bitcoins.core.protocol.ln.node.NodeId
 import org.bitcoins.core.protocol.transaction._
 import org.bitcoins.core.psbt.PSBT
-import org.bitcoins.crypto.SchnorrNonce
+import org.bitcoins.crypto.{SchnorrNonce, StringFactory}
 
 import java.net.InetSocketAddress
 
 sealed trait RoundDetails {
   def order: Int
+  def status: ClientStatus
 }
 
 case object NoDetails extends RoundDetails {
   override val order: Int = 0
+  override val status: ClientStatus = ClientStatus.NoDetails
 
   def nextStage(round: MixDetails): KnownRound = {
     KnownRound(round)
@@ -25,6 +26,7 @@ case object NoDetails extends RoundDetails {
 
 case class KnownRound(round: MixDetails) extends RoundDetails {
   override val order: Int = 1
+  override val status: ClientStatus = ClientStatus.KnownRound
 
   def nextStage(nonce: SchnorrNonce): ReceivedNonce =
     ReceivedNonce(round, nonce)
@@ -33,6 +35,7 @@ case class KnownRound(round: MixDetails) extends RoundDetails {
 case class ReceivedNonce(round: MixDetails, nonce: SchnorrNonce)
     extends RoundDetails {
   override val order: Int = 2
+  override val status: ClientStatus = ClientStatus.ReceivedNonce
 
   def nextStage(
       inputs: Vector[OutputReference],
@@ -49,6 +52,7 @@ case class InputsScheduled(
     peerAddrOpt: Option[InetSocketAddress])
     extends RoundDetails {
   override val order: Int = 3
+  override val status: ClientStatus = ClientStatus.InputsScheduled
 
   def nextStage(
       initDetails: InitDetails,
@@ -93,6 +97,7 @@ case class InputsRegistered(
     initDetails: InitDetails)
     extends InitializedRound {
   override val order: Int = 4
+  override val status: ClientStatus = ClientStatus.InputsRegistered
 
   def nextStage: MixOutputRegistered =
     MixOutputRegistered(round, inputFee, outputFee, nonce, initDetails)
@@ -106,6 +111,7 @@ case class MixOutputRegistered(
     initDetails: InitDetails)
     extends InitializedRound {
   override val order: Int = 5
+  override val status: ClientStatus = ClientStatus.MixOutputRegistered
 
   def nextStage(psbt: PSBT): PSBTSigned =
     PSBTSigned(round, inputFee, outputFee, nonce, initDetails, psbt)
@@ -120,6 +126,7 @@ case class PSBTSigned(
     psbt: PSBT)
     extends InitializedRound {
   override val order: Int = 6
+  override val status: ClientStatus = ClientStatus.PSBTSigned
 
   val channelOutpoint: TransactionOutPoint = {
     val txId = psbt.transaction.txId
@@ -161,5 +168,35 @@ object RoundDetails {
       case round: InitializedRound =>
         Some(round.initDetails)
     }
+  }
+}
+
+sealed abstract class ClientStatus
+
+object ClientStatus extends StringFactory[ClientStatus] {
+  case object NoDetails extends ClientStatus
+  case object KnownRound extends ClientStatus
+  case object ReceivedNonce extends ClientStatus
+  case object InputsScheduled extends ClientStatus
+  case object InputsRegistered extends ClientStatus
+  case object MixOutputRegistered extends ClientStatus
+  case object PSBTSigned extends ClientStatus
+
+  val all: Vector[ClientStatus] = Vector(NoDetails,
+                                         KnownRound,
+                                         ReceivedNonce,
+                                         InputsScheduled,
+                                         InputsRegistered,
+                                         MixOutputRegistered,
+                                         PSBTSigned)
+
+  override def fromStringOpt(string: String): Option[ClientStatus] = {
+    val searchString = string.trim.toLowerCase
+    all.find(_.toString.toLowerCase == searchString)
+  }
+
+  override def fromString(string: String): ClientStatus = {
+    fromStringOpt(string).getOrElse(
+      sys.error(s"Could not find a ClientStatus for string $string"))
   }
 }

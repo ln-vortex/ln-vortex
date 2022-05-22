@@ -1,7 +1,7 @@
 package com.lnvortex.client
 
 import akka.actor.{ActorRef, ActorSystem}
-import com.lnvortex.client.RoundDetails.{getMixDetailsOpt, getNonceOpt}
+import com.lnvortex.core.RoundDetails.{getMixDetailsOpt, getNonceOpt}
 import com.lnvortex.client.VortexClientException._
 import com.lnvortex.client.config.VortexAppConfig
 import com.lnvortex.client.networking.{P2PClient, Peer}
@@ -38,7 +38,7 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
   private[client] def setRoundDetails(details: RoundDetails): Unit =
     roundDetails = details
 
-  private[lnvortex] def getCurrentRoundDetails: RoundDetails =
+  def getCurrentRoundDetails: RoundDetails =
     roundDetails
 
   private[client] def setRound(adv: MixDetails): Unit = {
