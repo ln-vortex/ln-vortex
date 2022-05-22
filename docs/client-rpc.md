@@ -136,3 +136,17 @@ method: `queuecoins`
 #### Response
 
 null
+
+### Cancel Coins
+
+Cancels the queued coins
+
+method: `cancelcoins`
+
+#### Params
+
+None
+
+#### Response
+
+null
