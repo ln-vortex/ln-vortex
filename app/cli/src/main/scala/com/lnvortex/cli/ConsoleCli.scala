@@ -68,6 +68,9 @@ object ConsoleCli {
       cmd("getbalance")
         .action((_, conf) => conf.copy(command = GetBalance))
         .text("Get wallet balance"),
+      cmd("cancelcoins")
+        .action((_, conf) => conf.copy(command = CancelCoins))
+        .text("Cancels the queued coins"),
       cmd("queuecoins")
         .action((_, conf) =>
           conf.copy(command =
@@ -140,6 +143,7 @@ object ConsoleCli {
       case ListTransactions => RequestParam("listtransactions")
       case ListChannels     => RequestParam("listchannels")
       case GetBalance       => RequestParam("getbalance")
+      case CancelCoins      => RequestParam("cancelcoins")
       case qc: QueueCoins   => RequestParam("queuecoins", Some(qc.json))
       case GetVersion       =>
         // skip sending to server and just return version number of cli
@@ -267,6 +271,8 @@ object CliCommand {
   case object ListTransactions extends CliCommand
 
   case object ListChannels extends CliCommand
+
+  case object CancelCoins extends CliCommand
 
   case class QueueCoins(
       outpoints: Vector[TransactionOutPoint],
