@@ -3,6 +3,7 @@ package com.lnvortex.lnd
 import akka.actor.ActorSystem
 import com.lnvortex.core.api._
 import com.lnvortex.core.{InputReference, UnspentCoin}
+import lnrpc.NodeInfoRequest
 import org.bitcoins.core.config.{BitcoinNetwork, BitcoinNetworks}
 import org.bitcoins.core.currency.{CurrencyUnit, Satoshis}
 import org.bitcoins.core.protocol.BitcoinAddress
@@ -129,14 +130,22 @@ case class LndVortexWallet(lndRpcClient: LndRpcClient)(implicit
   override def listChannels(): Future[Vector[ChannelDetails]] = {
     lndRpcClient
       .listChannels()
-      .map(_.map { channel =>
-        ChannelDetails(
-          remotePubkey = NodeId(channel.remotePubkey),
-          shortChannelId = ShortChannelId(channel.chanId),
-          public = !channel.`private`,
-          amount = Satoshis(channel.capacity),
-          active = channel.active
-        )
-      })
+      .flatMap { channels =>
+        val fs = channels.map { channel =>
+          val request = NodeInfoRequest(channel.remotePubkey)
+          lndRpcClient.lnd.getNodeInfo(request).map { nodeInfo =>
+            ChannelDetails(
+              alias = nodeInfo.getNode.alias,
+              remotePubkey = NodeId(channel.remotePubkey),
+              shortChannelId = ShortChannelId(channel.chanId),
+              public = !channel.`private`,
+              amount = Satoshis(channel.capacity),
+              active = channel.active
+            )
+          }
+        }
+
+        Future.sequence(fs)
+      }
   }
 }

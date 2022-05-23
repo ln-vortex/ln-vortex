@@ -117,6 +117,7 @@ None
 
 list of channels:
 
+- alias: String
 - remotePubkey: String
 - shortChannelId: String
 - public: Boolean - If this is a public or private channel

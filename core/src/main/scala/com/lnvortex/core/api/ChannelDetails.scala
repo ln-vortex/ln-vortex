@@ -5,6 +5,7 @@ import org.bitcoins.core.protocol.ln.channel.ShortChannelId
 import org.bitcoins.core.protocol.ln.node.NodeId
 
 case class ChannelDetails(
+    alias: String,
     remotePubkey: NodeId,
     shortChannelId: ShortChannelId,
     public: Boolean,
