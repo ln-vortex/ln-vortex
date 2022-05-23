@@ -72,9 +72,10 @@ case class LnVortexRoutes(client: VortexClient[VortexWalletApi])(implicit
       withValidServerCommand(QueueCoins.fromJsObj(obj)) {
         case QueueCoins(outpoints, nodeId, peerAddrOpt) =>
           complete {
-            client.queueCoins(outpoints, nodeId, peerAddrOpt).map { _ =>
-              RpcServer.httpSuccess(id, JsNull)
-            }
+            for {
+              _ <- client.askNonce()
+              _ <- client.queueCoins(outpoints, nodeId, peerAddrOpt)
+            } yield RpcServer.httpSuccess(id, JsNull)
           }
       }
   }

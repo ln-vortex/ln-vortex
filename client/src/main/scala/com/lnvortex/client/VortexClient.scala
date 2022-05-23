@@ -159,7 +159,7 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
       case state @ (NoDetails | _: KnownRound | _: InputsScheduled |
           _: InputsRegistered | _: MixOutputRegistered | _: PSBTSigned) =>
         throw new IllegalStateException(
-          s"At invalid state $state, cannot sendRegisteredCoins")
+          s"At invalid state $state, cannot queue coins")
       case receivedNonce: ReceivedNonce =>
         logger.info(
           s"Queueing ${outputRefs.size} coins to open a channel to $nodeId")
