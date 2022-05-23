@@ -146,11 +146,14 @@ case class CLightningVortexWallet(clightning: CLightningRpcClient)(implicit
           if (channel.source == nodeId) channel.destination
           else channel.source
 
-        ChannelDetails(remotePubkey = remote,
-                       shortChannelId = channel.short_channel_id,
-                       public = channel.public,
-                       amount = channel.satoshis,
-                       active = channel.active)
+        ChannelDetails(
+          alias = "todo", // todo waiting on PR to bitcoin-s
+          remotePubkey = remote,
+          shortChannelId = channel.short_channel_id,
+          public = channel.public,
+          amount = channel.satoshis,
+          active = channel.active
+        )
       }
     }
   }
