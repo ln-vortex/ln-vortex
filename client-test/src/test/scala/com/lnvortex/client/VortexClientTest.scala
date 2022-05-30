@@ -58,8 +58,7 @@ class VortexClientTest extends VortexClientFixture {
 
       _ = vortexClient.handlerP.success(TestActorRef("test"))
       _ <- vortexClient.cancelRegistration()
-    } yield assert(
-      vortexClient.getCurrentRoundDetails == ReceivedNonce(dummyMix, nonce))
+    } yield assert(vortexClient.getCurrentRoundDetails == KnownRound(dummyMix))
   }
 
   it must "fail to sign a psbt with no channel" in { vortexClient =>
