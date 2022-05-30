@@ -174,12 +174,40 @@ object RoundDetails {
 sealed abstract class ClientStatus
 
 object ClientStatus extends StringFactory[ClientStatus] {
+
+  /** The client hasn't learned the details of the round yet */
   case object NoDetails extends ClientStatus
+
+  /** The client has received the details of the round */
   case object KnownRound extends ClientStatus
+
+  /** Intermediate step during queueing coins.
+    * This nonce will be unique to the user and used for blind signing
+    */
   case object ReceivedNonce extends ClientStatus
+
+  /** The user has scheduled inputs to be registered.
+    * Once the coordinator sends the [[AskInputs]] message it register them.
+    */
   case object InputsScheduled extends ClientStatus
+
+  /** After the [[AskInputs]] message has been received and the client sends its
+    * inputs to the coordinator its inputs will be registered.
+    * This is the first state when the mixing begins.
+    */
   case object InputsRegistered extends ClientStatus
+
+  /** Intermediate step during the mix.
+    * The client has registered its output with unblinded signature
+    * under its alternate Bob identity
+    */
   case object MixOutputRegistered extends ClientStatus
+
+  /** Final stage during the mix.
+    * The client has received the PSBT and signed it.
+    * It will send it back to the coordinator to
+    * complete the transaction and broadcast
+    */
   case object PSBTSigned extends ClientStatus
 
   val all: Vector[ClientStatus] = Vector(NoDetails,
