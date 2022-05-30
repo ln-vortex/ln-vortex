@@ -115,7 +115,7 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
           val mixDetails = getMixDetailsOpt(roundDetails).get
           handler ! CancelRegistrationMessage(nonce, mixDetails.roundId)
 
-          roundDetails = ReceivedNonce(mixDetails, nonce)
+          roundDetails = KnownRound(mixDetails)
         }
       case None =>
         Future.failed(new IllegalStateException("No registration to cancel"))
