@@ -479,7 +479,7 @@ case class CancelRegistrationMessage(
     nonce: SchnorrNonce,
     roundId: DoubleSha256Digest)
     extends ClientVortexMessage {
-  override val tpe: BigSizeUInt = RestartRoundMessage.tpe
+  override val tpe: BigSizeUInt = CancelRegistrationMessage.tpe
 
   override lazy val value: ByteVector = nonce.bytes ++ roundId.bytes
 }
@@ -493,7 +493,7 @@ object CancelRegistrationMessage
   override def fromTLVValue(value: ByteVector): CancelRegistrationMessage = {
     val iter = ValueIterator(value)
 
-    val nonce = iter.take(SchnorrNonce)
+    val nonce = iter.take(SchnorrNonce, 32)
     val roundId = iter.take(DoubleSha256Digest)
 
     CancelRegistrationMessage(nonce, roundId)

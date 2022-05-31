@@ -14,6 +14,21 @@ class ClientServerPairNetworkingTest
   val interval: FiniteDuration =
     if (LnVortexTestUtils.torEnabled) 500.milliseconds else 100.milliseconds
 
+  it must "cancel a registration and ask nonce again" in {
+    case (client, _, peerLnd) =>
+      for {
+        nodeId <- peerLnd.nodeId
+        _ <- client.askNonce()
+
+        // don't select all coins
+        utxos <- client.listCoins().map(_.tail)
+        _ = client.queueCoins(utxos.map(_.outputReference), nodeId, None)
+
+        _ <- client.cancelRegistration()
+        _ <- client.askNonce()
+      } yield succeed
+  }
+
   it must "open a channel" in { case (client, coordinator, peerLnd) =>
     for {
       nodeId <- peerLnd.nodeId

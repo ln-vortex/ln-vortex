@@ -108,6 +108,7 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
   }
 
   def cancelRegistration(): Future[Unit] = {
+    logger.info("Canceling registration")
     getNonceOpt(roundDetails) match {
       case Some(nonce) =>
         handlerP.future.map { handler =>
