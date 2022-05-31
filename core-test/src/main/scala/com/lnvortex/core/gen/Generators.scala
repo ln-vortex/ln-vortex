@@ -119,4 +119,11 @@ object Generators {
       nonceMsg <- nonceMsg
     } yield RestartRoundMessage(mixDetails, nonceMsg)
   }
+
+  def cancelRegistrationMessage: Gen[CancelRegistrationMessage] = {
+    for {
+      roundId <- CryptoGenerators.doubleSha256Digest
+      nonce <- CryptoGenerators.schnorrNonce
+    } yield CancelRegistrationMessage(nonce, roundId)
+  }
 }

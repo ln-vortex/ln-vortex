@@ -349,10 +349,12 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
           throw new IllegalArgumentException(
             s"No alice found with nonce $nonce")
       }
-      updated = aliceDb.unregister()
-      _ <- aliceDAO.updateAction(updated)
-      _ <- inputsDAO.deleteByPeerIdAction(updated.peerId, updated.roundId)
-      _ = signedPMap.remove(updated.peerId)
+      _ = logger.info(s"Alice ${aliceDb.peerId} canceling registration")
+
+      _ <- aliceDAO.deleteAction(aliceDb)
+      _ <- inputsDAO.deleteByPeerIdAction(aliceDb.peerId, aliceDb.roundId)
+      _ = signedPMap.remove(aliceDb.peerId)
+      _ = connectionHandlerMap.remove(aliceDb.peerId)
     } yield ()
 
     safeDatabase.run(action)
