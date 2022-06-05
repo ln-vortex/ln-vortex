@@ -6,7 +6,7 @@ import com.lnvortex.client.VortexClientException._
 import com.lnvortex.client.config.VortexAppConfig
 import com.lnvortex.client.networking.{P2PClient, Peer}
 import com.lnvortex.core._
-import com.lnvortex.core.api.VortexWalletApi
+import com.lnvortex.core.api.{OutputDetails, VortexWalletApi}
 import com.lnvortex.core.crypto.BlindSchnorrUtil
 import com.lnvortex.core.crypto.BlindingTweaks.freshBlindingTweaks
 import grizzled.slf4j.Logging
@@ -14,6 +14,7 @@ import org.bitcoins.asyncutil.AsyncUtil
 import org.bitcoins.core.currency.{CurrencyUnit, Satoshis}
 import org.bitcoins.core.number.UInt16
 import org.bitcoins.core.policy.Policy
+import org.bitcoins.core.protocol.BitcoinAddress
 import org.bitcoins.core.protocol.ln.node.NodeId
 import org.bitcoins.core.protocol.transaction._
 import org.bitcoins.core.psbt.PSBT
@@ -147,6 +148,17 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
   }
 
   def queueCoins(
+      outPoints: Vector[TransactionOutPoint],
+      address: BitcoinAddress): Future[Unit] = {
+    listCoins().map { utxos =>
+      val coins = utxos
+        .filter(u => outPoints.contains(u.outPoint))
+        .map(_.outputReference)
+      queueCoins(coins, address)
+    }
+  }
+
+  def queueCoins(
       outputRefs: Vector[OutputReference],
       nodeUri: NodeUri): Unit = {
     queueCoins(outputRefs, nodeUri.nodeId, Some(nodeUri.socketAddress))
@@ -164,7 +176,29 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
       case receivedNonce: ReceivedNonce =>
         logger.info(
           s"Queueing ${outputRefs.size} coins to open a channel to $nodeId")
-        roundDetails = receivedNonce.nextStage(outputRefs, nodeId, peerAddrOpt)
+        roundDetails = receivedNonce.nextStage(inputs = outputRefs,
+                                               addressOpt = None,
+                                               nodeIdOpt = Some(nodeId),
+                                               peerAddrOpt = peerAddrOpt)
+    }
+  }
+
+  def queueCoins(
+      outputRefs: Vector[OutputReference],
+      address: BitcoinAddress): Unit = {
+    roundDetails match {
+      case state @ (NoDetails | _: KnownRound | _: InputsScheduled |
+          _: InputsRegistered | _: MixOutputRegistered | _: PSBTSigned) =>
+        throw new IllegalStateException(
+          s"At invalid state $state, cannot queue coins")
+      case receivedNonce: ReceivedNonce =>
+        logger.info(
+          s"Queueing ${outputRefs.size} coins for on-chain self-spend")
+        // todo validate address is of correct type
+        roundDetails = receivedNonce.nextStage(inputs = outputRefs,
+                                               addressOpt = Some(address),
+                                               nodeIdOpt = None,
+                                               peerAddrOpt = None)
     }
   }
 
@@ -204,11 +238,24 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
             if (needsChange) vortexWallet.getChangeAddress().map(Some(_))
             else FutureUtil.none
 
-          channelDetails <- vortexWallet.initChannelOpen(
-            nodeId = scheduled.nodeId,
-            peerAddrOpt = scheduled.peerAddrOpt,
-            fundingAmount = scheduled.round.amount,
-            privateChannel = false)
+          channelDetails <- scheduled.nodeIdOpt match {
+            case Some(nodeId) =>
+              vortexWallet.initChannelOpen(nodeId = nodeId,
+                                           peerAddrOpt = scheduled.peerAddrOpt,
+                                           fundingAmount =
+                                             scheduled.round.amount,
+                                           privateChannel = false)
+            case None =>
+              val addressF = scheduled.addressOpt match {
+                case Some(addr) => Future.successful(addr)
+                case None       => vortexWallet.getNewAddress()
+              }
+
+              addressF.map { addr =>
+                val id = CryptoUtil.sha256(addr.value).bytes
+                OutputDetails(id, scheduled.round.amount, addr)
+              }
+          }
         } yield {
           val mixOutput = channelDetails.output
           val hashedOutput =
@@ -224,7 +271,8 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
 
           val details = InitDetails(
             inputs = outputRefs,
-            nodeId = scheduled.nodeId,
+            nodeIdOpt = scheduled.nodeIdOpt,
+            addressOpt = scheduled.addressOpt,
             peerAddrOpt = scheduled.peerAddrOpt,
             changeSpkOpt = changeAddrOpt.map(_.scriptPubKey),
             chanId = channelDetails.id,
@@ -323,8 +371,12 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
           logger.info("PSBT is valid, giving channel peer")
           for {
             // tell peer about funding psbt
-            _ <- vortexWallet.completeChannelOpen(state.initDetails.chanId,
-                                                  unsigned)
+            _ <- state.initDetails.nodeIdOpt match {
+              case Some(_) =>
+                vortexWallet.completeChannelOpen(state.initDetails.chanId,
+                                                 unsigned)
+              case None => Future.unit // skip if on-chain
+            }
             _ = logger.info("Valid with channel peer, signing")
             // sign to be sent to coordinator
             signed <- vortexWallet.signPSBT(unsigned, inputs)
@@ -363,12 +415,17 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
       case state: PSBTSigned =>
         logger.info("Round restarted..")
 
-        vortexWallet
-          .cancelChannel(state.channelOutpoint, state.initDetails.nodeId)
-          .map { _ =>
-            roundDetails =
-              state.restartRound(msg.mixDetails, msg.nonceMessage.schnorrNonce)
-          }
+        val cancelF = state.initDetails.nodeIdOpt match {
+          case Some(nodeId) =>
+            vortexWallet
+              .cancelChannel(state.channelOutpoint, nodeId)
+          case None => Future.unit
+        }
+
+        cancelF.map { _ =>
+          roundDetails =
+            state.restartRound(msg.mixDetails, msg.nonceMessage.schnorrNonce)
+        }
     }
   }
 

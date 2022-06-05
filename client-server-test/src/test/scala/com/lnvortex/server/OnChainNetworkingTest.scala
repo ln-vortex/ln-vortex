@@ -8,39 +8,38 @@ import org.bitcoins.testkit.async.TestAsyncUtil
 
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 
-class ClientServerPairNetworkingTest
-    extends ClientServerPairFixture
-    with EmbeddedPg {
+class OnChainNetworkingTest extends ClientServerPairFixture with EmbeddedPg {
   override val isNetworkingTest = true
-  override val mixScriptType: ScriptType = WITNESS_V0_SCRIPTHASH
+  override val mixScriptType: ScriptType = WITNESS_V0_KEYHASH
 
   val interval: FiniteDuration =
     if (LnVortexTestUtils.torEnabled) 500.milliseconds else 100.milliseconds
 
   it must "cancel a registration and ask nonce again" in {
-    case (client, _, peerLnd) =>
+    case (client, _, _) =>
       for {
-        nodeId <- peerLnd.nodeId
         _ <- client.askNonce()
 
         // don't select all coins
         utxos <- client.listCoins().map(_.tail)
-        _ = client.queueCoins(utxos.map(_.outputReference), nodeId, None)
+        addr <- client.vortexWallet.getNewAddress()
+        _ = client.queueCoins(utxos.map(_.outputReference), addr)
 
         _ <- client.cancelRegistration()
         _ <- client.askNonce()
       } yield succeed
   }
 
-  it must "open a channel" in { case (client, coordinator, peerLnd) =>
+  it must "do a self spend" in { case (client, coordinator, _) =>
     for {
-      nodeId <- peerLnd.nodeId
       _ <- client.askNonce()
       roundId = coordinator.getCurrentRoundId
 
       // don't select all coins
-      utxos <- client.listCoins().map(_.tail)
-      _ = client.queueCoins(utxos.map(_.outputReference), nodeId, None)
+      all <- client.listCoins()
+      utxos = all.tail
+      addr <- client.vortexWallet.getNewAddress()
+      _ = client.queueCoins(utxos.map(_.outputReference), addr)
 
       _ <- coordinator.beginInputRegistration()
       _ <- TestAsyncUtil.awaitConditionF(
@@ -69,9 +68,13 @@ class ClientServerPairNetworkingTest
       _ <- coordinator.bitcoind.getNewAddress.flatMap(
         coordinator.bitcoind.generateToAddress(6, _))
 
-      // wait until peerLnd sees new channel
+      // wait until we have new set of utxos
+      // with our queued address
       _ <- TestAsyncUtil.awaitConditionF(
-        () => peerLnd.listChannels().map(_.nonEmpty),
+        () =>
+          client.listCoins().map { utxos =>
+            utxos != all && utxos.exists(_.address == addr)
+          },
         interval = interval,
         maxTries = 500)
 

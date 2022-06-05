@@ -9,16 +9,18 @@ import org.bitcoins.core.script.ScriptType
 import org.bitcoins.core.script.ScriptType._
 import org.bitcoins.crypto.Sha256Digest
 import org.bitcoins.testkit.EmbeddedPg
+import org.bitcoins.testkit.async.TestAsyncUtil
 
-class ClientServerPairTest
+import scala.concurrent.duration.DurationInt
+
+class OnChainTest
     extends ClientServerPairFixture
     with ClientServerTestUtils
     with EmbeddedPg {
   override val isNetworkingTest = false
-  override val mixScriptType: ScriptType = WITNESS_V0_SCRIPTHASH
+  override val mixScriptType: ScriptType = WITNESS_V0_KEYHASH
 
-  val testActor: TestActorRef[Nothing] = TestActorRef(
-    "ClientServerPairTest-test")
+  val testActor: TestActorRef[Nothing] = TestActorRef("OnChainTest-test")
   val peerId: Sha256Digest = Sha256Digest.empty
 
   it must "get the correct round details" in { case (client, coordinator, _) =>
@@ -49,9 +51,9 @@ class ClientServerPairTest
       }
   }
 
-  it must "register inputs" in { case (client, coordinator, peerLnd) =>
+  it must "register inputs" in { case (client, coordinator, _) =>
     for {
-      _ <- registerInputs(peerId, client, coordinator, peerLnd)
+      _ <- registerInputs(peerId, client, coordinator)
 
       dbs <- coordinator.inputsDAO.findAll()
     } yield {
@@ -61,29 +63,30 @@ class ClientServerPairTest
     }
   }
 
-  it must "register inputs & outputs" in {
-    case (client, coordinator, peerLnd) =>
-      for {
-        _ <- registerInputsAndOutputs(peerId, client, coordinator, peerLnd)
-        outputDbs <- coordinator.outputsDAO.findAll()
-      } yield {
-        val expectedOutput =
-          getInitDetailsOpt(client.getCurrentRoundDetails).get.mixOutput
+  it must "register inputs & outputs" in { case (client, coordinator, _) =>
+    for {
+      _ <- registerInputsAndOutputs(peerId, client, coordinator)
+      outputDbs <- coordinator.outputsDAO.findAll()
+    } yield {
+      val expectedOutput =
+        getInitDetailsOpt(client.getCurrentRoundDetails).get.mixOutput
 
-        assert(outputDbs.size == 1)
-        assert(outputDbs.head.output == expectedOutput)
-      }
+      assert(outputDbs.size == 1)
+      assert(outputDbs.head.output == expectedOutput)
+    }
   }
 
-  it must "sign the psbt" in { case (client, coordinator, peerLnd) =>
+  it must "sign the psbt" in { case (client, coordinator, _) =>
     for {
-      signed <- signPSBT(peerId, client, coordinator, peerLnd)
+      signed <- signPSBT(peerId, client, coordinator)
     } yield assert(signed.inputMaps.exists(_.isFinalized))
   }
 
-  it must "open a channel" in { case (client, coordinator, peerLnd) =>
+  it must "complete the round" in { case (client, coordinator, _) =>
     for {
-      _ <- completeMixRound(peerId, client, coordinator, peerLnd)
+      _ <- completeRound(peerId, client, coordinator)
+
+      _ <- TestAsyncUtil.nonBlockingSleep(5.seconds)
 
       roundDbs <- coordinator.roundDAO.findAll()
     } yield assert(roundDbs.size == 2)

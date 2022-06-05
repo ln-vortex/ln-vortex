@@ -9,9 +9,9 @@ import org.bitcoins.commons.serializers.Picklers.{
   transactionOutPointPickler => _,
   _
 }
+import org.bitcoins.core.protocol.BitcoinAddress
 import org.bitcoins.core.protocol.ln.node.NodeId
 import org.bitcoins.core.protocol.transaction._
-import org.bitcoins.crypto.ECPublicKey
 import scopt.OParser
 import ujson._
 import upickle.{default => up}
@@ -73,8 +73,7 @@ object ConsoleCli {
         .text("Cancels the queued coins"),
       cmd("queuecoins")
         .action((_, conf) =>
-          conf.copy(command =
-            QueueCoins(Vector.empty, NodeId(ECPublicKey.dummy), None)))
+          conf.copy(command = QueueCoins(Vector.empty, None, None, None)))
         .text("Queues coins for collaborative transaction")
         .children(
           arg[Seq[TransactionOutPoint]]("utxos")
@@ -84,11 +83,18 @@ object ConsoleCli {
                 case c: QueueCoins => c.copy(outpoints = utxos.toVector)
                 case other         => other
               })),
+          arg[BitcoinAddress]("address")
+            .optional()
+            .action((addr, conf) =>
+              conf.copy(command = conf.command match {
+                case c: QueueCoins => c.copy(address = Some(addr))
+                case other         => other
+              })),
           arg[NodeId]("nodeid")
-            .required()
+            .optional()
             .action((nodeId, conf) =>
               conf.copy(command = conf.command match {
-                case c: QueueCoins => c.copy(nodeId = nodeId)
+                case c: QueueCoins => c.copy(nodeId = Some(nodeId))
                 case other         => other
               })),
           arg[InetSocketAddress]("address")
@@ -276,24 +282,18 @@ object CliCommand {
 
   case class QueueCoins(
       outpoints: Vector[TransactionOutPoint],
-      nodeId: NodeId,
+      address: Option[BitcoinAddress],
+      nodeId: Option[NodeId],
       peerAddrOpt: Option[InetSocketAddress])
       extends CliCommand {
 
     val json: Obj = {
-      peerAddrOpt match {
-        case Some(peerAddr) =>
-          Obj(
-            "outpoints" -> up.writeJs(outpoints),
-            "nodeId" -> up.writeJs(nodeId),
-            "peerAddr" -> up.writeJs(peerAddr)
-          )
-        case None =>
-          Obj(
-            "outpoints" -> up.writeJs(outpoints),
-            "nodeId" -> up.writeJs(nodeId)
-          )
-      }
+      Obj(
+        "outpoints" -> up.writeJs(outpoints),
+        "address" -> up.writeJs(address),
+        "nodeId" -> up.writeJs(nodeId),
+        "peerAddr" -> up.writeJs(peerAddrOpt)
+      )
     }
   }
 }
