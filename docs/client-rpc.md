@@ -130,8 +130,15 @@ method: `queuecoins`
 
 #### Params
 
+You can set `address` to give an address to do the collaborative transaction to.
+
+You can set `nodeId` to for the pubkey of the node to open the channel to.
+
+Or you can set neither and Vortex will generate an address to do the collaborative transaction to.
+
 - outpoints: Array[String] - Outpoints should be in the format `txid:vout`
-- nodeId: String - The pubkey of the node to open the channel to
+- address: String - Optional, address to do the collaborative transaction to
+- nodeId: String - Optional, The pubkey of the node to open the channel to
 - peerAddr: String - Optional, IP or onion address of the peer
 
 #### Response
