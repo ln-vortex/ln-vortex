@@ -70,12 +70,26 @@ case class LnVortexRoutes(client: VortexClient[VortexWalletApi])(implicit
 
     case ServerCommand(id, "queuecoins", obj) =>
       withValidServerCommand(QueueCoins.fromJsObj(obj)) {
-        case QueueCoins(outpoints, nodeId, peerAddrOpt) =>
+        case QueueCoins(outpoints, addrOpt, nodeIdOpt, peerAddrOpt) =>
           complete {
-            for {
-              _ <- client.askNonce()
-              _ <- client.queueCoins(outpoints, nodeId, peerAddrOpt)
-            } yield RpcServer.httpSuccess(id, JsNull)
+            val f = client.askNonce().flatMap { _ =>
+              (addrOpt, nodeIdOpt) match {
+                case (Some(_), Some(_)) =>
+                  throw new IllegalArgumentException(
+                    "Cannot have both nodeId and address")
+                case (Some(addr), None) =>
+                  client.queueCoins(outpoints, addr)
+                case (None, Some(nodeId)) =>
+                  client.queueCoins(outpoints, nodeId, peerAddrOpt)
+                case (None, None) =>
+                  for {
+                    addr <- client.vortexWallet.getNewAddress()
+                    _ <- client.queueCoins(outpoints, addr)
+                  } yield ()
+              }
+            }
+
+            f.map(_ => RpcServer.httpSuccess(id, JsNull))
           }
       }
   }

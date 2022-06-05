@@ -1,7 +1,10 @@
 package com.lnvortex.rpc
 
 import com.lnvortex.config.VortexPicklers._
-import org.bitcoins.commons.serializers.Picklers.inetSocketAddress
+import org.bitcoins.commons.serializers.Picklers.{
+  bitcoinAddressPickler,
+  inetSocketAddress
+}
 import org.bitcoins.commons.jsonmodels.bitcoind.RpcOpts._
 import org.bitcoins.core.api.wallet.CoinSelectionAlgo
 import org.bitcoins.core.protocol.BitcoinAddress
@@ -20,8 +23,12 @@ import scala.util.control.NonFatal
 
 case class QueueCoins(
     outpoints: Vector[TransactionOutPoint],
-    nodeId: NodeId,
-    peerAddr: Option[InetSocketAddress])
+    address: Option[BitcoinAddress],
+    nodeId: Option[NodeId],
+    peerAddr: Option[InetSocketAddress]) {
+  require(!(address.isDefined && nodeId.isDefined),
+          "Cannot have nodeId and address set")
+}
 
 object QueueCoins extends ServerJsonModels {
 
@@ -29,22 +36,28 @@ object QueueCoins extends ServerJsonModels {
     reader[ujson.Obj].map[QueueCoins](json =>
       QueueCoins(
         up.read[Vector[TransactionOutPoint]](json("outpoints")),
-        up.read[NodeId](json("nodeId")),
+        if (json.obj.contains("address")) {
+          Try(up.read[BitcoinAddress](json("address"))).toOption
+        } else None,
+        if (json.obj.contains("nodeId")) {
+          Try(up.read[NodeId](json("nodeId"))).toOption
+        } else None,
         if (json.obj.contains("peerAddr")) {
-          Option(up.read[InetSocketAddress](json("peerAddr")))
+          Try(up.read[InetSocketAddress](json("peerAddr"))).toOption
         } else None
       ))
 
   def fromJsArr(jsArr: ujson.Arr): Try[QueueCoins] = {
     jsArr.arr.toList match {
-      case outpointsJs :: nodeIdJs :: peerAddrOptJs :: Nil =>
+      case outpointsJs :: addrJs :: nodeIdJs :: peerAddrOptJs :: Nil =>
         Try {
           val outpoints = jsToTransactionOutPointSeq(outpointsJs).toVector
-          val nodeId = NodeId(nodeIdJs.str)
+          val addrOpt = nullToOpt(addrJs).map(js => BitcoinAddress(js.str))
+          val nodeIdOpt = nullToOpt(nodeIdJs).map(js => NodeId(js.str))
           val peerOpt = nullToOpt(peerAddrOptJs).map(js =>
             new InetSocketAddress(js.str, 9735))
 
-          QueueCoins(outpoints, nodeId, peerOpt)
+          QueueCoins(outpoints, addrOpt, nodeIdOpt, peerOpt)
         }
       case Nil =>
         Failure(

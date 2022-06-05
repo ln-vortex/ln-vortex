@@ -5,6 +5,7 @@ import com.lnvortex.lnd.LndVortexWallet
 import com.lnvortex.server.coordinator.VortexCoordinator
 import com.lnvortex.testkit.LnVortexTestUtils.getTestConfigs
 import com.typesafe.config.ConfigFactory
+import org.bitcoins.core.script.ScriptType
 import org.bitcoins.lnd.rpc.LndRpcClient
 import org.bitcoins.testkit.async.TestAsyncUtil
 import org.bitcoins.testkit.fixtures.BitcoinSFixture
@@ -21,13 +22,17 @@ trait ClientServerPairFixture extends BitcoinSFixture with CachedBitcoindV21 {
 
   def isNetworkingTest: Boolean
 
+  def mixScriptType: ScriptType
+
   override def withFixture(test: OneArgAsyncTest): FutureOutcome = {
     makeDependentFixture[(
         VortexClient[LndVortexWallet],
         VortexCoordinator,
         LndRpcClient)](
       () => {
-        implicit val (_, serverConf) = getTestConfigs()
+        val scriptTypeConfig =
+          ConfigFactory.parseString(s"vortex.mixScriptType = $mixScriptType")
+        implicit val (_, serverConf) = getTestConfigs(Vector(scriptTypeConfig))
 
         for {
           _ <- serverConf.start()
@@ -40,9 +45,9 @@ trait ClientServerPairFixture extends BitcoinSFixture with CachedBitcoindV21 {
             if (addr.getHostString == "0:0:0:0:0:0:0:0") "127.0.0.1"
             else addr.getHostString
 
-          config = ConfigFactory.parseString(
+          netConfig = ConfigFactory.parseString(
             s"""vortex.coordinator = "$host:${addr.getPort}" """)
-          clientConfig = getTestConfigs(Vector(config))._1
+          clientConfig = getTestConfigs(Vector(netConfig))._1
 
           (lnd, peerLnd) <- LndTestUtils.createNodePair(bitcoind)
           client = VortexClient(LndVortexWallet(lnd))(system, clientConfig)

@@ -52,7 +52,8 @@ class VortexClientTest extends VortexClientFixture {
       testState = InputsScheduled(round = dummyMix,
                                   nonce = nonce,
                                   inputs = refs,
-                                  nodeId = nodeId,
+                                  addressOpt = None,
+                                  nodeIdOpt = Some(nodeId),
                                   peerAddrOpt = None)
       _ = vortexClient.setRoundDetails(testState)
 
@@ -73,13 +74,16 @@ class VortexClientTest extends VortexClientFixture {
       change = TransactionOutput(Satoshis(599800000), addrA.scriptPubKey)
       mix = TransactionOutput(Satoshis(200000), addrB.scriptPubKey)
 
-      testDetails = InitDetails(inputs = refs,
-                                nodeId = nodeId,
-                                peerAddrOpt = None,
-                                changeSpkOpt = Some(change.scriptPubKey),
-                                chanId = Sha256Digest.empty.bytes,
-                                mixOutput = mix,
-                                tweaks = dummyTweaks)
+      testDetails = InitDetails(
+        inputs = refs,
+        addressOpt = None,
+        nodeIdOpt = Some(nodeId),
+        peerAddrOpt = None,
+        changeSpkOpt = Some(change.scriptPubKey),
+        chanId = Sha256Digest.empty.bytes,
+        mixOutput = mix,
+        tweaks = dummyTweaks
+      )
       testState = MixOutputRegistered(dummyMix,
                                       Satoshis.zero,
                                       Satoshis.zero,
@@ -110,13 +114,16 @@ class VortexClientTest extends VortexClientFixture {
       change = TransactionOutput(Satoshis(599800000), addrA.scriptPubKey)
       mix = TransactionOutput(Satoshis(200000), addrB.scriptPubKey)
 
-      testDetails = InitDetails(inputs = refs,
-                                nodeId = nodeId,
-                                peerAddrOpt = None,
-                                changeSpkOpt = Some(change.scriptPubKey),
-                                chanId = Sha256Digest.empty.bytes,
-                                mixOutput = mix,
-                                tweaks = dummyTweaks)
+      testDetails = InitDetails(
+        inputs = refs,
+        addressOpt = None,
+        nodeIdOpt = Some(nodeId),
+        peerAddrOpt = None,
+        changeSpkOpt = Some(change.scriptPubKey),
+        chanId = Sha256Digest.empty.bytes,
+        mixOutput = mix,
+        tweaks = dummyTweaks
+      )
       testState = MixOutputRegistered(dummyMix,
                                       Satoshis.zero,
                                       Satoshis.zero,
@@ -148,13 +155,16 @@ class VortexClientTest extends VortexClientFixture {
         change = TransactionOutput(Satoshis(599800000), addrA.scriptPubKey)
         mix = TransactionOutput(Satoshis(200000), addrB.scriptPubKey)
 
-        testDetails = InitDetails(inputs = refs,
-                                  nodeId = nodeId,
-                                  peerAddrOpt = None,
-                                  changeSpkOpt = Some(change.scriptPubKey),
-                                  chanId = Sha256Digest.empty.bytes,
-                                  mixOutput = mix,
-                                  tweaks = dummyTweaks)
+        testDetails = InitDetails(
+          inputs = refs,
+          addressOpt = None,
+          nodeIdOpt = Some(nodeId),
+          peerAddrOpt = None,
+          changeSpkOpt = Some(change.scriptPubKey),
+          chanId = Sha256Digest.empty.bytes,
+          mixOutput = mix,
+          tweaks = dummyTweaks
+        )
         testState = MixOutputRegistered(dummyMix,
                                         Satoshis.zero,
                                         Satoshis.zero,
@@ -186,13 +196,16 @@ class VortexClientTest extends VortexClientFixture {
         change = TransactionOutput(Satoshis(599700000), addrA.scriptPubKey)
         mix = TransactionOutput(Satoshis(200000), addrB.scriptPubKey)
 
-        testDetails = InitDetails(inputs = refs,
-                                  nodeId = nodeId,
-                                  peerAddrOpt = None,
-                                  changeSpkOpt = Some(change.scriptPubKey),
-                                  chanId = Sha256Digest.empty.bytes,
-                                  mixOutput = mix,
-                                  tweaks = dummyTweaks)
+        testDetails = InitDetails(
+          inputs = refs,
+          addressOpt = None,
+          nodeIdOpt = Some(nodeId),
+          peerAddrOpt = None,
+          changeSpkOpt = Some(change.scriptPubKey),
+          chanId = Sha256Digest.empty.bytes,
+          mixOutput = mix,
+          tweaks = dummyTweaks
+        )
         testState = MixOutputRegistered(dummyMix,
                                         Satoshis.zero,
                                         Satoshis.zero,
@@ -224,13 +237,16 @@ class VortexClientTest extends VortexClientFixture {
       change = TransactionOutput(Satoshis(599800000), addrA.scriptPubKey)
       mix = TransactionOutput(Satoshis(200000), addrB.scriptPubKey)
 
-      testDetails = InitDetails(inputs = refs,
-                                nodeId = nodeId,
-                                peerAddrOpt = None,
-                                changeSpkOpt = Some(change.scriptPubKey),
-                                chanId = Sha256Digest.empty.bytes,
-                                mixOutput = mix,
-                                tweaks = dummyTweaks)
+      testDetails = InitDetails(
+        inputs = refs,
+        addressOpt = None,
+        nodeIdOpt = Some(nodeId),
+        peerAddrOpt = None,
+        changeSpkOpt = Some(change.scriptPubKey),
+        chanId = Sha256Digest.empty.bytes,
+        mixOutput = mix,
+        tweaks = dummyTweaks
+      )
       testState = MixOutputRegistered(dummyMix,
                                       Satoshis.zero,
                                       Satoshis.zero,

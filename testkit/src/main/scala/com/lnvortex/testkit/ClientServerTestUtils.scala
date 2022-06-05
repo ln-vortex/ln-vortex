@@ -53,6 +53,26 @@ trait ClientServerTestUtils {
   }
 
   def registerInputs(
+      peerId: Sha256Digest,
+      client: VortexClient[LndVortexWallet],
+      coordinator: VortexCoordinator)(implicit
+      ec: ExecutionContext): Future[FieldElement] = {
+    for {
+      _ <- getNonce(peerId, client, coordinator)
+      // don't select all coins
+      utxos <- client.listCoins().map(_.tail)
+      addr <- client.vortexWallet.getNewAddress()
+      _ = client.queueCoins(utxos.map(_.outputReference), addr)
+      msg <- coordinator.beginInputRegistration()
+
+      registerInputs <- client.registerCoins(msg.roundId,
+                                             msg.inputFee,
+                                             msg.outputFee)
+      blindSig <- coordinator.registerAlice(peerId, registerInputs)
+    } yield blindSig
+  }
+
+  def registerInputs(
       peerIdA: Sha256Digest,
       peerIdB: Sha256Digest,
       clientA: VortexClient[LndVortexWallet],
@@ -104,6 +124,22 @@ trait ClientServerTestUtils {
   }
 
   def registerInputsAndOutputs(
+      peerId: Sha256Digest,
+      client: VortexClient[LndVortexWallet],
+      coordinator: VortexCoordinator)(implicit
+      ec: ExecutionContext): Future[Unit] = {
+    for {
+      blindSig <- registerInputs(peerId, client, coordinator)
+
+      registerMixOutput = client.processBlindOutputSig(blindSig)
+
+      _ <- coordinator.beginOutputRegistration()
+
+      _ <- coordinator.verifyAndRegisterBob(registerMixOutput)
+    } yield ()
+  }
+
+  def registerInputsAndOutputs(
       peerIdA: Sha256Digest,
       peerIdB: Sha256Digest,
       clientA: VortexClient[LndVortexWallet],
@@ -134,6 +170,25 @@ trait ClientServerTestUtils {
       peerLnd: LndRpcClient)(implicit ec: ExecutionContext): Future[PSBT] = {
     for {
       _ <- registerInputsAndOutputs(peerId, client, coordinator, peerLnd)
+
+      // registering inputs and outputs will make it construct the unsigned psbt
+      _ <- TestAsyncUtil.awaitConditionF(
+        () => coordinator.currentRound().map(_.psbtOpt.isDefined),
+        interval = 100.milliseconds,
+        maxTries = 500)
+      psbt <- coordinator.currentRound().map(_.psbtOpt.get)
+
+      signed <- client.validateAndSignPsbt(psbt)
+    } yield signed
+  }
+
+  def signPSBT(
+      peerId: Sha256Digest,
+      client: VortexClient[LndVortexWallet],
+      coordinator: VortexCoordinator)(implicit
+      ec: ExecutionContext): Future[PSBT] = {
+    for {
+      _ <- registerInputsAndOutputs(peerId, client, coordinator)
 
       // registering inputs and outputs will make it construct the unsigned psbt
       _ <- TestAsyncUtil.awaitConditionF(
@@ -191,6 +246,28 @@ trait ClientServerTestUtils {
         () => peerLnd.listChannels().map(_.nonEmpty),
         interval = 100.milliseconds,
         maxTries = 500)
+    } yield ()
+  }
+
+  def completeRound(
+      peerId: Sha256Digest,
+      client: VortexClient[LndVortexWallet],
+      coordinator: VortexCoordinator)(implicit
+      ec: ExecutionContext): Future[Unit] = {
+    for {
+      all <- client.listCoins()
+      psbt <- signPSBT(peerId, client, coordinator)
+
+      _ <- coordinator.registerPSBTSignatures(peerId, psbt)
+
+      // Mine some blocks
+      _ <- coordinator.bitcoind.getNewAddress.flatMap(
+        coordinator.bitcoind.generateToAddress(6, _))
+
+      // wait until new set of utxos
+      _ <- TestAsyncUtil.awaitConditionF(() => client.listCoins().map(_ != all),
+                                         interval = 100.milliseconds,
+                                         maxTries = 500)
     } yield ()
   }
 

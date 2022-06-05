@@ -3,6 +3,7 @@ package com.lnvortex.core
 import org.bitcoins.core.currency.{CurrencyUnit, Satoshis}
 import org.bitcoins.core.number.UInt32
 import org.bitcoins.core.policy.Policy
+import org.bitcoins.core.protocol.BitcoinAddress
 import org.bitcoins.core.protocol.ln.node.NodeId
 import org.bitcoins.core.protocol.transaction._
 import org.bitcoins.core.psbt.PSBT
@@ -39,16 +40,18 @@ case class ReceivedNonce(round: MixDetails, nonce: SchnorrNonce)
 
   def nextStage(
       inputs: Vector[OutputReference],
-      nodeId: NodeId,
+      addressOpt: Option[BitcoinAddress],
+      nodeIdOpt: Option[NodeId],
       peerAddrOpt: Option[InetSocketAddress]): InputsScheduled =
-    InputsScheduled(round, nonce, inputs, nodeId, peerAddrOpt)
+    InputsScheduled(round, nonce, inputs, addressOpt, nodeIdOpt, peerAddrOpt)
 }
 
 case class InputsScheduled(
     round: MixDetails,
     nonce: SchnorrNonce,
     inputs: Vector[OutputReference],
-    nodeId: NodeId,
+    addressOpt: Option[BitcoinAddress],
+    nodeIdOpt: Option[NodeId],
     peerAddrOpt: Option[InetSocketAddress])
     extends RoundDetails {
   override val order: Int = 3
@@ -82,11 +85,14 @@ sealed trait InitializedRound extends RoundDetails {
     }
 
   def restartRound(round: MixDetails, nonce: SchnorrNonce): InputsScheduled =
-    InputsScheduled(round = round,
-                    nonce = nonce,
-                    inputs = initDetails.inputs,
-                    nodeId = initDetails.nodeId,
-                    peerAddrOpt = initDetails.peerAddrOpt)
+    InputsScheduled(
+      round = round,
+      nonce = nonce,
+      inputs = initDetails.inputs,
+      addressOpt = initDetails.addressOpt,
+      nodeIdOpt = initDetails.nodeIdOpt,
+      peerAddrOpt = initDetails.peerAddrOpt
+    )
 }
 
 case class InputsRegistered(
