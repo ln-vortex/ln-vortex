@@ -65,7 +65,10 @@ case class LndChannelOpener(lndRpcClient: LndRpcClient)(implicit
 
     val connectF = peerAddrOpt match {
       case Some(addr) =>
-        lndRpcClient.connectPeer(nodeId, addr)
+        lndRpcClient.isConnected(nodeId).flatMap { connected =>
+          if (connected) Future.unit
+          else lndRpcClient.connectPeer(nodeId, addr)
+        }
       case None => Future.unit
     }
 

@@ -124,30 +124,35 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
     }
   }
 
-  def queueCoins(
-      outPoints: Vector[TransactionOutPoint],
-      nodeUri: NodeUri): Future[Unit] = {
-    listCoins().map { utxos =>
-      val coins = utxos
-        .filter(u => outPoints.contains(u.outPoint))
-        .map(_.outputReference)
-      queueCoins(coins, nodeUri)
+  private def tryConnect(
+      nodeId: NodeId,
+      peerAddrOpt: Option[InetSocketAddress]): Future[Unit] = {
+    vortexWallet.isConnected(nodeId).flatMap { connected =>
+      if (!connected) {
+        peerAddrOpt match {
+          case None =>
+            Future.failed(new IllegalArgumentException(
+              s"Not connected to peer $nodeId, you must connect with them in order to open a channel to them"))
+          case Some(peerAddr) =>
+            vortexWallet.connect(nodeId, peerAddr)
+        }
+      } else Future.unit
     }
   }
 
-  def queueCoins(
+  def getCoinsAndQueue(
       outPoints: Vector[TransactionOutPoint],
       nodeId: NodeId,
       peerAddrOpt: Option[InetSocketAddress]): Future[Unit] = {
-    listCoins().map { utxos =>
+    listCoins().flatMap { utxos =>
       val coins = utxos
         .filter(u => outPoints.contains(u.outPoint))
         .map(_.outputReference)
-      queueCoins(coins, nodeId, peerAddrOpt)
+      queueCoinsAndTryConnect(coins, nodeId, peerAddrOpt)
     }
   }
 
-  def queueCoins(
+  def getCoinsAndQueue(
       outPoints: Vector[TransactionOutPoint],
       address: BitcoinAddress): Future[Unit] = {
     listCoins().map { utxos =>
@@ -160,14 +165,23 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
 
   def queueCoins(
       outputRefs: Vector[OutputReference],
-      nodeUri: NodeUri): Unit = {
-    queueCoins(outputRefs, nodeUri.nodeId, Some(nodeUri.socketAddress))
+      nodeUri: NodeUri): Future[Unit] = {
+    queueCoinsAndTryConnect(outputRefs,
+                            nodeUri.nodeId,
+                            Some(nodeUri.socketAddress))
   }
 
   def queueCoins(
       outputRefs: Vector[OutputReference],
       nodeId: NodeId,
-      peerAddrOpt: Option[InetSocketAddress]): Unit = {
+      peerAddrOpt: Option[InetSocketAddress]): Future[Unit] = {
+    queueCoinsAndTryConnect(outputRefs, nodeId, peerAddrOpt)
+  }
+
+  private def queueCoinsAndTryConnect(
+      outputRefs: Vector[OutputReference],
+      nodeId: NodeId,
+      peerAddrOpt: Option[InetSocketAddress]): Future[Unit] = {
     roundDetails match {
       case state @ (NoDetails | _: KnownRound | _: InputsScheduled |
           _: InputsRegistered | _: MixOutputRegistered | _: PSBTSigned) =>
@@ -176,10 +190,12 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
       case receivedNonce: ReceivedNonce =>
         logger.info(
           s"Queueing ${outputRefs.size} coins to open a channel to $nodeId")
-        roundDetails = receivedNonce.nextStage(inputs = outputRefs,
-                                               addressOpt = None,
-                                               nodeIdOpt = Some(nodeId),
-                                               peerAddrOpt = peerAddrOpt)
+        tryConnect(nodeId, peerAddrOpt).map { _ =>
+          roundDetails = receivedNonce.nextStage(inputs = outputRefs,
+                                                 addressOpt = None,
+                                                 nodeIdOpt = Some(nodeId),
+                                                 peerAddrOpt = peerAddrOpt)
+        }
     }
   }
 

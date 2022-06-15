@@ -92,6 +92,16 @@ case class LndVortexWallet(lndRpcClient: LndRpcClient)(implicit
     lndRpcClient.wallet.labelTransaction(request).map(_ => ())
   }
 
+  override def isConnected(nodeId: NodeId): Future[Boolean] = {
+    lndRpcClient.isConnected(nodeId)
+  }
+
+  override def connect(
+      nodeId: NodeId,
+      peerAddr: InetSocketAddress): Future[Unit] = {
+    lndRpcClient.connectPeer(nodeId, peerAddr).map(_ => ())
+  }
+
   override def initChannelOpen(
       nodeId: NodeId,
       peerAddrOpt: Option[InetSocketAddress],
