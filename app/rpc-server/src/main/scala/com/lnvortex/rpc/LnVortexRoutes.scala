@@ -78,13 +78,13 @@ case class LnVortexRoutes(client: VortexClient[VortexWalletApi])(implicit
                   throw new IllegalArgumentException(
                     "Cannot have both nodeId and address")
                 case (Some(addr), None) =>
-                  client.queueCoins(outpoints, addr)
+                  client.getCoinsAndQueue(outpoints, addr)
                 case (None, Some(nodeId)) =>
-                  client.queueCoins(outpoints, nodeId, peerAddrOpt)
+                  client.getCoinsAndQueue(outpoints, nodeId, peerAddrOpt)
                 case (None, None) =>
                   for {
                     addr <- client.vortexWallet.getNewAddress()
-                    _ <- client.queueCoins(outpoints, addr)
+                    _ <- client.getCoinsAndQueue(outpoints, addr)
                   } yield ()
               }
             }

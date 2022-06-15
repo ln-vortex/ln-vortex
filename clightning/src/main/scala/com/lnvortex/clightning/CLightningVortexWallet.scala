@@ -87,6 +87,16 @@ case class CLightningVortexWallet(clightning: CLightningRpcClient)(implicit
       txId: DoubleSha256DigestBE,
       label: String): Future[Unit] = Future.unit
 
+  override def isConnected(nodeId: NodeId): Future[Boolean] = {
+    clightning.isConnected(nodeId)
+  }
+
+  override def connect(
+      nodeId: NodeId,
+      peerAddr: InetSocketAddress): Future[Unit] = {
+    clightning.connect(nodeId, peerAddr).map(_ => ())
+  }
+
   override def initChannelOpen(
       nodeId: NodeId,
       peerAddrOpt: Option[InetSocketAddress],

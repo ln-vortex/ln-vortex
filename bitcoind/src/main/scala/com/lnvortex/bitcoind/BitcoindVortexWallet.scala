@@ -108,6 +108,18 @@ case class BitcoindVortexWallet(
       label: String): Future[Unit] =
     Future.unit // bitcoind doesn't have tx labeling
 
+  override def isConnected(nodeId: NodeId): Future[Boolean] = {
+    Future.failed(
+      new UnsupportedOperationException("Bitcoind is not a lightning wallet"))
+  }
+
+  override def connect(
+      nodeId: NodeId,
+      peerAddr: InetSocketAddress): Future[Unit] = {
+    Future.failed(
+      new UnsupportedOperationException("Bitcoind is not a lightning wallet"))
+  }
+
   override def initChannelOpen(
       nodeId: NodeId,
       peerAddrOpt: Option[InetSocketAddress],

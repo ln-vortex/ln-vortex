@@ -41,6 +41,10 @@ abstract class VortexWalletApi extends StartStopAsync[Unit] {
 
   def labelTransaction(txId: DoubleSha256DigestBE, label: String): Future[Unit]
 
+  def isConnected(nodeId: NodeId): Future[Boolean]
+
+  def connect(nodeId: NodeId, peerAddr: InetSocketAddress): Future[Unit]
+
   def initChannelOpen(
       nodeId: NodeId,
       peerAddrOpt: Option[InetSocketAddress],

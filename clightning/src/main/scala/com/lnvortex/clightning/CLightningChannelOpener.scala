@@ -25,7 +25,10 @@ case class CLightningChannelOpener(clightning: CLightningRpcClient)(implicit
     // connect to peer
     val connectF = peerAddrOpt match {
       case Some(addr) =>
-        clightning.connect(nodeId, addr)
+        clightning.isConnected(nodeId).flatMap { connected =>
+          if (connected) Future.unit
+          else clightning.connect(nodeId, addr)
+        }
       case None => Future.unit
     }
 
