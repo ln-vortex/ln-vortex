@@ -100,7 +100,8 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       amount = config.mixAmount,
       mixFee = config.mixFee,
       publicKey = publicKey,
-      time = UInt64(roundStartTime)
+      time = UInt64(roundStartTime),
+      status = config.statusString
     )
 
   private var inputRegStartTime = roundStartTime
