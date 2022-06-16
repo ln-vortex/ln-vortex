@@ -25,6 +25,7 @@ class VortexClientTest extends VortexClientFixture {
     mixFee = Satoshis.zero,
     publicKey = ECPublicKey.freshPublicKey.schnorrPublicKey,
     time = UInt64.zero,
+    maxPeers = UInt16(5),
     status = "hello world"
   )
 

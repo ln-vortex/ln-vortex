@@ -101,6 +101,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       mixFee = config.mixFee,
       publicKey = publicKey,
       time = UInt64(roundStartTime),
+      maxPeers = UInt16(config.maxPeers),
       status = config.statusString
     )
 
@@ -391,7 +392,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
                 // if we are remixing, can only have one input
                 val singleInput = registerInputs.inputs.size == 1
                 // make sure it wasn't a change output
-                val isMixUtxo = inputRef.output.value == config.remixAmount
+                val isMixUtxo = inputRef.output.value == config.mixAmount
                 val noChange = registerInputs.changeSpkOpt.isEmpty
 
                 singleInput && isMixUtxo && noChange
