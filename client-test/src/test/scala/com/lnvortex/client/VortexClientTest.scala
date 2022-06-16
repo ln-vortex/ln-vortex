@@ -24,7 +24,8 @@ class VortexClientTest extends VortexClientFixture {
     amount = Satoshis(200000),
     mixFee = Satoshis.zero,
     publicKey = ECPublicKey.freshPublicKey.schnorrPublicKey,
-    time = UInt64.zero
+    time = UInt64.zero,
+    status = "hello world"
   )
 
   val nonce: SchnorrNonce = ECPublicKey.freshPublicKey.schnorrNonce
