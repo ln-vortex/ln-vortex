@@ -22,6 +22,7 @@ trait VortexClientFixture extends BitcoinSFixture with CachedBitcoindV21 {
         implicit val conf: VortexAppConfig = getTestConfigs()._1
         for {
           bitcoind <- cachedBitcoindWithFundsF
+          _ <- conf.start()
 
           client = LndRpcTestClient.fromSbtDownload(Some(bitcoind))
           lnd <- client.start()

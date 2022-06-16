@@ -13,7 +13,7 @@ object BlindSchnorrUtil {
     val BlindingTweaks(nonceTweak, challengeTweak, keyTweak) = blindingTweaks
     val tweakedNonce = signerNonce.publicKey
       .add(nonceTweak.getPublicKey)
-      .add(signerPubKey.publicKey.tweakMultiply(challengeTweak))
+      .add(signerPubKey.publicKey.multiply(challengeTweak))
       .schnorrNonce
     val tweakedPubKey = {
       if (keyTweak.isZero) signerPubKey
@@ -64,7 +64,7 @@ object BlindSchnorrUtil {
 
     val tweakedNonce = signerNonce.publicKey
       .add(nonceTweak.getPublicKey)
-      .add(signerPubKey.publicKey.tweakMultiply(challengeTweak))
+      .add(signerPubKey.publicKey.multiply(challengeTweak))
       .schnorrNonce
 
     val sig = SchnorrDigitalSignature(tweakedNonce, tweakedSig)
