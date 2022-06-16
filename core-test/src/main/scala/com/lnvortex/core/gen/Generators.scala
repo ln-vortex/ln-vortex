@@ -35,9 +35,17 @@ object Generators {
       mixFee <- CurrencyUnitGenerator.positiveSatoshis
       pubkey <- CryptoGenerators.schnorrPublicKey
       time <- NumberGenerator.uInt64
+      maxPeers <- NumberGenerator.uInt16
       status <- StringGenerators.genUTF8String
     } yield {
-      MixDetails(version, roundId, amount, mixFee, pubkey, time, status)
+      MixDetails(version = version,
+                 roundId = roundId,
+                 amount = amount,
+                 mixFee = mixFee,
+                 publicKey = pubkey,
+                 time = time,
+                 maxPeers = maxPeers,
+                 status = status)
     }
   }
 

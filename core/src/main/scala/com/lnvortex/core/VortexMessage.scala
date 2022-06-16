@@ -170,6 +170,7 @@ case class MixDetails(
     mixFee: CurrencyUnit,
     publicKey: SchnorrPublicKey,
     time: UInt64,
+    maxPeers: UInt16,
     status: NormalizedString)
     extends ServerVortexMessage {
   override val tpe: BigSizeUInt = MixDetails.tpe
@@ -180,7 +181,9 @@ case class MixDetails(
       amount.satoshis.toUInt64.bytes ++
       mixFee.satoshis.toUInt64.bytes ++
       publicKey.bytes ++
-      time.bytes ++ TLV.getStringBytes(status)
+      time.bytes ++
+      maxPeers.bytes ++
+      TLV.getStringBytes(status)
   }
 }
 
@@ -198,6 +201,7 @@ object MixDetails extends VortexMessageFactory[MixDetails] {
     val mixFee = iter.takeSats()
     val publicKey = SchnorrPublicKey(iter.take(32))
     val time = iter.takeU64()
+    val maxPeers = iter.takeU16()
     val status = iter.takeString()
 
     MixDetails(version = version,
@@ -206,6 +210,7 @@ object MixDetails extends VortexMessageFactory[MixDetails] {
                mixFee = mixFee,
                publicKey = publicKey,
                time = time,
+               maxPeers = maxPeers,
                status = status)
   }
 }
