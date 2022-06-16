@@ -5,6 +5,7 @@ import akka.stream.scaladsl.Sink
 import com.lnvortex.core.{api, NodeUri}
 import com.lnvortex.core.api.OutputDetails
 import grizzled.slf4j.Logging
+import lnrpc.ChannelPoint.FundingTxid
 import lnrpc.FundingShim.Shim.{PsbtShim => FundingPsbtShim}
 import lnrpc.FundingTransitionMsg.Trigger._
 import lnrpc.OpenStatusUpdate.Update.PsbtFund
@@ -129,6 +130,13 @@ case class LndChannelOpener(lndRpcClient: LndRpcClient)(implicit
     * @return
     */
   def cancelChannel(chanOutPoint: TransactionOutPoint): Future[Unit] = {
-    lndRpcClient.abandonChannel(chanOutPoint, pendingFundingShimOnly = true)
+    val txid = FundingTxid.FundingTxidBytes(chanOutPoint.txId.bytes)
+    val channelPoint: ChannelPoint = ChannelPoint(txid, chanOutPoint.vout)
+    val request =
+      AbandonChannelRequest(Some(channelPoint),
+                            pendingFundingShimOnly = true,
+                            iKnowWhatIAmDoing = true)
+
+    lndRpcClient.abandonChannel(request)
   }
 }

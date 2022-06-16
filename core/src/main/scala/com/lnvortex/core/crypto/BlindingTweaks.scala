@@ -31,7 +31,7 @@ object BlindingTweaks {
 
     val tweaksOpt = for {
       nonceTweak <- isValidBIP340Tweak(signerPubKey.publicKey
-                                         .tweakMultiply(challengeTweak)
+                                         .multiply(challengeTweak)
                                          .add(signerNonce.publicKey),
                                        nonceTweakRaw)
     } yield BlindingTweaks(nonceTweak, challengeTweak, FieldElement.zero)
@@ -53,7 +53,7 @@ object BlindingTweaks {
     val tweaksOpt = for {
       keyTweak <- isValidBIP340Tweak(signerPubKey.publicKey, keyTweakRaw)
       nonceTweak <- isValidBIP340Tweak(signerPubKey.publicKey
-                                         .tweakMultiply(challengeTweak)
+                                         .multiply(challengeTweak)
                                          .add(signerNonce.publicKey),
                                        nonceTweakRaw)
     } yield BlindingTweaks(nonceTweak, challengeTweak, keyTweak)

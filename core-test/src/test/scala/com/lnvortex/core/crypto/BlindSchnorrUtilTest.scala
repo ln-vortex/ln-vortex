@@ -54,8 +54,7 @@ class BlindSchnorrUtilTest extends BitcoinSUnitTest {
 
         val tweakedNonce = signerNonce.publicKey
           .add(blindingTweaks.nonceTweak.getPublicKey)
-          .add(
-            signerPubKey.publicKey.tweakMultiply(blindingTweaks.challengeTweak))
+          .add(signerPubKey.publicKey.multiply(blindingTweaks.challengeTweak))
           .schnorrNonce
 
         assert(tweakedNonceKey.schnorrNonce == tweakedNonce)
@@ -88,7 +87,7 @@ class BlindSchnorrUtilTest extends BitcoinSUnitTest {
           .add(unblindChallenge.multiply(blindingTweaks.keyTweak))
 
         val expectedSigPoint = tweakedPubKey.publicKey
-          .tweakMultiply(unblindChallenge)
+          .multiply(unblindChallenge)
           .add(tweakedNonce.publicKey)
 
         assert(expectedSig2.getPublicKey == expectedSigPoint)

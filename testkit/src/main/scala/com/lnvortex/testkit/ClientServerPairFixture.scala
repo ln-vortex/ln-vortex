@@ -48,6 +48,7 @@ trait ClientServerPairFixture extends BitcoinSFixture with CachedBitcoindV21 {
           netConfig = ConfigFactory.parseString(
             s"""vortex.coordinator = "$host:${addr.getPort}" """)
           clientConfig = getTestConfigs(Vector(netConfig))._1
+          _ <- clientConfig.start()
 
           (lnd, peerLnd) <- LndTestUtils.createNodePair(bitcoind)
           client = VortexClient(LndVortexWallet(lnd))(system, clientConfig)
