@@ -7,6 +7,8 @@ import org.bitcoins.core.protocol.BigSizeUInt
 import org.bitcoins.core.protocol.script.ScriptPubKey
 import org.bitcoins.core.protocol.tlv.NormalizedString
 import org.bitcoins.core.protocol.tlv.TLV.{FALSE_BYTE, TRUE_BYTE}
+import org.bitcoins.core.script.ScriptType
+import org.bitcoins.core.script.ScriptType._
 import org.bitcoins.crypto.{Factory, NetworkElement}
 import scodec.bits.ByteVector
 
@@ -158,5 +160,15 @@ case class ValueIterator(value: ByteVector, var index: Int = 0) {
   def takeSPK(): ScriptPubKey = {
     val len = takeU16().toInt
     ScriptPubKey.fromAsmBytes(take(len))
+  }
+
+  def takeScriptType(): ScriptType = {
+    take(1).head match {
+      case 0x00 => WITNESS_V0_KEYHASH
+      case 0x01 => WITNESS_V0_SCRIPTHASH
+      case 0x02 => WITNESS_V1_TAPROOT
+      case byte: Byte =>
+        throw new RuntimeException(s"Unknown ScriptType, got $byte")
+    }
   }
 }

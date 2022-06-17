@@ -26,7 +26,7 @@ trait ClientServerPairFixture
 
   def isNetworkingTest: Boolean
 
-  def mixScriptType: ScriptType
+  def outputScriptType: ScriptType
 
   override def withFixture(test: OneArgAsyncTest): FutureOutcome = {
     makeDependentFixture[(
@@ -35,7 +35,8 @@ trait ClientServerPairFixture
         LndRpcClient)](
       () => {
         val scriptTypeConfig =
-          ConfigFactory.parseString(s"vortex.mixScriptType = $mixScriptType")
+          ConfigFactory.parseString(
+            s"vortex.outputScriptType = $outputScriptType")
         implicit val (_, serverConf) = getTestConfigs(Vector(scriptTypeConfig))
 
         for {

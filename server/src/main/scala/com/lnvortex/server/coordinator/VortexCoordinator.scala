@@ -102,6 +102,9 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       publicKey = publicKey,
       time = UInt64(roundStartTime),
       maxPeers = UInt16(config.maxPeers),
+      inputType = config.inputScriptType,
+      outputType = config.outputScriptType,
+      changeType = config.changeScriptType,
       status = config.statusString
     )
 
@@ -478,7 +481,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       bob: RegisterMixOutput): Future[Unit] = {
     logger.info("A bob is registering an output")
 
-    val validSpk = bob.output.scriptPubKey.scriptType == config.mixScriptType
+    val validSpk = bob.output.scriptPubKey.scriptType == config.outputScriptType
     lazy val validSig = bob.verifySig(publicKey, currentRoundId)
 
     // todo verify address has never been in any tx

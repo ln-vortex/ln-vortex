@@ -13,7 +13,7 @@ class ClientServerPairNetworkingTest
     with EmbeddedPg
     with LnVortexTestUtils {
   override val isNetworkingTest = true
-  override val mixScriptType: ScriptType = WITNESS_V0_SCRIPTHASH
+  override val outputScriptType: ScriptType = WITNESS_V0_SCRIPTHASH
 
   val interval: FiniteDuration =
     if (torEnabled) 500.milliseconds else 100.milliseconds

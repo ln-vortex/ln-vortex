@@ -14,7 +14,7 @@ class DualClientTest
     with ClientServerTestUtils
     with EmbeddedPg {
   override val isNetworkingTest = false
-  override val mixScriptType: ScriptType = WITNESS_V0_SCRIPTHASH
+  override val outputScriptType: ScriptType = WITNESS_V0_SCRIPTHASH
 
   override val testActor: TestActorRef[Nothing] = TestActorRef(
     "DualClientTest-test")

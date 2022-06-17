@@ -3,6 +3,7 @@ package com.lnvortex.core.gen
 import com.lnvortex.core._
 import org.bitcoins.core.protocol.script.EmptyScriptPubKey
 import org.bitcoins.core.protocol.transaction.OutputReference
+import org.bitcoins.core.script.ScriptType
 import org.bitcoins.testkitcore.gen._
 import org.scalacheck.Gen
 
@@ -27,6 +28,12 @@ object Generators {
     }
   }
 
+  def validScriptType: Gen[ScriptType] = {
+    Gen.oneOf(ScriptType.WITNESS_V0_KEYHASH,
+              ScriptType.WITNESS_V0_SCRIPTHASH,
+              ScriptType.WITNESS_V1_TAPROOT)
+  }
+
   def mixDetails: Gen[MixDetails] = {
     for {
       version <- NumberGenerator.uInt16
@@ -35,17 +42,25 @@ object Generators {
       mixFee <- CurrencyUnitGenerator.positiveSatoshis
       pubkey <- CryptoGenerators.schnorrPublicKey
       time <- NumberGenerator.uInt64
+      inputType <- validScriptType
+      outputType <- validScriptType
+      changeType <- validScriptType
       maxPeers <- NumberGenerator.uInt16
       status <- StringGenerators.genUTF8String
     } yield {
-      MixDetails(version = version,
-                 roundId = roundId,
-                 amount = amount,
-                 mixFee = mixFee,
-                 publicKey = pubkey,
-                 time = time,
-                 maxPeers = maxPeers,
-                 status = status)
+      MixDetails(
+        version = version,
+        roundId = roundId,
+        amount = amount,
+        mixFee = mixFee,
+        publicKey = pubkey,
+        time = time,
+        inputType = inputType,
+        outputType = outputType,
+        changeType = changeType,
+        maxPeers = maxPeers,
+        status = status
+      )
     }
   }
 

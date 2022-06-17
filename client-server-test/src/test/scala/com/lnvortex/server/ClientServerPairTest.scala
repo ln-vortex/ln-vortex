@@ -15,7 +15,7 @@ class ClientServerPairTest
     with ClientServerTestUtils
     with EmbeddedPg {
   override val isNetworkingTest = false
-  override val mixScriptType: ScriptType = WITNESS_V0_SCRIPTHASH
+  override val outputScriptType: ScriptType = WITNESS_V0_SCRIPTHASH
 
   val testActor: TestActorRef[Nothing] = TestActorRef(
     "ClientServerPairTest-test")
