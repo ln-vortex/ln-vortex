@@ -8,12 +8,15 @@ import org.bitcoins.testkit.async.TestAsyncUtil
 
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 
-class OnChainNetworkingTest extends ClientServerPairFixture with EmbeddedPg {
+class OnChainNetworkingTest
+    extends ClientServerPairFixture
+    with EmbeddedPg
+    with LnVortexTestUtils {
   override val isNetworkingTest = true
   override val mixScriptType: ScriptType = WITNESS_V0_KEYHASH
 
   val interval: FiniteDuration =
-    if (LnVortexTestUtils.torEnabled) 500.milliseconds else 100.milliseconds
+    if (torEnabled) 500.milliseconds else 100.milliseconds
 
   it must "cancel a registration and ask nonce again" in {
     case (client, _, _) =>

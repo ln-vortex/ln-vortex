@@ -91,51 +91,58 @@ trait PeerValidation extends Logging { self: VortexCoordinator =>
   }
 
   def validateAliceChange(
+      isRemix: Boolean,
       roundDb: RoundDb,
       registerInputs: RegisterInputs,
       otherInputs: Vector[RegisteredInputDb]): Option[VortexServerException] = {
-    val uniqueChangeSpk = registerInputs.changeSpkOpt.forall { spk =>
-      !otherInputs
-        .map(_.output.scriptPubKey)
-        .contains(spk)
+    if (isRemix) {
+      registerInputs.changeSpkOpt.map(_ =>
+        new InvalidChangeScriptPubKeyException(
+          s"Alice registered with change for a remix"))
+    } else {
+      val uniqueChangeSpk = registerInputs.changeSpkOpt.forall { spk =>
+        !otherInputs
+          .map(_.output.scriptPubKey)
+          .contains(spk)
+      }
+
+      // if change make sure it is of correct type
+      val validChange = registerInputs.changeSpkOpt.forall(
+        _.scriptType == config.changeScriptType) && uniqueChangeSpk
+
+      val inputAmt = registerInputs.inputs.map(_.output.value).sum
+      val changeE = calculateChangeOutput(roundDb,
+                                          registerInputs.inputs.size,
+                                          inputAmt,
+                                          registerInputs.changeSpkOpt)
+      val excess = changeE match {
+        case Left(amt)     => amt
+        case Right(output) => output.value
+      }
+
+      val enoughFunding = excess >= Satoshis.zero
+
+      lazy val changeSpkVec = registerInputs.changeSpkOpt match {
+        case Some(spk) => Vector(spk)
+        case None      => Vector.empty
+      }
+      lazy val allSpks =
+        registerInputs.inputs.map(_.output.scriptPubKey) ++ changeSpkVec
+
+      lazy val uniqueSpks = allSpks.size == allSpks.distinct.size
+
+      if (!validChange) {
+        Some(new InvalidChangeScriptPubKeyException(
+          s"Alice registered with invalid change spk ${registerInputs.changeSpkOpt}"))
+      } else if (!enoughFunding) {
+        Some(
+          new NotEnoughFundingException(
+            s"Alice registered with not enough funding, need $excess more"))
+      } else if (!uniqueSpks) {
+        Some(
+          new AttemptedAddressReuseException(
+            s"Cannot have duplicate spks, got $allSpks"))
+      } else None
     }
-
-    // if change make sure it is of correct type
-    val validChange = registerInputs.changeSpkOpt.forall(
-      _.scriptType == config.changeScriptType) && uniqueChangeSpk
-
-    val inputAmt = registerInputs.inputs.map(_.output.value).sum
-    val changeE = calculateChangeOutput(roundDb,
-                                        registerInputs.inputs.size,
-                                        inputAmt,
-                                        registerInputs.changeSpkOpt)
-    val excess = changeE match {
-      case Left(amt)     => amt
-      case Right(output) => output.value
-    }
-
-    val enoughFunding = excess >= Satoshis.zero
-
-    lazy val changeSpkVec = registerInputs.changeSpkOpt match {
-      case Some(spk) => Vector(spk)
-      case None      => Vector.empty
-    }
-    lazy val allSpks =
-      registerInputs.inputs.map(_.output.scriptPubKey) ++ changeSpkVec
-
-    lazy val uniqueSpks = allSpks.size == allSpks.distinct.size
-
-    if (!validChange) {
-      Some(new InvalidChangeScriptPubKeyException(
-        s"Alice registered with invalid change spk ${registerInputs.changeSpkOpt}"))
-    } else if (!enoughFunding) {
-      Some(
-        new NotEnoughFundingException(
-          s"Alice registered with not enough funding, need $excess more"))
-    } else if (!uniqueSpks) {
-      Some(
-        new AttemptedAddressReuseException(
-          s"Cannot have duplicate spks, got $allSpks"))
-    } else None
   }
 }

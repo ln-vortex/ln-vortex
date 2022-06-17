@@ -3,6 +3,8 @@ package com.lnvortex.server
 import akka.testkit.TestActorRef
 import com.lnvortex.core.RoundDetails.getInitDetailsOpt
 import com.lnvortex.testkit._
+import org.bitcoins.core.script.ScriptType
+import org.bitcoins.core.script.ScriptType.WITNESS_V0_SCRIPTHASH
 import org.bitcoins.crypto.Sha256Digest
 import org.bitcoins.testkit.EmbeddedPg
 import scodec.bits.ByteVector
@@ -12,6 +14,7 @@ class DualClientTest
     with ClientServerTestUtils
     with EmbeddedPg {
   override val isNetworkingTest = false
+  override val mixScriptType: ScriptType = WITNESS_V0_SCRIPTHASH
 
   override val testActor: TestActorRef[Nothing] = TestActorRef(
     "DualClientTest-test")

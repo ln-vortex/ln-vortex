@@ -84,7 +84,7 @@ case class CLightningVortexWallet(clightning: CLightningRpcClient)(implicit
     Future.unit
 
   override def labelTransaction(
-      txId: DoubleSha256DigestBE,
+      txId: DoubleSha256Digest,
       label: String): Future[Unit] = Future.unit
 
   override def isConnected(nodeId: NodeId): Future[Boolean] = {

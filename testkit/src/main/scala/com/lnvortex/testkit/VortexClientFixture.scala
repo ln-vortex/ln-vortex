@@ -3,16 +3,20 @@ package com.lnvortex.testkit
 import com.lnvortex.client.VortexClient
 import com.lnvortex.client.config.VortexAppConfig
 import com.lnvortex.lnd.LndVortexWallet
-import com.lnvortex.testkit.LnVortexTestUtils.getTestConfigs
 import org.bitcoins.core.currency.Bitcoins
 import org.bitcoins.core.number.UInt32
+import org.bitcoins.testkit.EmbeddedPg
 import org.bitcoins.testkit.async.TestAsyncUtil
 import org.bitcoins.testkit.fixtures.BitcoinSFixture
 import org.bitcoins.testkit.lnd.LndRpcTestClient
 import org.bitcoins.testkit.rpc.CachedBitcoindV21
 import org.scalatest.FutureOutcome
 
-trait VortexClientFixture extends BitcoinSFixture with CachedBitcoindV21 {
+trait VortexClientFixture
+    extends BitcoinSFixture
+    with CachedBitcoindV21
+    with LnVortexTestUtils
+    with EmbeddedPg {
 
   override type FixtureParam = VortexClient[LndVortexWallet]
 

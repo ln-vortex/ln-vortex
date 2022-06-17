@@ -5,13 +5,15 @@ import com.lnvortex.client.config.VortexAppConfig
 import com.lnvortex.server.config.VortexCoordinatorAppConfig
 import com.typesafe.config.{Config, ConfigFactory}
 import org.bitcoins.rpc.util.RpcUtil
+import org.bitcoins.testkit.BitcoinSTestAppConfig.configWithEmbeddedDb
+import org.bitcoins.testkit.EmbeddedPg
 import org.bitcoins.testkit.util.FileUtil
 
 import java.io.File
 import java.nio.file.Path
 import scala.util.Properties
 
-trait LnVortexTestUtils {
+trait LnVortexTestUtils { self: EmbeddedPg =>
 
   def tmpDir(): Path = new File(
     s"/tmp/ln-vortex-test/${FileUtil.randomDirName}/").toPath
@@ -45,11 +47,11 @@ trait LnVortexTestUtils {
       """.stripMargin
     }
 
-    val clientConf = VortexAppConfig(dir, overrideConf +: config)
-    val serverConf = VortexCoordinatorAppConfig(dir, overrideConf +: config)
+    val pg = configWithEmbeddedDb(None, () => pgUrl())
+    val clientConf = VortexAppConfig(dir, Vector(pg, overrideConf) ++ config)
+    val serverConf =
+      VortexCoordinatorAppConfig(dir, Vector(pg, overrideConf) ++ config)
 
     (clientConf, serverConf)
   }
 }
-
-object LnVortexTestUtils extends LnVortexTestUtils

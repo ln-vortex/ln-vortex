@@ -3,8 +3,9 @@ package com.lnvortex.testkit
 import com.lnvortex.client.VortexClient
 import com.lnvortex.lnd.LndVortexWallet
 import com.lnvortex.server.coordinator.VortexCoordinator
-import com.lnvortex.testkit.LnVortexTestUtils.getTestConfigs
 import com.typesafe.config.ConfigFactory
+import org.bitcoins.core.script.ScriptType
+import org.bitcoins.testkit.EmbeddedPg
 import org.bitcoins.testkit.async.TestAsyncUtil
 import org.bitcoins.testkit.fixtures.BitcoinSFixture
 import org.bitcoins.testkit.lnd.LndRpcTestUtil
@@ -13,7 +14,11 @@ import org.scalatest.FutureOutcome
 
 import scala.reflect.io.Directory
 
-trait DualClientFixture extends BitcoinSFixture with CachedBitcoindV21 {
+trait DualClientFixture
+    extends BitcoinSFixture
+    with CachedBitcoindV21
+    with LnVortexTestUtils
+    with EmbeddedPg {
   def isNetworkingTest: Boolean
 
   override type FixtureParam = (
@@ -21,13 +26,17 @@ trait DualClientFixture extends BitcoinSFixture with CachedBitcoindV21 {
       VortexClient[LndVortexWallet],
       VortexCoordinator)
 
+  def mixScriptType: ScriptType
+
   override def withFixture(test: OneArgAsyncTest): FutureOutcome = {
     makeDependentFixture[(
         VortexClient[LndVortexWallet],
         VortexClient[LndVortexWallet],
         VortexCoordinator)](
       () => {
-        implicit val (_, serverConf) = getTestConfigs()
+        val scriptTypeConfig =
+          ConfigFactory.parseString(s"vortex.mixScriptType = $mixScriptType")
+        implicit val (_, serverConf) = getTestConfigs(Vector(scriptTypeConfig))
 
         for {
           _ <- serverConf.start()
