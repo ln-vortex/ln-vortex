@@ -99,8 +99,8 @@ case class VortexCoordinatorAppConfig(
     ScriptType.fromString(str)
   }
 
-  lazy val mixScriptType: ScriptType = {
-    val str = config.getString(s"$moduleName.mixScriptType")
+  lazy val outputScriptType: ScriptType = {
+    val str = config.getString(s"$moduleName.outputScriptType")
     ScriptType.fromString(str)
   }
 

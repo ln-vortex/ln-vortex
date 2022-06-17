@@ -12,6 +12,7 @@ import org.bitcoins.core.number._
 import org.bitcoins.core.protocol.script._
 import org.bitcoins.core.protocol.transaction._
 import org.bitcoins.core.psbt.PSBT
+import org.bitcoins.core.script.ScriptType
 import org.bitcoins.crypto._
 import org.bitcoins.testkitcore.gen.NumberGenerator
 
@@ -25,6 +26,9 @@ class VortexClientTest extends VortexClientFixture {
     mixFee = Satoshis.zero,
     publicKey = ECPublicKey.freshPublicKey.schnorrPublicKey,
     time = UInt64.zero,
+    inputType = ScriptType.WITNESS_V0_KEYHASH,
+    outputType = ScriptType.WITNESS_V0_SCRIPTHASH,
+    changeType = ScriptType.WITNESS_V0_KEYHASH,
     maxPeers = UInt16(5),
     status = "hello world"
   )

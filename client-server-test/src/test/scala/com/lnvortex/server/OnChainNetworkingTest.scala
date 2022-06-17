@@ -13,7 +13,7 @@ class OnChainNetworkingTest
     with EmbeddedPg
     with LnVortexTestUtils {
   override val isNetworkingTest = true
-  override val mixScriptType: ScriptType = WITNESS_V0_KEYHASH
+  override val outputScriptType: ScriptType = WITNESS_V0_KEYHASH
 
   val interval: FiniteDuration =
     if (torEnabled) 500.milliseconds else 100.milliseconds

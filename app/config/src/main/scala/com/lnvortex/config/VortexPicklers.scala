@@ -16,6 +16,7 @@ import org.bitcoins.core.currency._
 import org.bitcoins.core.number._
 import org.bitcoins.core.protocol.ln.channel._
 import org.bitcoins.core.protocol.transaction._
+import org.bitcoins.core.script.ScriptType
 import org.bitcoins.crypto._
 import play.api.libs.json._
 import upickle.default._
@@ -136,6 +137,9 @@ object VortexPicklers {
 
   implicit val InitDetailsWrites: OWrites[InitDetails] =
     Json.writes[InitDetails]
+
+  implicit val scriptTypeWrites: Writes[ScriptType] = scriptType =>
+    JsString(scriptType.toString)
 
   implicit val mixDetailsWrites: OWrites[MixDetails] = Json.writes[MixDetails]
 

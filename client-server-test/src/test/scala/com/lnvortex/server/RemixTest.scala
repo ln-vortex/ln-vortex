@@ -17,7 +17,7 @@ class RemixTest
     with EmbeddedPg {
   override lazy val pgEnabled: Boolean = true
   override val isNetworkingTest = false
-  override val mixScriptType: ScriptType = WITNESS_V0_KEYHASH
+  override val outputScriptType: ScriptType = WITNESS_V0_KEYHASH
 
   val testActor: TestActorRef[Nothing] = TestActorRef("Remix-test")
   val peerIdA: Sha256Digest = Sha256Digest(ByteVector.low(32))

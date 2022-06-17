@@ -1,5 +1,6 @@
 package com.lnvortex.core
 
+import com.lnvortex.core.VortexMessage.getScriptTypeBytes
 import grizzled.slf4j.Logging
 import org.bitcoins.core.config.{BitcoinNetwork, Networks}
 import org.bitcoins.core.currency._
@@ -10,6 +11,7 @@ import org.bitcoins.core.protocol.tlv.TLV._
 import org.bitcoins.core.protocol.tlv._
 import org.bitcoins.core.protocol.transaction._
 import org.bitcoins.core.psbt.PSBT
+import org.bitcoins.core.script.ScriptType
 import org.bitcoins.crypto._
 import scodec.bits.ByteVector
 
@@ -59,6 +61,16 @@ object VortexMessage extends Factory[VortexMessage] with Logging {
       .find(_.tpe == tpe)
       .map(_.typeName)
       .getOrElse("Unknown TLV type")
+  }
+
+  def getScriptTypeBytes(scriptType: ScriptType): ByteVector = {
+    scriptType match {
+      case ScriptType.WITNESS_V0_KEYHASH    => ByteVector.fromByte(0x00)
+      case ScriptType.WITNESS_V0_SCRIPTHASH => ByteVector.fromByte(0x01)
+      case ScriptType.WITNESS_V1_TAPROOT    => ByteVector.fromByte(0x02)
+      case _: ScriptType =>
+        throw new IllegalArgumentException("Unhandled script type")
+    }
   }
 
   override def fromBytes(bytes: ByteVector): VortexMessage = {
@@ -170,6 +182,9 @@ case class MixDetails(
     mixFee: CurrencyUnit,
     publicKey: SchnorrPublicKey,
     time: UInt64,
+    inputType: ScriptType,
+    outputType: ScriptType,
+    changeType: ScriptType,
     maxPeers: UInt16,
     status: NormalizedString)
     extends ServerVortexMessage {
@@ -182,6 +197,9 @@ case class MixDetails(
       mixFee.satoshis.toUInt64.bytes ++
       publicKey.bytes ++
       time.bytes ++
+      getScriptTypeBytes(inputType) ++
+      getScriptTypeBytes(outputType) ++
+      getScriptTypeBytes(changeType) ++
       maxPeers.bytes ++
       TLV.getStringBytes(status)
   }
@@ -193,7 +211,7 @@ object MixDetails extends VortexMessageFactory[MixDetails] {
   override val typeName: String = "MixDetails"
 
   override def fromTLVValue(value: ByteVector): MixDetails = {
-    val iter = ValueIterator(value)
+    val iter = com.lnvortex.core.ValueIterator(value)
 
     val version = iter.takeU16()
     val roundId = DoubleSha256Digest(iter.take(32))
@@ -201,17 +219,25 @@ object MixDetails extends VortexMessageFactory[MixDetails] {
     val mixFee = iter.takeSats()
     val publicKey = SchnorrPublicKey(iter.take(32))
     val time = iter.takeU64()
+    val inputType = iter.takeScriptType()
+    val outputType = iter.takeScriptType()
+    val changeType = iter.takeScriptType()
     val maxPeers = iter.takeU16()
     val status = iter.takeString()
 
-    MixDetails(version = version,
-               roundId = roundId,
-               amount = amount,
-               mixFee = mixFee,
-               publicKey = publicKey,
-               time = time,
-               maxPeers = maxPeers,
-               status = status)
+    MixDetails(
+      version = version,
+      roundId = roundId,
+      amount = amount,
+      mixFee = mixFee,
+      publicKey = publicKey,
+      time = time,
+      inputType = inputType,
+      outputType = outputType,
+      changeType = changeType,
+      maxPeers = maxPeers,
+      status = status
+    )
   }
 }
 
