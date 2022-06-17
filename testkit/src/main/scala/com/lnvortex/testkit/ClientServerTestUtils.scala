@@ -63,7 +63,8 @@ trait ClientServerTestUtils {
       _ <- getNonce(peerId, client, coordinator)
       // don't select all coins
       utxos <- client.listCoins().map(_.tail)
-      addr <- client.vortexWallet.getNewAddress()
+      addr <- client.vortexWallet.getNewAddress(
+        coordinator.mixDetails.outputType)
       _ = client.queueCoins(utxos.map(_.outputReference), addr)
       msg <- coordinator.beginInputRegistration()
 
@@ -341,7 +342,8 @@ trait ClientServerTestUtils {
           case None => coins.tail
         }
       }
-      addrA <- clientA.vortexWallet.getNewAddress()
+      addrA <- clientA.vortexWallet.getNewAddress(
+        coordinator.mixDetails.outputType)
       _ = clientA.queueCoins(utxosA.map(_.outputReference), addrA)
       // select non-remix coins
       utxosB <- clientB.listCoins().map { coins =>
@@ -351,7 +353,8 @@ trait ClientServerTestUtils {
           case None => coins.tail
         }
       }
-      addrB <- clientB.vortexWallet.getNewAddress()
+      addrB <- clientB.vortexWallet.getNewAddress(
+        coordinator.mixDetails.outputType)
       _ = clientB.queueCoins(utxosB.map(_.outputReference), addrB)
       msg <- coordinator.beginInputRegistration()
 

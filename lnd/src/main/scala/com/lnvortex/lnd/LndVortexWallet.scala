@@ -3,7 +3,7 @@ package com.lnvortex.lnd
 import akka.actor.ActorSystem
 import com.lnvortex.core.api._
 import com.lnvortex.core.{InputReference, UnspentCoin}
-import lnrpc.NodeInfoRequest
+import lnrpc.{AddressType, NewAddressRequest, NodeInfoRequest}
 import org.bitcoins.core.config.{BitcoinNetwork, BitcoinNetworks}
 import org.bitcoins.core.currency.{CurrencyUnit, Satoshis}
 import org.bitcoins.core.protocol.BitcoinAddress
@@ -12,6 +12,7 @@ import org.bitcoins.core.protocol.ln.node.NodeId
 import org.bitcoins.core.protocol.script.ScriptWitness
 import org.bitcoins.core.protocol.transaction._
 import org.bitcoins.core.psbt.PSBT
+import org.bitcoins.core.script.ScriptType
 import org.bitcoins.crypto._
 import org.bitcoins.lnd.rpc.LndRpcClient
 import org.bitcoins.lnd.rpc.LndUtils._
@@ -37,11 +38,37 @@ case class LndVortexWallet(lndRpcClient: LndRpcClient)(implicit
     Await.result(networkF, 15.seconds)
   }
 
-  override def getNewAddress(): Future[BitcoinAddress] =
-    lndRpcClient.getNewAddress
+  private def addressTypeFromScriptType(scriptType: ScriptType): AddressType = {
+    scriptType match {
+      case ScriptType.PUBKEY | ScriptType.PUBKEYHASH | ScriptType.NONSTANDARD |
+          ScriptType.MULTISIG | ScriptType.CLTV | ScriptType.CSV |
+          ScriptType.NONSTANDARD_IF_CONDITIONAL |
+          ScriptType.NOT_IF_CONDITIONAL | ScriptType.MULTISIG_WITH_TIMEOUT |
+          ScriptType.PUBKEY_WITH_TIMEOUT | ScriptType.NULLDATA |
+          ScriptType.WITNESS_UNKNOWN | ScriptType.WITNESS_COMMITMENT =>
+        throw new IllegalArgumentException("Unknown address type")
+      case ScriptType.SCRIPTHASH => AddressType.NESTED_PUBKEY_HASH
+      case ScriptType.WITNESS_V0_KEYHASH =>
+        AddressType.WITNESS_PUBKEY_HASH
+      case ScriptType.WITNESS_V0_SCRIPTHASH =>
+        throw new IllegalArgumentException("Unknown address type")
+      case ScriptType.WITNESS_V1_TAPROOT =>
+        throw new IllegalArgumentException("Waiting on 0.15-beta")
+    }
+  }
 
-  override def getChangeAddress(): Future[BitcoinAddress] =
-    lndRpcClient.getNewAddress
+  override def getNewAddress(scriptType: ScriptType): Future[BitcoinAddress] = {
+    val req: NewAddressRequest = NewAddressRequest(
+      addressTypeFromScriptType(scriptType))
+
+    lndRpcClient.lnd
+      .newAddress(req)
+      .map(r => BitcoinAddress.fromString(r.address))
+  }
+
+  override def getChangeAddress(
+      scriptType: ScriptType): Future[BitcoinAddress] =
+    getNewAddress(scriptType)
 
   override def listCoins(): Future[Vector[UnspentCoin]] = {
     lndRpcClient.listUnspent.map(_.map { utxo =>

@@ -12,6 +12,7 @@ import org.bitcoins.core.protocol.ln.node.NodeId
 import org.bitcoins.core.protocol.script.ScriptWitness
 import org.bitcoins.core.protocol.transaction._
 import org.bitcoins.core.psbt.PSBT
+import org.bitcoins.core.script.ScriptType
 import org.bitcoins.crypto._
 import scodec.bits.ByteVector
 
@@ -29,11 +30,35 @@ case class CLightningVortexWallet(clightning: CLightningRpcClient)(implicit
   override lazy val network: BitcoinNetwork =
     clightning.instance.network
 
-  override def getNewAddress(): Future[BitcoinAddress] =
-    clightning.getNewAddress(AddressType.SegWit)
+  private def addressTypeFromScriptType(scriptType: ScriptType): AddressType = {
+    scriptType match {
+      case ScriptType.PUBKEY | ScriptType.NONSTANDARD | ScriptType.MULTISIG |
+          ScriptType.CLTV | ScriptType.CSV |
+          ScriptType.NONSTANDARD_IF_CONDITIONAL |
+          ScriptType.NOT_IF_CONDITIONAL | ScriptType.MULTISIG_WITH_TIMEOUT |
+          ScriptType.PUBKEY_WITH_TIMEOUT | ScriptType.NULLDATA |
+          ScriptType.WITNESS_UNKNOWN | ScriptType.WITNESS_COMMITMENT =>
+        throw new IllegalArgumentException("Unknown address type")
+      case ScriptType.PUBKEYHASH         => AddressType.Legacy
+      case ScriptType.SCRIPTHASH         => AddressType.NestedSegWit
+      case ScriptType.WITNESS_V0_KEYHASH => AddressType.SegWit
+      case ScriptType.WITNESS_V0_SCRIPTHASH =>
+        throw new IllegalArgumentException("Unknown address type")
+      case ScriptType.WITNESS_V1_TAPROOT =>
+        throw new IllegalArgumentException("Waiting on 0.15-beta")
+    }
+  }
 
-  override def getChangeAddress(): Future[BitcoinAddress] =
-    clightning.getNewAddress(AddressType.SegWit)
+  override def getNewAddress(scriptType: ScriptType): Future[BitcoinAddress] = {
+    val addressType = addressTypeFromScriptType(scriptType)
+    clightning.getNewAddress(addressType)
+  }
+
+  override def getChangeAddress(
+      scriptType: ScriptType): Future[BitcoinAddress] = {
+    val addressType = addressTypeFromScriptType(scriptType)
+    clightning.getNewAddress(addressType)
+  }
 
   override def listCoins(): Future[Vector[UnspentCoin]] = {
     val outsF = clightning.listFunds

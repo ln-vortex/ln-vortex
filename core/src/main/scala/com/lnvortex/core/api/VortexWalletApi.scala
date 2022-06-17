@@ -8,6 +8,7 @@ import org.bitcoins.core.protocol.ln.node.NodeId
 import org.bitcoins.core.protocol.script.ScriptWitness
 import org.bitcoins.core.protocol.transaction._
 import org.bitcoins.core.psbt.PSBT
+import org.bitcoins.core.script.ScriptType
 import org.bitcoins.core.util.StartStopAsync
 import org.bitcoins.crypto._
 import scodec.bits.ByteVector
@@ -19,9 +20,9 @@ abstract class VortexWalletApi extends StartStopAsync[Unit] {
 
   def network: BitcoinNetwork
 
-  def getNewAddress(): Future[BitcoinAddress]
+  def getNewAddress(scriptType: ScriptType): Future[BitcoinAddress]
 
-  def getChangeAddress(): Future[BitcoinAddress]
+  def getChangeAddress(scriptType: ScriptType): Future[BitcoinAddress]
 
   def listCoins(): Future[Vector[UnspentCoin]]
 

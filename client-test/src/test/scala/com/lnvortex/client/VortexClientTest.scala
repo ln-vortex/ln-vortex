@@ -27,7 +27,7 @@ class VortexClientTest extends VortexClientFixture {
     publicKey = ECPublicKey.freshPublicKey.schnorrPublicKey,
     time = UInt64.zero,
     inputType = ScriptType.WITNESS_V0_KEYHASH,
-    outputType = ScriptType.WITNESS_V0_SCRIPTHASH,
+    outputType = ScriptType.WITNESS_V0_KEYHASH,
     changeType = ScriptType.WITNESS_V0_KEYHASH,
     maxPeers = UInt16(5),
     status = "hello world"
@@ -75,8 +75,8 @@ class VortexClientTest extends VortexClientFixture {
       nodeId <- lnd.lndRpcClient.nodeId
       utxos <- vortexClient.listCoins()
       refs = utxos.map(_.outputReference)
-      addrA <- lnd.getNewAddress()
-      addrB <- lnd.getNewAddress()
+      addrA <- lnd.getNewAddress(dummyMix.changeType)
+      addrB <- lnd.getNewAddress(dummyMix.outputType)
       change = TransactionOutput(Satoshis(599800000), addrA.scriptPubKey)
       mix = TransactionOutput(Satoshis(200000), addrB.scriptPubKey)
 
@@ -115,8 +115,8 @@ class VortexClientTest extends VortexClientFixture {
       utxos <- lnd.listCoins()
       refs = utxos.map(_.outputReference)
 
-      addrA <- lnd.getNewAddress()
-      addrB <- lnd.getNewAddress()
+      addrA <- lnd.getNewAddress(dummyMix.changeType)
+      addrB <- lnd.getNewAddress(dummyMix.outputType)
       change = TransactionOutput(Satoshis(599800000), addrA.scriptPubKey)
       mix = TransactionOutput(Satoshis(200000), addrB.scriptPubKey)
 
@@ -156,8 +156,8 @@ class VortexClientTest extends VortexClientFixture {
         nodeId <- lnd.lndRpcClient.nodeId
         utxos <- vortexClient.listCoins()
         refs = utxos.map(_.outputReference)
-        addrA <- lnd.getNewAddress()
-        addrB <- lnd.getNewAddress()
+        addrA <- lnd.getNewAddress(dummyMix.changeType)
+        addrB <- lnd.getNewAddress(dummyMix.outputType)
         change = TransactionOutput(Satoshis(599800000), addrA.scriptPubKey)
         mix = TransactionOutput(Satoshis(200000), addrB.scriptPubKey)
 
@@ -197,8 +197,8 @@ class VortexClientTest extends VortexClientFixture {
         nodeId <- lnd.lndRpcClient.nodeId
         utxos <- vortexClient.listCoins()
         refs = utxos.map(_.outputReference)
-        addrA <- lnd.getNewAddress()
-        addrB <- lnd.getNewAddress()
+        addrA <- lnd.getNewAddress(dummyMix.changeType)
+        addrB <- lnd.getNewAddress(dummyMix.outputType)
         change = TransactionOutput(Satoshis(599700000), addrA.scriptPubKey)
         mix = TransactionOutput(Satoshis(200000), addrB.scriptPubKey)
 
@@ -238,8 +238,8 @@ class VortexClientTest extends VortexClientFixture {
       utxos <- vortexClient.listCoins()
       _ = require(utxos.nonEmpty)
       refs = utxos.map(_.outputReference)
-      addrA <- lnd.getNewAddress()
-      addrB <- lnd.getNewAddress()
+      addrA <- lnd.getNewAddress(dummyMix.changeType)
+      addrB <- lnd.getNewAddress(dummyMix.outputType)
       change = TransactionOutput(Satoshis(599800000), addrA.scriptPubKey)
       mix = TransactionOutput(Satoshis(200000), addrB.scriptPubKey)
 
