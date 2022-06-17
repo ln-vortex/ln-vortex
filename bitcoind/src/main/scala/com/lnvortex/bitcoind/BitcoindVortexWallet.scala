@@ -33,6 +33,8 @@ case class BitcoindVortexWallet(
     case network: BitcoinNetwork => network
   }
 
+  override def getBlockHeight(): Future[Int] = bitcoind.getBlockCount
+
   private def addressTypeFromScriptType(scriptType: ScriptType): AddressType = {
     scriptType match {
       case ScriptType.NONSTANDARD | ScriptType.MULTISIG | ScriptType.CLTV |

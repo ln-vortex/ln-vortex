@@ -73,11 +73,16 @@ sealed trait InitializedRound extends RoundDetails {
   def initDetails: InitDetails
 
   // todo add tests
-  def expectedAmtBackOpt: Option[CurrencyUnit] =
+  def expectedAmtBackOpt(
+      numRemixes: Int,
+      numNewEntrants: Int): Option[CurrencyUnit] =
     initDetails.changeSpkOpt.flatMap { _ =>
+      val totalNewEntrantFee = Satoshis(numRemixes) * (inputFee + outputFee)
+      val newEntrantFee = totalNewEntrantFee / Satoshis(numNewEntrants)
+
       val excessAfterChange =
         initDetails.inputAmt - round.amount - round.mixFee - (Satoshis(
-          initDetails.inputs.size) * inputFee) - outputFee - outputFee
+          initDetails.inputs.size) * inputFee) - outputFee - outputFee - newEntrantFee
 
       if (excessAfterChange > Policy.dustThreshold)
         Some(excessAfterChange)

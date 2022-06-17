@@ -30,6 +30,10 @@ case class CLightningVortexWallet(clightning: CLightningRpcClient)(implicit
   override lazy val network: BitcoinNetwork =
     clightning.instance.network
 
+  override def getBlockHeight(): Future[Int] = {
+    clightning.getInfo.map(_.blockheight)
+  }
+
   private def addressTypeFromScriptType(scriptType: ScriptType): AddressType = {
     scriptType match {
       case ScriptType.PUBKEY | ScriptType.NONSTANDARD | ScriptType.MULTISIG |

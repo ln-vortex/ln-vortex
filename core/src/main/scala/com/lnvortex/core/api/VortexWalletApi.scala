@@ -20,6 +20,8 @@ abstract class VortexWalletApi extends StartStopAsync[Unit] {
 
   def network: BitcoinNetwork
 
+  def getBlockHeight(): Future[Int]
+
   def getNewAddress(scriptType: ScriptType): Future[BitcoinAddress]
 
   def getChangeAddress(scriptType: ScriptType): Future[BitcoinAddress]

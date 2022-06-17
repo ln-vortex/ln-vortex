@@ -398,71 +398,90 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
           new IllegalStateException(
             s"At invalid state $state, cannot validateAndSignPsbt"))
       case state: MixOutputRegistered =>
-        val inputs: Vector[OutputReference] = state.initDetails.inputs
-        lazy val myOutpoints = inputs.map(_.outPoint)
-        val tx = unsigned.transaction
-        lazy val txOutpoints = tx.inputs.map(_.previousOutput)
-        // should we care if they don't have our inputs?
-        lazy val missingInputs = myOutpoints.filterNot(txOutpoints.contains)
+        vortexWallet.getBlockHeight().flatMap { height =>
+          val inputs: Vector[OutputReference] = state.initDetails.inputs
+          lazy val myOutpoints = inputs.map(_.outPoint)
+          val tx = unsigned.transaction
+          lazy val txOutpoints = tx.inputs.map(_.previousOutput)
+          // should we care if they don't have our inputs?
+          lazy val missingInputs = myOutpoints.filterNot(txOutpoints.contains)
 
-        lazy val hasCorrectChange =
-          (state.expectedAmtBackOpt, state.initDetails.changeSpkOpt) match {
-            case (Some(changeAmt), Some(changeSpk)) =>
-              val outputOpt =
-                tx.outputs.find(_.scriptPubKey == changeSpk)
-              outputOpt.exists(_.value >= changeAmt)
-            case (None, None) => true
-            case (Some(_), None) =>
-              logger.error(
-                "Incorrect state expecting change when having no change address")
-              false
-            case (None, Some(_)) =>
-              logger.error(
-                "Incorrect state has change address when expecting no change")
-              false
-          }
+          // make sure this can be broadcast now
+          val goodLockTime = tx.lockTime.toBigInt <= height + 1
 
-        lazy val hasMixOutput = tx.outputs.contains(state.initDetails.mixOutput)
+          val numRemixes = unsigned.inputMaps.count(
+            _.witnessUTXOOpt.exists(_.witnessUTXO.value == state.round.amount))
+          val numNewEntrants =
+            tx.outputs.count(_.value == state.round.amount) - numRemixes
 
-        lazy val noDust = tx.outputs.forall(_.value > Policy.dustThreshold)
+          lazy val expectedAmtBackOpt =
+            state.expectedAmtBackOpt(numRemixes, numNewEntrants)
 
-        if (
-          hasMixOutput && hasCorrectChange && missingInputs.isEmpty && noDust
-        ) {
-          logger.info("PSBT is valid, giving channel peer")
-          for {
-            // tell peer about funding psbt
-            _ <- state.initDetails.nodeIdOpt match {
-              case Some(_) =>
-                vortexWallet.completeChannelOpen(state.initDetails.chanId,
-                                                 unsigned)
-              case None => Future.unit // skip if on-chain
+          lazy val hasCorrectChange =
+            (expectedAmtBackOpt, state.initDetails.changeSpkOpt) match {
+              case (Some(changeAmt), Some(changeSpk)) =>
+                val outputOpt =
+                  tx.outputs.find(_.scriptPubKey == changeSpk)
+                outputOpt.exists(_.value >= changeAmt)
+              case (None, None) => true
+              case (Some(_), None) =>
+                logger.error(
+                  "Incorrect state expecting change when having no change address")
+                false
+              case (None, Some(_)) =>
+                logger.error(
+                  "Incorrect state has change address when expecting no change")
+                false
             }
-            _ = logger.info("Valid with channel peer, signing")
-            // sign to be sent to coordinator
-            signed <- vortexWallet.signPSBT(unsigned, inputs)
-          } yield {
-            roundDetails = state.nextStage(signed)
-            signed
+
+          lazy val hasMixOutput =
+            tx.outputs.contains(state.initDetails.mixOutput)
+
+          lazy val noDust = tx.outputs.forall(_.value > Policy.dustThreshold)
+
+          // todo check above min relay fee
+          if (
+            goodLockTime && hasMixOutput && hasCorrectChange && missingInputs.isEmpty && noDust
+          ) {
+            logger.info("PSBT is valid, giving channel peer")
+            for {
+              // tell peer about funding psbt
+              _ <- state.initDetails.nodeIdOpt match {
+                case Some(_) =>
+                  vortexWallet.completeChannelOpen(state.initDetails.chanId,
+                                                   unsigned)
+                case None => Future.unit // skip if on-chain
+              }
+              _ = logger.info("Valid with channel peer, signing")
+              // sign to be sent to coordinator
+              signed <- vortexWallet.signPSBT(unsigned, inputs)
+            } yield {
+              roundDetails = state.nextStage(signed)
+              signed
+            }
+          } else { // error
+            val exception: Exception =
+              if (!goodLockTime) {
+                new BadLocktimeException(
+                  "Transaction locktime is too far in the future")
+              } else if (!hasMixOutput) {
+                new InvalidMixedOutputException(
+                  s"Missing expected mixed output ${state.initDetails.mixOutput}")
+              } else if (!hasCorrectChange) {
+                new InvalidChangeOutputException(
+                  s"Missing expected change output of $expectedAmtBackOpt")
+              } else if (missingInputs.nonEmpty) {
+                new MissingInputsException(
+                  s"Missing inputs from transaction: ${missingInputs.mkString(",")}")
+              } else if (!noDust) {
+                new DustOutputsException("Transaction contains dust outputs")
+              } else {
+                // this should be impossible
+                new RuntimeException(
+                  "Received PSBT did not contain our inputs or outputs")
+              }
+            Future.failed(exception)
           }
-        } else { // error
-          val exception: Exception = if (!hasMixOutput) {
-            new InvalidMixedOutputException(
-              s"Missing expected mixed output ${state.initDetails.mixOutput}")
-          } else if (!hasCorrectChange) {
-            new InvalidChangeOutputException(
-              s"Missing expected change output of ${state.expectedAmtBackOpt}")
-          } else if (missingInputs.nonEmpty) {
-            new MissingInputsException(
-              s"Missing inputs from transaction: ${missingInputs.mkString(",")}")
-          } else if (!noDust) {
-            new DustOutputsException("Transaction contains dust outputs")
-          } else {
-            // this should be impossible
-            new RuntimeException(
-              "Received PSBT did not contain our inputs or outputs")
-          }
-          Future.failed(exception)
         }
     }
   }

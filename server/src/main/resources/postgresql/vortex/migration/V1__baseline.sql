@@ -31,6 +31,7 @@ CREATE TABLE `alices`
     `chain`          INTEGER          NOT NULL,
     `nonce_index`    INTEGER          NOT NULL,
     `nonce`          TEXT UNIQUE      NOT NULL,
+    `is_remix`       BOOLEAN          NOT NULL,
     `num_inputs`     INTEGER          NOT NULL,
     `blinded_output` TEXT,
     `change_spk`     TEXT,

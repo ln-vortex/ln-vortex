@@ -38,6 +38,10 @@ case class LndVortexWallet(lndRpcClient: LndRpcClient)(implicit
     Await.result(networkF, 15.seconds)
   }
 
+  override def getBlockHeight(): Future[Int] = {
+    lndRpcClient.getInfo.map(_.blockHeight.toInt)
+  }
+
   private def addressTypeFromScriptType(scriptType: ScriptType): AddressType = {
     scriptType match {
       case ScriptType.PUBKEY | ScriptType.PUBKEYHASH | ScriptType.NONSTANDARD |

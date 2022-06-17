@@ -13,6 +13,7 @@ case class AliceDb(
     chain: HDChainType,
     nonceIndex: Int,
     nonce: SchnorrNonce,
+    isRemix: Boolean,
     numInputs: Int,
     blindedOutputOpt: Option[FieldElement],
     changeSpkOpt: Option[ScriptPubKey],
@@ -31,11 +32,13 @@ case class AliceDb(
   }
 
   def setOutputValues(
+      isRemix: Boolean,
       numInputs: Int,
       blindedOutput: FieldElement,
       changeSpkOpt: Option[ScriptPubKey],
       blindOutputSig: FieldElement): AliceDb = {
-    copy(numInputs = numInputs,
+    copy(isRemix = isRemix,
+         numInputs = numInputs,
          blindedOutputOpt = Some(blindedOutput),
          changeSpkOpt = changeSpkOpt,
          blindOutputSigOpt = Some(blindOutputSig))
@@ -80,6 +83,7 @@ object AliceDbs {
       nonceIndex = address.index,
       nonce = nonce,
       numInputs = -1,
+      isRemix = false,
       blindedOutputOpt = None,
       changeSpkOpt = None,
       blindOutputSigOpt = None,
