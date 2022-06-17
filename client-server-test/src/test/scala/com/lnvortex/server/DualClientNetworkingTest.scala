@@ -1,16 +1,22 @@
 package com.lnvortex.server
 
 import com.lnvortex.testkit.{DualClientFixture, LnVortexTestUtils}
+import org.bitcoins.core.script.ScriptType
+import org.bitcoins.core.script.ScriptType.WITNESS_V0_SCRIPTHASH
 import org.bitcoins.testkit.EmbeddedPg
 import org.bitcoins.testkit.async.TestAsyncUtil
 
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 
-class DualClientNetworkingTest extends DualClientFixture with EmbeddedPg {
+class DualClientNetworkingTest
+    extends DualClientFixture
+    with EmbeddedPg
+    with LnVortexTestUtils {
   override val isNetworkingTest = true
+  override val mixScriptType: ScriptType = WITNESS_V0_SCRIPTHASH
 
   val interval: FiniteDuration =
-    if (LnVortexTestUtils.torEnabled) 500.milliseconds else 100.milliseconds
+    if (torEnabled) 500.milliseconds else 100.milliseconds
 
   it must "open the channels" in { case (clientA, clientB, coordinator) =>
     for {

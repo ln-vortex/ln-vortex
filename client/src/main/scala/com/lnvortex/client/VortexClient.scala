@@ -42,7 +42,7 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
   def getCurrentRoundDetails: RoundDetails =
     roundDetails
 
-  private[client] def setRound(adv: MixDetails): Unit = {
+  private[lnvortex] def setRound(adv: MixDetails): Unit = {
     if (VortexClient.knownVersions.contains(adv.version)) {
       roundDetails = KnownRound(adv)
     } else {
@@ -456,7 +456,9 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
         logger.info("Round complete!!")
         for {
           _ <- vortexWallet.broadcastTransaction(signedTx)
-          _ <- vortexWallet.labelTransaction(signedTx.txIdBE, "LnVortex Mix")
+          _ <- vortexWallet
+            .labelTransaction(signedTx.txId, "LnVortex Mix")
+            .recover(_ => ())
           _ <- stop()
           _ <- getNewRound
         } yield ()

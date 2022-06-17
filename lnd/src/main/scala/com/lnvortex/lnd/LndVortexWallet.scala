@@ -12,7 +12,7 @@ import org.bitcoins.core.protocol.ln.node.NodeId
 import org.bitcoins.core.protocol.script.ScriptWitness
 import org.bitcoins.core.protocol.transaction._
 import org.bitcoins.core.psbt.PSBT
-import org.bitcoins.crypto.{DoubleSha256DigestBE, SchnorrNonce}
+import org.bitcoins.crypto._
 import org.bitcoins.lnd.rpc.LndRpcClient
 import org.bitcoins.lnd.rpc.LndUtils._
 import scodec.bits.ByteVector
@@ -86,7 +86,7 @@ case class LndVortexWallet(lndRpcClient: LndRpcClient)(implicit
     lndRpcClient.publishTransaction(transaction).map(_ => ())
 
   override def labelTransaction(
-      txId: DoubleSha256DigestBE,
+      txId: DoubleSha256Digest,
       label: String): Future[Unit] = {
     val request = LabelTransactionRequest(txId.bytes, label)
     lndRpcClient.wallet.labelTransaction(request).map(_ => ())

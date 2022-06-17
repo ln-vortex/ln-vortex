@@ -43,7 +43,7 @@ case class AliceDb(
 
   def markSigned(): AliceDb = {
     require(blindedOutputOpt.isDefined)
-    require(changeSpkOpt.isDefined)
+    require(numInputs > 0)
     require(blindOutputSigOpt.isDefined)
 
     copy(signed = true)

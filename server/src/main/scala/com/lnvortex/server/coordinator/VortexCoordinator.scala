@@ -380,43 +380,40 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
     val otherInputDbsF =
       roundDbF.flatMap(db => inputsDAO.findByRoundId(db.roundId))
 
+    val isRemixF = if (registerInputs.inputs.size == 1) {
+      val inputRef = registerInputs.inputs.head
+      roundDAO.hasTxId(inputRef.outPoint.txIdBE).map { isPrevRound =>
+        // make sure it wasn't a change output
+        val isMixUtxo = inputRef.output.value == config.mixAmount
+        val noChange = registerInputs.changeSpkOpt.isEmpty
+        isPrevRound && isMixUtxo && noChange
+      }
+    } else Future.successful(false)
+
     val init: Option[InvalidInputsException] = None
     val validInputsF = FutureUtil.foldLeftAsync(init, registerInputs.inputs) {
       case (accum, inputRef) =>
         if (accum.isEmpty) {
           for {
-            isRemix <- roundDAO.hasTxId(inputRef.outPoint.txIdBE)
-
-            validRemix =
-              if (isRemix) {
-                // if we are remixing, can only have one input
-                val singleInput = registerInputs.inputs.size == 1
-                // make sure it wasn't a change output
-                val isMixUtxo = inputRef.output.value == config.mixAmount
-                val noChange = registerInputs.changeSpkOpt.isEmpty
-
-                singleInput && isMixUtxo && noChange
-              } else true
-
-            res <-
-              if (validRemix)
-                validateAliceInput(inputRef, isRemix, aliceDbF, otherInputDbsF)
-              else
-                Future.successful(
-                  Some(new InvalidInputsException("Invalid utxo for remix")))
-          } yield res
+            isRemix <- isRemixF
+            errorOpt <- validateAliceInput(inputRef,
+                                           isRemix,
+                                           aliceDbF,
+                                           otherInputDbsF)
+          } yield errorOpt
         } else Future.successful(accum)
     }
 
     val f = for {
+      isRemix <- isRemixF
       validInputs <- validInputsF
       otherInputDbs <- otherInputDbsF
       roundDb <- roundDbF
-    } yield (validInputs, otherInputDbs, roundDb)
+    } yield (isRemix, validInputs, otherInputDbs, roundDb)
 
-    f.flatMap { case (inputsErrorOpt, otherInputDbs, roundDb) =>
+    f.flatMap { case (isRemix, inputsErrorOpt, otherInputDbs, roundDb) =>
       lazy val changeErrorOpt =
-        validateAliceChange(roundDb, registerInputs, otherInputDbs)
+        validateAliceChange(isRemix, roundDb, registerInputs, otherInputDbs)
 
       // condense to one error option
       val errorOpt: Option[VortexServerException] =

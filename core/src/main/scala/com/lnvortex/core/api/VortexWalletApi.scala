@@ -9,7 +9,7 @@ import org.bitcoins.core.protocol.script.ScriptWitness
 import org.bitcoins.core.protocol.transaction._
 import org.bitcoins.core.psbt.PSBT
 import org.bitcoins.core.util.StartStopAsync
-import org.bitcoins.crypto.{DoubleSha256DigestBE, SchnorrNonce}
+import org.bitcoins.crypto._
 import scodec.bits.ByteVector
 
 import java.net.InetSocketAddress
@@ -39,7 +39,7 @@ abstract class VortexWalletApi extends StartStopAsync[Unit] {
 
   def broadcastTransaction(transaction: Transaction): Future[Unit]
 
-  def labelTransaction(txId: DoubleSha256DigestBE, label: String): Future[Unit]
+  def labelTransaction(txId: DoubleSha256Digest, label: String): Future[Unit]
 
   def isConnected(nodeId: NodeId): Future[Boolean]
 
