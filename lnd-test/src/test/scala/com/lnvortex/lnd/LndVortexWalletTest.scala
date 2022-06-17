@@ -7,6 +7,7 @@ import org.bitcoins.core.number._
 import org.bitcoins.core.protocol.script._
 import org.bitcoins.core.protocol.transaction._
 import org.bitcoins.core.psbt.PSBT
+import org.bitcoins.core.script.ScriptType
 import org.bitcoins.crypto._
 
 import scala.concurrent.Future
@@ -17,7 +18,7 @@ class LndVortexWalletTest extends LndVortexWalletFixture {
     for {
       utxos <- wallet.listCoins()
       refs = utxos.map(_.outputReference)
-      addr <- wallet.getNewAddress()
+      addr <- wallet.getNewAddress(ScriptType.WITNESS_V0_KEYHASH)
 
       inputs = utxos
         .map(_.outPoint)

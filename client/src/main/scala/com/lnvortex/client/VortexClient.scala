@@ -18,6 +18,7 @@ import org.bitcoins.core.protocol.BitcoinAddress
 import org.bitcoins.core.protocol.ln.node.NodeId
 import org.bitcoins.core.protocol.transaction._
 import org.bitcoins.core.psbt.PSBT
+import org.bitcoins.core.script.ScriptType
 import org.bitcoins.core.util.{FutureUtil, StartStopAsync}
 import org.bitcoins.crypto._
 
@@ -182,6 +183,7 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
       outputRefs: Vector[OutputReference],
       nodeId: NodeId,
       peerAddrOpt: Option[InetSocketAddress]): Future[Unit] = {
+    require(outputRefs.nonEmpty, "Must include inputs")
     roundDetails match {
       case state @ (NoDetails | _: KnownRound | _: InputsScheduled |
           _: InputsRegistered | _: MixOutputRegistered | _: PSBTSigned) =>
@@ -190,6 +192,20 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
       case receivedNonce: ReceivedNonce =>
         logger.info(
           s"Queueing ${outputRefs.size} coins to open a channel to $nodeId")
+        // todo check if peer supports taproot channel if needed
+        if (
+          !outputRefs.forall(
+            _.output.scriptPubKey.scriptType == receivedNonce.round.inputType)
+        ) {
+          throw new InvalidInputException(
+            s"Inputs must be of type ${receivedNonce.round.inputType}")
+        } else if (
+          receivedNonce.round.outputType != ScriptType.WITNESS_V0_SCRIPTHASH
+        ) {
+          throw new InvalidMixedOutputException(
+            "This version of lnd only supports segwitv0 channels")
+        }
+
         tryConnect(nodeId, peerAddrOpt).map { _ =>
           roundDetails = receivedNonce.nextStage(inputs = outputRefs,
                                                  addressOpt = None,
@@ -202,19 +218,33 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
   def queueCoins(
       outputRefs: Vector[OutputReference],
       address: BitcoinAddress): Unit = {
+    require(outputRefs.nonEmpty, "Must include inputs")
     roundDetails match {
       case state @ (NoDetails | _: KnownRound | _: InputsScheduled |
           _: InputsRegistered | _: MixOutputRegistered | _: PSBTSigned) =>
         throw new IllegalStateException(
           s"At invalid state $state, cannot queue coins")
       case receivedNonce: ReceivedNonce =>
-        logger.info(
-          s"Queueing ${outputRefs.size} coins for on-chain self-spend")
-        // todo validate address is of correct type
-        roundDetails = receivedNonce.nextStage(inputs = outputRefs,
-                                               addressOpt = Some(address),
-                                               nodeIdOpt = None,
-                                               peerAddrOpt = None)
+        if (
+          !outputRefs.forall(
+            _.output.scriptPubKey.scriptType == receivedNonce.round.inputType)
+        ) {
+          throw new InvalidInputException(
+            s"Inputs must be of type ${receivedNonce.round.inputType}")
+        } else if (
+          address.scriptPubKey.scriptType != receivedNonce.round.outputType
+        ) {
+          throw new InvalidMixedOutputException(
+            s"Address must be of type ${receivedNonce.round.outputType}")
+        } else {
+          logger.info(
+            s"Queueing ${outputRefs.size} coins for on-chain self-spend")
+          // todo validate address is of correct type
+          roundDetails = receivedNonce.nextStage(inputs = outputRefs,
+                                                 addressOpt = Some(address),
+                                                 nodeIdOpt = None,
+                                                 peerAddrOpt = None)
+        }
     }
   }
 
@@ -251,20 +281,35 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
           }
 
           changeAddrOpt <-
-            if (needsChange) vortexWallet.getChangeAddress().map(Some(_))
+            if (needsChange)
+              vortexWallet.getChangeAddress(round.changeType).map(Some(_))
             else FutureUtil.none
 
           channelDetails <- scheduled.nodeIdOpt match {
             case Some(nodeId) =>
-              vortexWallet.initChannelOpen(nodeId = nodeId,
-                                           peerAddrOpt = scheduled.peerAddrOpt,
-                                           fundingAmount =
-                                             scheduled.round.amount,
-                                           privateChannel = false)
+              vortexWallet
+                .initChannelOpen(nodeId = nodeId,
+                                 peerAddrOpt = scheduled.peerAddrOpt,
+                                 fundingAmount = scheduled.round.amount,
+                                 privateChannel = false)
+                .map { details =>
+                  if (
+                    details.address.scriptPubKey.scriptType != round.outputType
+                  ) {
+                    throw new InvalidMixedOutputException(
+                      s"Channel type is invalid, need output of type ${round.outputType}")
+                  } else details
+                }
             case None =>
               val addressF = scheduled.addressOpt match {
-                case Some(addr) => Future.successful(addr)
-                case None       => vortexWallet.getNewAddress()
+                case Some(addr) =>
+                  if (addr.scriptPubKey.scriptType == round.outputType) {
+                    Future.successful(addr)
+                  } else {
+                    Future.failed(new InvalidMixedOutputException(
+                      s"Need address of type ${round.outputType}, got ${addr.scriptPubKey.scriptType}"))
+                  }
+                case None => vortexWallet.getNewAddress(round.outputType)
               }
 
               addressF.map { addr =>

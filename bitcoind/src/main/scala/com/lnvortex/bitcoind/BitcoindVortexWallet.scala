@@ -3,7 +3,10 @@ package com.lnvortex.bitcoind
 import akka.actor.ActorSystem
 import com.lnvortex.core.api._
 import com.lnvortex.core.{InputReference, UnspentCoin}
-import org.bitcoins.commons.jsonmodels.bitcoind.RpcOpts.LockUnspentOutputParameter
+import org.bitcoins.commons.jsonmodels.bitcoind.RpcOpts.{
+  AddressType,
+  LockUnspentOutputParameter
+}
 import org.bitcoins.core.config.BitcoinNetwork
 import org.bitcoins.core.currency.CurrencyUnit
 import org.bitcoins.core.number.UInt32
@@ -12,6 +15,7 @@ import org.bitcoins.core.protocol.ln.node.NodeId
 import org.bitcoins.core.protocol.script.ScriptWitness
 import org.bitcoins.core.protocol.transaction._
 import org.bitcoins.core.psbt.PSBT
+import org.bitcoins.core.script.ScriptType
 import org.bitcoins.crypto._
 import org.bitcoins.rpc.client.common.BitcoindRpcClient
 import scodec.bits.ByteVector
@@ -29,13 +33,39 @@ case class BitcoindVortexWallet(
     case network: BitcoinNetwork => network
   }
 
-  override def getNewAddress(): Future[BitcoinAddress] =
-    bitcoind.getNewAddress(walletNameOpt)
+  private def addressTypeFromScriptType(scriptType: ScriptType): AddressType = {
+    scriptType match {
+      case ScriptType.NONSTANDARD | ScriptType.MULTISIG | ScriptType.CLTV |
+          ScriptType.CSV | ScriptType.NONSTANDARD_IF_CONDITIONAL |
+          ScriptType.NOT_IF_CONDITIONAL | ScriptType.MULTISIG_WITH_TIMEOUT |
+          ScriptType.PUBKEY_WITH_TIMEOUT | ScriptType.NULLDATA |
+          ScriptType.WITNESS_UNKNOWN | ScriptType.WITNESS_COMMITMENT =>
+        throw new IllegalArgumentException("Unknown address type")
+      case ScriptType.PUBKEY                => AddressType.Legacy
+      case ScriptType.PUBKEYHASH            => AddressType.Legacy
+      case ScriptType.SCRIPTHASH            => AddressType.P2SHSegwit
+      case ScriptType.WITNESS_V0_KEYHASH    => AddressType.Bech32
+      case ScriptType.WITNESS_V0_SCRIPTHASH => AddressType.Bech32
+      case ScriptType.WITNESS_V1_TAPROOT    => AddressType.Bech32 // fixme
+    }
+  }
 
-  override def getChangeAddress(): Future[BitcoinAddress] = {
+  override def getNewAddress(scriptType: ScriptType): Future[BitcoinAddress] = {
+    val addrType = addressTypeFromScriptType(scriptType)
     walletNameOpt match {
-      case Some(walletName) => bitcoind.getRawChangeAddress(walletName)
-      case None             => bitcoind.getRawChangeAddress
+      case Some(walletName) =>
+        bitcoind.getNewAddress("Vortex", addrType, walletName)
+      case None => bitcoind.getNewAddress(addrType)
+    }
+  }
+
+  override def getChangeAddress(
+      scriptType: ScriptType): Future[BitcoinAddress] = {
+    val addrType = addressTypeFromScriptType(scriptType)
+    walletNameOpt match {
+      case Some(walletName) =>
+        bitcoind.getRawChangeAddress(addrType, walletName)
+      case None => bitcoind.getRawChangeAddress(addrType)
     }
   }
 
