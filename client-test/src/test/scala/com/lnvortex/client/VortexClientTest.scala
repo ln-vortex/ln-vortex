@@ -270,4 +270,46 @@ class VortexClientTest extends VortexClientFixture {
         vortexClient.validateAndSignPsbt(psbt))
     } yield res
   }
+
+  it must "fail to sign a psbt with a locktime too far in the future" in {
+    vortexClient =>
+      val lnd = vortexClient.vortexWallet
+
+      for {
+        nodeId <- lnd.lndRpcClient.nodeId
+        utxos <- vortexClient.listCoins()
+        _ = require(utxos.nonEmpty)
+        refs = utxos.map(_.outputReference)
+        addrA <- lnd.getNewAddress(dummyMix.changeType)
+        addrB <- lnd.getNewAddress(dummyMix.outputType)
+        change = TransactionOutput(Satoshis(599800000), addrA.scriptPubKey)
+        mix = TransactionOutput(Satoshis(200000), addrB.scriptPubKey)
+
+        testDetails = InitDetails(
+          inputs = refs,
+          addressOpt = None,
+          nodeIdOpt = Some(nodeId),
+          peerAddrOpt = None,
+          changeSpkOpt = Some(change.scriptPubKey),
+          chanId = Sha256Digest.empty.bytes,
+          mixOutput = mix,
+          tweaks = dummyTweaks
+        )
+        testState = MixOutputRegistered(dummyMix,
+                                        Satoshis.zero,
+                                        Satoshis.zero,
+                                        nonce,
+                                        testDetails)
+        _ = vortexClient.setRoundDetails(testState)
+
+        inputs = refs
+          .map(_.outPoint)
+          .map(TransactionInput(_, EmptyScriptSignature, UInt32.max))
+        outputs = Vector(change, mix)
+        tx = BaseTransaction(Int32.two, inputs, outputs, UInt32.max)
+        psbt = PSBT.fromUnsignedTx(tx)
+        res <- recoverToSucceededIf[BadLocktimeException](
+          vortexClient.validateAndSignPsbt(psbt))
+      } yield res
+  }
 }

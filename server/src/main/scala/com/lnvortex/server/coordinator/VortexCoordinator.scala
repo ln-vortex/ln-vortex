@@ -434,6 +434,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
 
             val updated =
               aliceDb.setOutputValues(
+                isRemix = isRemix,
                 numInputs = inputDbs.size,
                 blindedOutput = registerInputs.blindedOutput,
                 changeSpkOpt = registerInputs.changeSpkOpt,
@@ -541,106 +542,126 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
 
   private[server] def calculateChangeOutput(
       roundDb: RoundDb,
+      isRemix: Boolean,
       numInputs: Int,
+      numRemixes: Int,
+      numNewEntrants: Int,
       inputAmount: CurrencyUnit,
       changeSpkOpt: Option[ScriptPubKey]): Either[
     CurrencyUnit,
     TransactionOutput] = {
-    val excess = inputAmount - roundDb.amount - roundDb.mixFee - (Satoshis(
-      numInputs) * roundDb.inputFee) - roundDb.outputFee
+    if (isRemix) Left(Satoshis.zero)
+    else {
+      val totalNewEntrantFee =
+        Satoshis(numRemixes) * (roundDb.inputFee + roundDb.outputFee)
+      val newEntrantFee = totalNewEntrantFee / Satoshis(numNewEntrants)
+      val excess = inputAmount - roundDb.amount - roundDb.mixFee - (Satoshis(
+        numInputs) * roundDb.inputFee) - roundDb.outputFee - newEntrantFee
 
-    changeSpkOpt match {
-      case Some(changeSpk) =>
-        val dummy = TransactionOutput(Satoshis.zero, changeSpk)
-        val changeCost = roundDb.feeRate * dummy.byteSize
+      changeSpkOpt match {
+        case Some(changeSpk) =>
+          val dummy = TransactionOutput(Satoshis.zero, changeSpk)
+          val changeCost = roundDb.feeRate * dummy.byteSize
 
-        val excessAfterChange = excess - changeCost
+          val excessAfterChange = excess - changeCost
 
-        if (excessAfterChange > Policy.dustThreshold)
-          Right(TransactionOutput(excessAfterChange, changeSpk))
-        else Left(excess)
-      case None => Left(excess)
+          if (excessAfterChange > Policy.dustThreshold)
+            Right(TransactionOutput(excessAfterChange, changeSpk))
+          else Left(excess)
+        case None => Left(excess)
+      }
     }
   }
 
   private[coordinator] def constructUnsignedPSBT(
       mixAddr: BitcoinAddress): Future[PSBT] = {
-    val dbsAction = for {
-      aliceDbs <- aliceDAO.findRegisteredForRoundAction(currentRoundId)
-      inputDbs <- inputsDAO.findByRoundIdAction(currentRoundId)
-      outputDbs <- outputsDAO.findByRoundIdAction(currentRoundId)
-      roundDb <- currentRoundAction()
-    } yield (aliceDbs, inputDbs, outputDbs, roundDb)
+    bitcoind.getBlockCount.flatMap { height =>
+      val dbsAction = for {
+        aliceDbs <- aliceDAO.findRegisteredForRoundAction(currentRoundId)
+        inputDbs <- inputsDAO.findByRoundIdAction(currentRoundId)
+        outputDbs <- outputsDAO.findByRoundIdAction(currentRoundId)
+        roundDb <- currentRoundAction()
+      } yield (aliceDbs, inputDbs, outputDbs, roundDb)
 
-    val action = dbsAction.flatMap {
-      case (aliceDbs, inputDbs, outputDbs, roundDb) =>
-        val txBuilder = RawTxBuilder().setFinalizer(
-          FilterDustFinalizer.andThen(ShuffleFinalizer))
+      val action = dbsAction.flatMap {
+        case (aliceDbs, inputDbs, outputDbs, roundDb) =>
+          val txBuilder = RawTxBuilder()
+            .setFinalizer(FilterDustFinalizer.andThen(ShuffleFinalizer))
+            .setLockTime(UInt32(height + 1))
 
-        val inputAmountByPeerId = inputDbs
-          .groupBy(_.peerId)
-          .map { case (peerId, dbs) =>
-            val amt = dbs.map(_.output.value).sum
-            (peerId, amt)
+          val inputAmountByPeerId = inputDbs
+            .groupBy(_.peerId)
+            .map { case (peerId, dbs) =>
+              val amt = dbs.map(_.output.value).sum
+              (peerId, amt)
+            }
+
+          val numRemixes = aliceDbs.count(_.isRemix)
+          val numNewEntrants = aliceDbs.count(!_.isRemix)
+          val changeOutputResults = aliceDbs.map { db =>
+            calculateChangeOutput(
+              roundDb = roundDb,
+              isRemix = db.isRemix,
+              numInputs = db.numInputs,
+              numNewEntrants = numNewEntrants,
+              numRemixes = numRemixes,
+              inputAmount = inputAmountByPeerId(db.peerId),
+              changeSpkOpt = db.changeSpkOpt
+            )
           }
 
-        val changeOutputResults = aliceDbs.map { db =>
-          calculateChangeOutput(roundDb = roundDb,
-                                numInputs = db.numInputs,
-                                inputAmount = inputAmountByPeerId(db.peerId),
-                                changeSpkOpt = db.changeSpkOpt)
-        }
+          val (changeOutputs, excess) = changeOutputResults.foldLeft(
+            (Vector.empty[TransactionOutput], CurrencyUnits.zero)) {
+            case ((outputs, amt), either) =>
+              either match {
+                case Left(extraFee)      => (outputs, amt + extraFee)
+                case Right(changeOutput) => (outputs :+ changeOutput, amt)
+              }
+          }
 
-        val (changeOutputs, excess) = changeOutputResults.foldLeft(
-          (Vector.empty[TransactionOutput], CurrencyUnits.zero)) {
-          case ((outputs, amt), either) =>
-            either match {
-              case Left(extraFee)      => (outputs, amt + extraFee)
-              case Right(changeOutput) => (outputs :+ changeOutput, amt)
-            }
-        }
+          // add inputs
+          txBuilder ++= inputDbs.map(_.transactionInput)
 
-        // add inputs
-        txBuilder ++= inputDbs.map(_.transactionInput)
+          val usedExcess = if (excess < Satoshis.zero) Satoshis.zero else excess
+          // add outputs
+          val mixFee = usedExcess + (Satoshis(numNewEntrants) * config.mixFee)
+          val mixFeeOutput = TransactionOutput(mixFee, mixAddr.scriptPubKey)
+          val mixOutputs = outputDbs.map(_.output)
+          val outputsToAdd = mixOutputs ++ changeOutputs :+ mixFeeOutput
 
-        // add outputs
-        val mixFee = excess + (Satoshis(aliceDbs.size) * config.mixFee)
-        val mixFeeOutput = TransactionOutput(mixFee, mixAddr.scriptPubKey)
-        val mixOutputs = outputDbs.map(_.output)
-        val outputsToAdd = mixOutputs ++ changeOutputs :+ mixFeeOutput
+          txBuilder ++= outputsToAdd
 
-        txBuilder ++= outputsToAdd
+          val transaction = txBuilder.buildTx()
 
-        val transaction = txBuilder.buildTx()
+          val outPoints = transaction.inputs.map(_.previousOutput)
 
-        val outPoints = transaction.inputs.map(_.previousOutput)
+          val unsigned = PSBT.fromUnsignedTx(transaction)
 
-        val unsigned = PSBT.fromUnsignedTx(transaction)
+          val psbt = outPoints.zipWithIndex.foldLeft(unsigned) {
+            case (psbt, (outPoint, idx)) =>
+              val prevOut = inputDbs.find(_.outPoint == outPoint).get.output
+              psbt.addWitnessUTXOToInput(prevOut, idx)
+          }
 
-        val psbt = outPoints.zipWithIndex.foldLeft(unsigned) {
-          case (psbt, (outPoint, idx)) =>
-            val prevOut = inputDbs.find(_.outPoint == outPoint).get.output
-            psbt.addWitnessUTXOToInput(prevOut, idx)
-        }
+          val updatedRound =
+            roundDb.copy(psbtOpt = Some(psbt), status = SigningPhase)
+          val updatedInputs = inputDbs.map { db =>
+            val index = outPoints.indexOf(db.outPoint)
+            db.copy(indexOpt = Some(index))
+          }
 
-        val updatedRound =
-          roundDb.copy(psbtOpt = Some(psbt), status = SigningPhase)
-        val updatedInputs = inputDbs.map { db =>
-          val index = outPoints.indexOf(db.outPoint)
-          db.copy(indexOpt = Some(index))
-        }
+          inputDbs.map(_.peerId).distinct.foreach { peerId =>
+            signedPMap.put(peerId, Promise[PSBT]())
+          }
 
-        inputDbs.map(_.peerId).distinct.foreach { peerId =>
-          signedPMap.put(peerId, Promise[PSBT]())
-        }
+          for {
+            _ <- inputsDAO.updateAllAction(updatedInputs)
+            _ <- roundDAO.updateAction(updatedRound)
+          } yield psbt
+      }
 
-        for {
-          _ <- inputsDAO.updateAllAction(updatedInputs)
-          _ <- roundDAO.updateAction(updatedRound)
-        } yield psbt
+      safeDatabase.run(action)
     }
-
-    safeDatabase.run(action)
   }
 
   private[lnvortex] def registerPSBTSignatures(

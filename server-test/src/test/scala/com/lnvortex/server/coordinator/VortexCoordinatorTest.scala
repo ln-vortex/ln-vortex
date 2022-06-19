@@ -892,10 +892,13 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
       aliceDbs <- Future.sequence(aliceDbFs)
       updatedAliceDbs = aliceDbs.map { db =>
         val spk = P2WPKHWitnessSPKV0(ECPublicKey.freshPublicKey)
-        db.setOutputValues(1,
-                           ECPrivateKey.freshPrivateKey.fieldElement,
-                           Some(spk),
-                           ECPrivateKey.freshPrivateKey.fieldElement)
+        db.setOutputValues(
+          isRemix = false,
+          numInputs = 1,
+          blindedOutput = ECPrivateKey.freshPrivateKey.fieldElement,
+          changeSpkOpt = Some(spk),
+          blindOutputSig = ECPrivateKey.freshPrivateKey.fieldElement
+        )
       }
       _ <- coordinator.aliceDAO.updateAll(updatedAliceDbs)
 
@@ -969,10 +972,13 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
       unspent <- bitcoind.listUnspent.map(_.head)
 
       updatedAliceDbs = {
-        aliceDb.setOutputValues(1,
-                                ECPrivateKey.freshPrivateKey.fieldElement,
-                                Some(addr.scriptPubKey),
-                                ECPrivateKey.freshPrivateKey.fieldElement)
+        aliceDb.setOutputValues(
+          isRemix = false,
+          numInputs = 1,
+          blindedOutput = ECPrivateKey.freshPrivateKey.fieldElement,
+          changeSpkOpt = Some(addr.scriptPubKey),
+          blindOutputSig = ECPrivateKey.freshPrivateKey.fieldElement
+        )
       }
       _ <- coordinator.aliceDAO.update(updatedAliceDbs)
 
@@ -1023,10 +1029,13 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
       unspent <- bitcoind.listUnspent.map(_.head)
 
       updatedAliceDbs = {
-        aliceDb.setOutputValues(1,
-                                ECPrivateKey.freshPrivateKey.fieldElement,
-                                Some(addr.scriptPubKey),
-                                ECPrivateKey.freshPrivateKey.fieldElement)
+        aliceDb.setOutputValues(
+          isRemix = false,
+          numInputs = 1,
+          blindedOutput = ECPrivateKey.freshPrivateKey.fieldElement,
+          changeSpkOpt = Some(addr.scriptPubKey),
+          blindOutputSig = ECPrivateKey.freshPrivateKey.fieldElement
+        )
       }
       _ <- coordinator.aliceDAO.update(updatedAliceDbs)
 
@@ -1085,7 +1094,8 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
 
       updatedAliceDbs = {
         // wrong number of inputs
-        aliceDb.setOutputValues(numInputs = 2,
+        aliceDb.setOutputValues(isRemix = false,
+                                numInputs = 2,
                                 ECPrivateKey.freshPrivateKey.fieldElement,
                                 Some(addr.scriptPubKey),
                                 ECPrivateKey.freshPrivateKey.fieldElement)
@@ -1140,7 +1150,8 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
       unspent <- bitcoind.listUnspent.map(_.head)
 
       updatedAliceDbs = {
-        aliceDb.setOutputValues(numInputs = 1,
+        aliceDb.setOutputValues(isRemix = false,
+                                numInputs = 1,
                                 ECPrivateKey.freshPrivateKey.fieldElement,
                                 Some(addr.scriptPubKey),
                                 ECPrivateKey.freshPrivateKey.fieldElement)

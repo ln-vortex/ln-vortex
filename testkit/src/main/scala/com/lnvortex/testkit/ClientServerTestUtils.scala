@@ -7,6 +7,8 @@ import com.lnvortex.core.RoundDetails.getMixDetailsOpt
 import com.lnvortex.lnd.LndVortexWallet
 import com.lnvortex.server.coordinator.VortexCoordinator
 import com.lnvortex.server.models.AliceDb
+import org.bitcoins.core.currency.Satoshis
+import org.bitcoins.core.number.Int32
 import org.bitcoins.core.protocol.transaction.Transaction
 import org.bitcoins.core.psbt.PSBT
 import org.bitcoins.crypto.{DoubleSha256DigestBE, FieldElement, Sha256Digest}
@@ -329,6 +331,8 @@ trait ClientServerTestUtils {
               clientB.getCurrentRoundDetails).get.roundId,
             "Incorrect round id")
 
+    val roundAmount = coordinator.mixDetails.amount
+
     for {
       _ <- getNonce(peerIdA, clientA, coordinator)
       _ <- getNonce(peerIdB, clientB, coordinator)
@@ -393,6 +397,41 @@ trait ClientServerTestUtils {
       tx2 <- regBF
       _ = assert(tx == tx2)
 
+      height <- coordinator.bitcoind.getBlockCount
+
+      // correct meta data
+      _ = assert(tx.lockTime.toInt == height + 1)
+      _ = assert(tx.version == Int32.two)
+      // check correct inputs
+      _ = (utxosA ++ utxosB).foreach { utxo =>
+        assert(tx.inputs.exists(_.previousOutput == utxo.outPoint))
+      }
+      // check correct outputs
+      _ = assert(tx.outputs.exists(o =>
+        o.scriptPubKey == addrA.scriptPubKey && o.value == roundAmount))
+      _ = assert(tx.outputs.exists(o =>
+        o.scriptPubKey == addrB.scriptPubKey && o.value == roundAmount))
+
+      // remix checks
+      _ = txidOpt match {
+        case Some(txid) =>
+          assert(tx.inputs.exists(_.previousOutput.txIdBE == txid))
+          assert(tx.outputs.count(_.value == roundAmount) == 2)
+          assert(tx.outputs.count(_.value != roundAmount) == 2)
+          assert(
+            tx.outputs.count(_.value == coordinator.mixDetails.mixFee) == 1)
+          // 2 mix outputs + 1 change + coordinator fee
+          assert(tx.outputs.size == 4)
+        case None =>
+          assert(tx.outputs.count(_.value == roundAmount) == 2)
+          assert(tx.outputs.count(_.value != roundAmount) == 3)
+          assert(
+            tx.outputs.count(
+              _.value == coordinator.mixDetails.mixFee * Satoshis(2)) == 1)
+          // 2 mix outputs + 2 change + coordinator fee
+          assert(tx.outputs.size == 5)
+      }
+
       _ <- clientA.completeRound(tx)
       _ <- clientB.completeRound(tx)
 
@@ -410,7 +449,35 @@ trait ClientServerTestUtils {
         () => clientB.listCoins().map(_ != utxosB),
         interval = 100.milliseconds,
         maxTries = 500)
-      // todo better checks on post wallet utxos
+
+      coinsA <- clientA.listCoins()
+      _ = txidOpt match {
+        case Some(txid) =>
+          // prev change
+          val prev = coinsA.filter(_.outPoint.txIdBE == txid)
+          assert(prev.size == 1 && prev.head.amount != roundAmount)
+
+          // mix output
+          assert(
+            coinsA
+              .find(_.outPoint.txIdBE == tx.txIdBE)
+              .exists(_.amount == roundAmount))
+        case None =>
+          val roundOutputs = coinsA.filter(_.outPoint.txIdBE == tx.txIdBE)
+          assert(roundOutputs.size == 2) // output + change
+          // mix output
+          assert(roundOutputs.exists(_.amount == roundAmount))
+          // change output
+          assert(roundOutputs.exists(_.amount != roundAmount))
+      }
+
+      coinsB <- clientB.listCoins()
+      roundOutputs = coinsB.filter(_.outPoint.txIdBE == tx.txIdBE)
+      _ = assert(roundOutputs.size == 2) // output + change
+      // mix output
+      _ = assert(roundOutputs.exists(_.amount == roundAmount))
+      // change output
+      _ = assert(roundOutputs.exists(_.amount != roundAmount))
     } yield tx
   }
 }

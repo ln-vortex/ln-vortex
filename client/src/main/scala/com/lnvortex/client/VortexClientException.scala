@@ -21,4 +21,7 @@ object VortexClientException {
 
   class DustOutputsException(private val reason: String)
       extends VortexClientException(reason)
+
+  class BadLocktimeException(private val reason: String)
+      extends VortexClientException(reason)
 }

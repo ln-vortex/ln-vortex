@@ -127,6 +127,8 @@ case class AliceDAO()(implicit
 
     def nonce: Rep[SchnorrNonce] = column("nonce", O.Unique)
 
+    def isRemix: Rep[Boolean] = column("is_remix")
+
     def numInputs: Rep[Int] = column("num_inputs")
 
     def blindedOutputOpt: Rep[Option[FieldElement]] = column("blinded_output")
@@ -146,6 +148,7 @@ case class AliceDAO()(implicit
        chain,
        nonceIndex,
        nonce,
+       isRemix,
        numInputs,
        blindedOutputOpt,
        changeSpkOpt,
