@@ -12,6 +12,7 @@ import com.lnvortex.server.networking.ServerConnectionHandler.CloseConnection
 import com.lnvortex.server.networking.VortexServer
 import grizzled.slf4j.Logging
 import org.bitcoins.commons.jsonmodels.bitcoind.RpcOpts.AddressType
+import org.bitcoins.core.config._
 import org.bitcoins.core.currency._
 import org.bitcoins.core.number._
 import org.bitcoins.core.policy.Policy
@@ -812,7 +813,15 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
   }
 
   private def updateFeeRate(): Future[SatoshisPerVirtualByte] = {
-    feeProvider.getFeeRate().map { res =>
+    val feeRateF = config.network match {
+      case MainNet | TestNet3 | SigNet =>
+        feeProvider.getFeeRate()
+      case RegTest =>
+        // allow for offline testing
+        Future.successful(SatoshisPerVirtualByte.fromLong(2))
+    }
+
+    feeRateF.map { res =>
       feeRate = res
       res
     }
