@@ -14,6 +14,7 @@ import org.bitcoins.rpc.client.v19.BitcoindV19RpcClient
 import org.bitcoins.rpc.client.v20.BitcoindV20RpcClient
 import org.bitcoins.rpc.client.v21.BitcoindV21RpcClient
 import org.bitcoins.rpc.client.v22.BitcoindV22RpcClient
+import org.bitcoins.rpc.client.v23.BitcoindV23RpcClient
 import org.bitcoins.rpc.config.{BitcoindInstance, BitcoindRpcAppConfig}
 
 import java.nio.file.{Path, Paths}
@@ -62,6 +63,7 @@ case class LnVortexAppConfig(
         case BitcoindVersion.V20          => BitcoindV20RpcClient(instance)
         case BitcoindVersion.V21          => BitcoindV21RpcClient(instance)
         case BitcoindVersion.V22          => BitcoindV22RpcClient(instance)
+        case BitcoindVersion.V23          => BitcoindV23RpcClient(instance)
         case BitcoindVersion.Experimental => BitcoindV18RpcClient(instance)
         case BitcoindVersion.Unknown      => BitcoindRpcClient(instance)
       }
