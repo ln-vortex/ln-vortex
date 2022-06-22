@@ -14,12 +14,12 @@ import org.bitcoins.asyncutil.AsyncUtil
 import org.bitcoins.core.currency.{CurrencyUnit, Satoshis}
 import org.bitcoins.core.number.UInt16
 import org.bitcoins.core.policy.Policy
-import org.bitcoins.core.protocol.BitcoinAddress
+import org.bitcoins.core.protocol.{BitcoinAddress, BlockStamp}
 import org.bitcoins.core.protocol.ln.node.NodeId
 import org.bitcoins.core.protocol.transaction._
 import org.bitcoins.core.psbt.PSBT
 import org.bitcoins.core.script.ScriptType
-import org.bitcoins.core.util.{FutureUtil, StartStopAsync}
+import org.bitcoins.core.util.{FutureUtil, StartStopAsync, TimeUtil}
 import org.bitcoins.crypto._
 
 import java.net.InetSocketAddress
@@ -407,7 +407,12 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
           lazy val missingInputs = myOutpoints.filterNot(txOutpoints.contains)
 
           // make sure this can be broadcast now
-          val goodLockTime = tx.lockTime.toBigInt <= height + 1
+          val goodLockTime = BlockStamp(tx.lockTime) match {
+            case BlockStamp.BlockHeight(lockHeight) =>
+              lockHeight <= height + 1
+            case BlockStamp.BlockTime(time) =>
+              time.toLong <= TimeUtil.currentEpochSecond
+          }
 
           val numRemixes = unsigned.inputMaps.count(
             _.witnessUTXOOpt.exists(_.witnessUTXO.value == state.round.amount))
