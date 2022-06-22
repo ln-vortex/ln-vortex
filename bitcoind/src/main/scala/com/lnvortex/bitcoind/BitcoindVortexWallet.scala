@@ -165,6 +165,9 @@ case class BitcoindVortexWallet(
       psbt: PSBT): Future[Unit] = Future.failed(
     new UnsupportedOperationException("Bitcoind is not a lightning wallet"))
 
+  def cancelPendingChannel(chanId: ByteVector): Future[Unit] = Future.failed(
+    new UnsupportedOperationException("Bitcoind is not a lightning wallet"))
+
   override def cancelChannel(
       chanOutPoint: TransactionOutPoint,
       nodeId: NodeId): Future[Unit] =

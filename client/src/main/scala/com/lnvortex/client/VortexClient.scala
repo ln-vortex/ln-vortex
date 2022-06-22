@@ -126,10 +126,11 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
     }
   }
 
-  private def tryConnect(
+  private def checkMinChanSize(
+      amount: CurrencyUnit,
       nodeId: NodeId,
       peerAddrOpt: Option[InetSocketAddress]): Future[Unit] = {
-    vortexWallet.isConnected(nodeId).flatMap { connected =>
+    val connectF = vortexWallet.isConnected(nodeId).flatMap { connected =>
       if (!connected) {
         peerAddrOpt match {
           case None =>
@@ -139,6 +140,21 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
             vortexWallet.connect(nodeId, peerAddr)
         }
       } else Future.unit
+    }
+
+    connectF.flatMap { _ =>
+      val f = for {
+        details <- vortexWallet.initChannelOpen(nodeId,
+                                                peerAddrOpt,
+                                                amount,
+                                                privateChannel = true)
+        _ <- vortexWallet.cancelPendingChannel(details.id)
+      } yield ()
+
+      f.recover { case ex: Throwable =>
+        logger.error(s"Error from ln node: ${ex.getMessage}", ex)
+        throw new RuntimeException(s"$amount is under peer's min chan size")
+      }
     }
   }
 
@@ -201,17 +217,23 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
           throw new InvalidInputException(
             s"Inputs must be of type ${receivedNonce.round.inputType}")
         } else if (
+          outputRefs.map(_.output.value).sum < receivedNonce.round.amount
+        ) {
+          throw new InvalidInputException(
+            s"Must select more inputs to find round, needed ${receivedNonce.round.amount}")
+        } else if (
           receivedNonce.round.outputType != ScriptType.WITNESS_V0_SCRIPTHASH
         ) {
           throw new InvalidMixedOutputException(
-            "This version of lnd only supports segwitv0 channels")
+            "This version of lnd only supports SegwitV0 channels")
         }
 
-        tryConnect(nodeId, peerAddrOpt).map { _ =>
-          roundDetails = receivedNonce.nextStage(inputs = outputRefs,
-                                                 addressOpt = None,
-                                                 nodeIdOpt = Some(nodeId),
-                                                 peerAddrOpt = peerAddrOpt)
+        checkMinChanSize(receivedNonce.round.amount, nodeId, peerAddrOpt).map {
+          _ =>
+            roundDetails = receivedNonce.nextStage(inputs = outputRefs,
+                                                   addressOpt = None,
+                                                   nodeIdOpt = Some(nodeId),
+                                                   peerAddrOpt = peerAddrOpt)
         }
     }
   }
@@ -240,7 +262,6 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
         } else {
           logger.info(
             s"Queueing ${outputRefs.size} coins for on-chain self-spend")
-          // todo validate address is of correct type
           roundDetails = receivedNonce.nextStage(inputs = outputRefs,
                                                  addressOpt = Some(address),
                                                  nodeIdOpt = None,

@@ -152,6 +152,10 @@ case class LndVortexWallet(lndRpcClient: LndRpcClient)(implicit
       nodeId: NodeId): Future[Unit] =
     channelOpener.cancelChannel(chanOutPoint)
 
+  def cancelPendingChannel(chanId: ByteVector): Future[Unit] = {
+    channelOpener.cancelPendingChannel(chanId)
+  }
+
   override def start(): Future[Unit] = Future.unit
 
   override def stop(): Future[Unit] = lndRpcClient.stop().map(_ => ())
