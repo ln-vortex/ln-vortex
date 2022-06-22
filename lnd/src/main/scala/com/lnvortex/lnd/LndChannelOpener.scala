@@ -2,7 +2,7 @@ package com.lnvortex.lnd
 
 import akka.actor.ActorSystem
 import akka.stream.scaladsl.Sink
-import com.lnvortex.core.{api, NodeUri}
+import com.lnvortex.core.NodeUri
 import com.lnvortex.core.api.OutputDetails
 import grizzled.slf4j.Logging
 import lnrpc.ChannelPoint.FundingTxid
@@ -82,7 +82,7 @@ case class LndChannelOpener(lndRpcClient: LndRpcClient)(implicit
           val amt = Satoshis(fund.value.fundingAmount)
           val addr = BitcoinAddress.fromString(fund.value.fundingAddress)
 
-          api.OutputDetails(chanId, amt, addr)
+          OutputDetails(chanId, amt, addr)
         }
         .runWith(Sink.head)
     }

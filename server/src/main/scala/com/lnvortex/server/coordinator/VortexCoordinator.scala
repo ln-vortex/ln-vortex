@@ -20,6 +20,7 @@ import org.bitcoins.core.protocol.BitcoinAddress
 import org.bitcoins.core.protocol.script._
 import org.bitcoins.core.protocol.transaction._
 import org.bitcoins.core.psbt.PSBT
+import org.bitcoins.core.script.ScriptType
 import org.bitcoins.core.util._
 import org.bitcoins.core.wallet.builder._
 import org.bitcoins.core.wallet.fee.SatoshisPerVirtualByte
@@ -282,8 +283,23 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
 
   private[lnvortex] def sendUnsignedPSBT(): Future[PSBT] = {
     logger.info("Sending unsigned PSBT to peers")
+    val addressType = config.changeScriptType match {
+      case ScriptType.NONSTANDARD | ScriptType.MULTISIG | ScriptType.CLTV |
+          ScriptType.CSV | ScriptType.NONSTANDARD_IF_CONDITIONAL |
+          ScriptType.NOT_IF_CONDITIONAL | ScriptType.MULTISIG_WITH_TIMEOUT |
+          ScriptType.PUBKEY_WITH_TIMEOUT | ScriptType.NULLDATA |
+          ScriptType.WITNESS_UNKNOWN | ScriptType.WITNESS_COMMITMENT =>
+        throw new IllegalArgumentException("Unknown address type")
+      case ScriptType.PUBKEY                => AddressType.Legacy
+      case ScriptType.PUBKEYHASH            => AddressType.Legacy
+      case ScriptType.SCRIPTHASH            => AddressType.P2SHSegwit
+      case ScriptType.WITNESS_V0_KEYHASH    => AddressType.Bech32
+      case ScriptType.WITNESS_V0_SCRIPTHASH => AddressType.Bech32
+      case ScriptType.WITNESS_V1_TAPROOT    => AddressType.Bech32 // fixme
+    }
+
     for {
-      addr <- bitcoind.getNewAddress(roundAddressLabel, AddressType.Bech32)
+      addr <- bitcoind.getNewAddress(roundAddressLabel, addressType)
       psbt <- constructUnsignedPSBT(addr)
     } yield {
       connectionHandlerMap.values.foreach(_ ! UnsignedPsbtMessage(psbt))
