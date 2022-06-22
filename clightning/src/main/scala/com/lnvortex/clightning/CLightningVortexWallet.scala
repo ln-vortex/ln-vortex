@@ -146,6 +146,9 @@ case class CLightningVortexWallet(clightning: CLightningRpcClient)(implicit
       nodeId: NodeId): Future[Unit] =
     channelOpener.cancelChannel(nodeId).map(_ => ())
 
+  override def cancelPendingChannel(chanId: ByteVector): Future[Unit] =
+    channelOpener.cancelChannel(NodeId(chanId)).map(_ => ())
+
   override def start(): Future[Unit] = Future.unit
 
   override def stop(): Future[Unit] = Future.unit

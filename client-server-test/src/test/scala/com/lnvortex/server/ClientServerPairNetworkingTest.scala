@@ -26,7 +26,7 @@ class ClientServerPairNetworkingTest
 
         // don't select all coins
         utxos <- client.listCoins().map(_.tail)
-        _ = client.queueCoins(utxos.map(_.outputReference), nodeId, None)
+        _ <- client.queueCoins(utxos.map(_.outputReference), nodeId, None)
 
         _ <- client.cancelRegistration()
         _ <- client.askNonce()
@@ -41,7 +41,7 @@ class ClientServerPairNetworkingTest
 
       // don't select all coins
       utxos <- client.listCoins().map(_.tail)
-      _ = client.queueCoins(utxos.map(_.outputReference), nodeId, None)
+      _ <- client.queueCoins(utxos.map(_.outputReference), nodeId, None)
 
       _ <- coordinator.beginInputRegistration()
       _ <- TestAsyncUtil.awaitConditionF(

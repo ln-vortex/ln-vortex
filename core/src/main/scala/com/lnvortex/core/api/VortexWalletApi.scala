@@ -56,6 +56,8 @@ abstract class VortexWalletApi extends StartStopAsync[Unit] {
 
   def completeChannelOpen(chanId: ByteVector, psbt: PSBT): Future[Unit]
 
+  def cancelPendingChannel(chanId: ByteVector): Future[Unit]
+
   def cancelChannel(
       chanOutPoint: TransactionOutPoint,
       nodeId: NodeId): Future[Unit]
