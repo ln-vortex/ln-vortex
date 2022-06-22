@@ -6,7 +6,6 @@ import com.lnvortex.client.VortexClientException._
 import com.lnvortex.core._
 import com.lnvortex.core.crypto.BlindingTweaks
 import com.lnvortex.testkit.VortexClientFixture
-import io.grpc.StatusRuntimeException
 import org.bitcoins.core.currency._
 import org.bitcoins.core.number._
 import org.bitcoins.core.protocol.script._
@@ -68,7 +67,7 @@ class VortexClientTest extends VortexClientFixture {
     } yield assert(vortexClient.getCurrentRoundDetails == KnownRound(dummyMix))
   }
 
-  it must "fail to sign a psbt with no channel" in { vortexClient =>
+  it must "fail to sign a psbt with no fee info" in { vortexClient =>
     val lnd = vortexClient.vortexWallet
 
     for {
@@ -102,7 +101,7 @@ class VortexClientTest extends VortexClientFixture {
         .map(TransactionInput(_, EmptyScriptSignature, UInt32.max))
       outputs = Vector(change, mix)
       tx = BaseTransaction(Int32.two, inputs, outputs, UInt32.zero)
-      res <- recoverToSucceededIf[StatusRuntimeException](
+      res <- recoverToSucceededIf[TooLowOfFeeException](
         vortexClient.validateAndSignPsbt(PSBT.fromUnsignedTx(tx)))
     } yield res
   }
