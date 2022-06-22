@@ -24,4 +24,7 @@ object VortexClientException {
 
   class BadLocktimeException(private val reason: String)
       extends VortexClientException(reason)
+
+  class TooLowOfFeeException(private val reason: String)
+      extends VortexClientException(reason)
 }

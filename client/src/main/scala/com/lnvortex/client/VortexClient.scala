@@ -20,6 +20,7 @@ import org.bitcoins.core.protocol.transaction._
 import org.bitcoins.core.psbt.PSBT
 import org.bitcoins.core.script.ScriptType
 import org.bitcoins.core.util.{FutureUtil, StartStopAsync, TimeUtil}
+import org.bitcoins.core.wallet.fee.SatoshisPerVirtualByte
 import org.bitcoins.crypto._
 
 import java.net.InetSocketAddress
@@ -444,10 +445,43 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
 
           lazy val noDust = tx.outputs.forall(_.value > Policy.dustThreshold)
 
-          // todo check above min relay fee
-          if (
-            goodLockTime && hasMixOutput && hasCorrectChange && missingInputs.isEmpty && noDust
-          ) {
+          lazy val goodFeeRate = {
+            if (unsigned.inputMaps.forall(_.witnessUTXOOpt.isDefined)) {
+              val inputAmt = unsigned.inputMaps
+                .flatMap(_.witnessUTXOOpt)
+                .map { utxo =>
+                  utxo.witnessUTXO.value
+                }
+                .sum
+
+              val feeRate =
+                SatoshisPerVirtualByte.calc(inputAmt, unsigned.transaction)
+
+              feeRate.toLong >= 1
+            } else false
+          }
+
+          if (!goodLockTime) {
+            Future.failed(
+              new BadLocktimeException(
+                "Transaction locktime is too far in the future"))
+          } else if (!hasMixOutput) {
+            Future.failed(new InvalidMixedOutputException(
+              s"Missing expected mixed output ${state.initDetails.mixOutput}"))
+          } else if (!hasCorrectChange) {
+            Future.failed(
+              new InvalidChangeOutputException(
+                s"Missing expected change output of $expectedAmtBackOpt"))
+          } else if (missingInputs.nonEmpty) {
+            Future.failed(new MissingInputsException(
+              s"Missing inputs from transaction: ${missingInputs.mkString(",")}"))
+          } else if (!noDust) {
+            Future.failed(
+              new DustOutputsException("Transaction contains dust outputs"))
+          } else if (!goodFeeRate) {
+            Future.failed(
+              new TooLowOfFeeException("Transaction has too low of a fee"))
+          } else {
             logger.info("PSBT is valid, giving channel peer")
             for {
               // tell peer about funding psbt
@@ -464,28 +498,6 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
               roundDetails = state.nextStage(signed)
               signed
             }
-          } else { // error
-            val exception: Exception =
-              if (!goodLockTime) {
-                new BadLocktimeException(
-                  "Transaction locktime is too far in the future")
-              } else if (!hasMixOutput) {
-                new InvalidMixedOutputException(
-                  s"Missing expected mixed output ${state.initDetails.mixOutput}")
-              } else if (!hasCorrectChange) {
-                new InvalidChangeOutputException(
-                  s"Missing expected change output of $expectedAmtBackOpt")
-              } else if (missingInputs.nonEmpty) {
-                new MissingInputsException(
-                  s"Missing inputs from transaction: ${missingInputs.mkString(",")}")
-              } else if (!noDust) {
-                new DustOutputsException("Transaction contains dust outputs")
-              } else {
-                // this should be impossible
-                new RuntimeException(
-                  "Received PSBT did not contain our inputs or outputs")
-              }
-            Future.failed(exception)
           }
         }
     }
