@@ -503,7 +503,13 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
     lazy val validSig = bob.verifySig(publicKey, currentRoundId)
 
     // todo verify address has never been in any tx
-    if (validSpk && validSig) {
+    if (!validSig) {
+      Future.failed(new InvalidOutputSignatureException(
+        s"Bob attempted to register an output with an invalid sig ${bob.sig.hex}"))
+    } else if (!validSpk) {
+      Future.failed(new InvalidMixOutputScriptPubKeyException(
+        s"Bob attempted to register an output with an invalid script pub key ${bob.output.scriptPubKey.scriptType}"))
+    } else {
       val db = RegisteredOutputDb(bob.output, bob.sig, currentRoundId)
       val action = for {
         round <- currentRoundAction()
@@ -541,19 +547,6 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       }
 
       safeDatabase.run(action)
-    } else { // error
-      val exception: Exception = if (!validSig) {
-        new InvalidOutputSignatureException(
-          s"Bob attempted to register an output with an invalid sig ${bob.sig.hex}")
-      } else if (!validSpk) {
-        new InvalidMixOutputScriptPubKeyException(
-          s"Bob attempted to register an output with an invalid script pub key ${bob.output.scriptPubKey}")
-      } else {
-        // this should be impossible
-        new IllegalArgumentException(s"Received invalid output ${bob.output}")
-      }
-
-      Future.failed(exception)
     }
   }
 
