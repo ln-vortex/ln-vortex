@@ -36,7 +36,7 @@ trait DualClientFixture
       () => {
         val scriptTypeConfig =
           ConfigFactory.parseString(
-            s"vortex.outputScriptType = $outputScriptType")
+            s"coordinator.outputScriptType = $outputScriptType")
         implicit val (_, serverConf) = getTestConfigs(Vector(scriptTypeConfig))
 
         for {
@@ -46,18 +46,23 @@ trait DualClientFixture
           _ <- coordinator.start()
           (addr, _) <- coordinator.serverBindF
 
+          _ = assert(serverConf.outputScriptType == outputScriptType)
+
           host =
             if (addr.getHostString == "0:0:0:0:0:0:0:0") "127.0.0.1"
             else addr.getHostString
 
           config = ConfigFactory.parseString(
             s"""vortex.coordinator = "$host:${addr.getPort}" """)
-          clientConfig = getTestConfigs(Vector(config))._1
+          clientConfigA = getTestConfigs(Vector(config))._1
+          clientConfigB = getTestConfigs(Vector(config))._1
+          _ <- clientConfigA.start()
+          _ <- clientConfigB.start()
 
           (lndA, lndB) <- LndTestUtils.createNodePair(bitcoind)
-          clientA = VortexClient(LndVortexWallet(lndA))(system, clientConfig)
+          clientA = VortexClient(LndVortexWallet(lndA))(system, clientConfigA)
           _ <- clientA.start()
-          clientB = VortexClient(LndVortexWallet(lndB))(system, clientConfig)
+          clientB = VortexClient(LndVortexWallet(lndB))(system, clientConfigB)
           _ <- clientB.start()
 
           _ <- LndRpcTestUtil.connectLNNodes(lndA, lndB)

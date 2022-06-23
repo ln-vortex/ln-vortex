@@ -1,44 +1,57 @@
 package com.lnvortex.client.config
 
 import akka.actor.ActorSystem
+import com.lnvortex.client.db.UTXODAO
 import com.typesafe.config.Config
 import grizzled.slf4j.Logging
 import org.bitcoins.commons.config._
-import org.bitcoins.core.util.{FutureUtil, NetworkUtil}
+import org.bitcoins.core.util.NetworkUtil
+import org.bitcoins.db._
 import org.bitcoins.tor.config.TorAppConfig
 import org.bitcoins.tor.{Socks5ProxyParams, TorParams}
 
 import java.net.InetSocketAddress
-import java.nio.file.{Path, Paths}
+import java.nio.file.{Files, Path, Paths}
 import scala.concurrent._
 import scala.util.Properties
 
 /** Configuration for Ln Vortex
   *
-  * @param directory The data directory of the wallet
+  * @param baseDatadir The data directory of the wallet
   * @param configOverrides Optional sequence of configuration overrides
   */
-case class VortexAppConfig(
-    private val directory: Path,
-    override val configOverrides: Vector[Config])(implicit system: ActorSystem)
-    extends AppConfig
+case class VortexAppConfig(baseDatadir: Path, configOverrides: Vector[Config])(
+    implicit system: ActorSystem)
+    extends DbAppConfig
+    with JdbcProfileComponent[VortexAppConfig]
+    with DbManagement
     with Logging {
+  import profile.api._
   import system.dispatcher
 
   override val moduleName: String = VortexAppConfig.moduleName
   override type ConfigType = VortexAppConfig
 
   override def newConfigOfType(configs: Vector[Config]): VortexAppConfig =
-    VortexAppConfig(directory, configs)
+    VortexAppConfig(baseDatadir, configs)
 
-  override val baseDatadir: Path = directory
+  override def start(): Future[Unit] = {
+    logger.info(s"Initializing vortex app config")
 
-  override def start(): Future[Unit] = FutureUtil.unit
+    if (Files.notExists(datadir)) {
+      Files.createDirectories(datadir)
+    }
+
+    val numMigrations = migrate().migrationsExecuted
+    logger.debug(s"Applied $numMigrations")
+
+    Future.unit
+  }
 
   override def stop(): Future[Unit] = Future.unit
 
   lazy val torConf: TorAppConfig =
-    TorAppConfig(directory, None, configOverrides)
+    TorAppConfig(baseDatadir, None, configOverrides)
 
   lazy val socks5ProxyParams: Option[Socks5ProxyParams] = {
     val host = coordinatorAddress.getHostString
@@ -52,6 +65,13 @@ case class VortexAppConfig(
   lazy val coordinatorAddress: InetSocketAddress = {
     val str = config.getString(s"$moduleName.coordinator")
     NetworkUtil.parseInetSocketAddress(str, 12523)
+  }
+
+  override lazy val appConfig: VortexAppConfig = this
+
+  override lazy val allTables: List[TableQuery[Table[_]]] = {
+    val utxoTable: TableQuery[Table[_]] = UTXODAO()(dispatcher, this).table
+    List(utxoTable)
   }
 }
 

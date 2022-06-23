@@ -8,7 +8,9 @@ case class UnspentCoin(
     address: BitcoinAddress,
     amount: CurrencyUnit,
     outPoint: TransactionOutPoint,
-    confirmed: Boolean) {
+    confirmed: Boolean,
+    anonSet: Int,
+    isChange: Boolean) {
 
   val output: TransactionOutput =
     TransactionOutput(amount, address.scriptPubKey)

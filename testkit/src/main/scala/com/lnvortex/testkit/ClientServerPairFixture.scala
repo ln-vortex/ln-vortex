@@ -36,7 +36,7 @@ trait ClientServerPairFixture
       () => {
         val scriptTypeConfig =
           ConfigFactory.parseString(
-            s"vortex.outputScriptType = $outputScriptType")
+            s"coordinator.outputScriptType = $outputScriptType")
         implicit val (_, serverConf) = getTestConfigs(Vector(scriptTypeConfig))
 
         for {
@@ -45,6 +45,8 @@ trait ClientServerPairFixture
           coordinator = VortexCoordinator(bitcoind)
           _ <- coordinator.start()
           (addr, _) <- coordinator.serverBindF
+
+          _ = assert(serverConf.outputScriptType == outputScriptType)
 
           host =
             if (addr.getHostString == "0:0:0:0:0:0:0:0") "127.0.0.1"

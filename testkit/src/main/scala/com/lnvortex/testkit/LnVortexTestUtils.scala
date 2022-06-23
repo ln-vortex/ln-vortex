@@ -33,9 +33,11 @@ trait LnVortexTestUtils { self: EmbeddedPg =>
          |  tor.enabled = $torEnabled
          |  tor.use-random-ports = false
          |}
-         |vortex {
+         |
+         |vortex.coordinator = "127.0.0.1:$listenPort"
+         |
+         |coordinator {
          |  listen = "0.0.0.0:$listenPort"
-         |  coordinator = "127.0.0.1:$listenPort"
          |  maxPeers = 2
          |  mixFee = 10000
          |  mixInterval = 60m

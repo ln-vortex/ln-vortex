@@ -52,6 +52,14 @@ class RemixTest
       _ <- TestAsyncUtil.nonBlockingSleep(5.seconds)
 
       roundDbs <- coordinator.roundDAO.findAll()
-    } yield assert(roundDbs.size >= 3)
+
+      coinsA <- clientA.listCoins()
+      coinsB <- clientB.listCoins()
+    } yield {
+      assert(roundDbs.size >= 3)
+
+      assert(coinsA.exists(_.anonSet >= 2))
+      assert(coinsB.exists(_.anonSet >= 2))
+    }
   }
 }

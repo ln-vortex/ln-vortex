@@ -155,6 +155,7 @@ object Deps {
 
   val client: List[ModuleID] = List(
     Compile.bitcoinsTor,
+    Compile.bitcoinsDbCommons,
     Compile.akkaActor,
     Compile.akkaHttp,
     Compile.akkaStream,

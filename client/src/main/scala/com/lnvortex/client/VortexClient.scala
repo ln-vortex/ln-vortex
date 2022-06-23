@@ -4,6 +4,7 @@ import akka.actor.{ActorRef, ActorSystem}
 import com.lnvortex.core.RoundDetails.{getMixDetailsOpt, getNonceOpt}
 import com.lnvortex.client.VortexClientException._
 import com.lnvortex.client.config.VortexAppConfig
+import com.lnvortex.client.db.UTXODAO
 import com.lnvortex.client.networking.{P2PClient, Peer}
 import com.lnvortex.core._
 import com.lnvortex.core.api.{OutputDetails, VortexWalletApi}
@@ -34,6 +35,8 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
     with Logging {
   import system.dispatcher
 
+  lazy val utxoDAO: UTXODAO = UTXODAO()
+
   private[client] var handlerP = Promise[ActorRef]()
 
   private var roundDetails: RoundDetails = NoDetails
@@ -41,8 +44,7 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
   private[client] def setRoundDetails(details: RoundDetails): Unit =
     roundDetails = details
 
-  def getCurrentRoundDetails: RoundDetails =
-    roundDetails
+  def getCurrentRoundDetails: RoundDetails = roundDetails
 
   private[lnvortex] def setRound(adv: MixDetails): Unit = {
     if (VortexClient.knownVersions.contains(adv.version)) {
@@ -56,7 +58,13 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
   lazy val peer: Peer = Peer(socket = config.coordinatorAddress,
                              socks5ProxyParams = config.socks5ProxyParams)
 
-  override def start(): Future[Unit] = getNewRound
+  override def start(): Future[Unit] = {
+    for {
+      coins <- vortexWallet.listCoins()
+      _ <- utxoDAO.createMissing(coins.map(_.outPoint))
+      _ <- getNewRound
+    } yield ()
+  }
 
   override def stop(): Future[Unit] = {
     handlerP.future.map { handler =>
@@ -75,7 +83,21 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
     } yield handler ! AskMixDetails(vortexWallet.network)
   }
 
-  def listCoins(): Future[Vector[UnspentCoin]] = vortexWallet.listCoins()
+  def listCoins(): Future[Vector[UnspentCoin]] = {
+    for {
+      coins <- vortexWallet.listCoins()
+      utxoDbs <- utxoDAO.findByOutPoints(coins.map(_.outPoint))
+    } yield {
+      coins.map { coin =>
+        val utxoOpt = utxoDbs.find(_.outPoint == coin.outPoint)
+        utxoOpt match {
+          case Some(utxo) =>
+            coin.copy(anonSet = utxo.anonSet, isChange = utxo.isChange)
+          case None => coin
+        }
+      }
+    }
+  }
 
   def askNonce(): Future[SchnorrNonce] = {
     logger.info("Asking nonce from coordinator")
@@ -535,8 +557,7 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
 
         val cancelF = state.initDetails.nodeIdOpt match {
           case Some(nodeId) =>
-            vortexWallet
-              .cancelChannel(state.channelOutpoint, nodeId)
+            vortexWallet.cancelChannel(state.channelOutpoint, nodeId)
           case None => Future.unit
         }
 
@@ -554,13 +575,23 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
         Future.failed(
           new IllegalStateException(
             s"At invalid state $state, cannot completeRound"))
-      case _: PSBTSigned =>
+      case state: PSBTSigned =>
         logger.info("Round complete!!")
+        val anonSet = VortexUtils.getAnonymitySet(
+          signedTx,
+          state.channelOutpoint.vout.toInt)
+
+        logger.info(s"Anonymity Set gained from round: $anonSet")
+
         for {
           _ <- vortexWallet.broadcastTransaction(signedTx)
           _ <- vortexWallet
-            .labelTransaction(signedTx.txId, "LnVortex Mix")
+            .labelTransaction(signedTx.txId, s"LnVortex Mix Anon set: $anonSet")
             .recover(_ => ())
+          _ <- utxoDAO.setAnonSets(state.initDetails.inputs.map(_.outPoint),
+                                   state.channelOutpoint,
+                                   state.changeOutpointOpt,
+                                   anonSet)
           _ <- stop()
           _ <- getNewRound
         } yield ()

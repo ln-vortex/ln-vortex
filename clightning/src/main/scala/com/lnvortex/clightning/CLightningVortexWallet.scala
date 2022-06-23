@@ -70,7 +70,9 @@ case class CLightningVortexWallet(clightning: CLightningRpcClient)(implicit
       UnspentCoin(address = out.address.get,
                   amount = out.value,
                   outPoint = out.outPoint,
-                  confirmed = out.blockheight.isDefined)
+                  confirmed = out.blockheight.isDefined,
+                  anonSet = 0,
+                  isChange = false)
     })
   }
 
