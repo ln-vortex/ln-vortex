@@ -45,7 +45,7 @@ case class UTXODAO()(implicit
     val q = findByPrimaryKeys(outpoints).result.flatMap { existing =>
       val missing = outpoints.filterNot(existing.contains)
       if (missing.isEmpty) DBIO.successful(Vector.empty)
-      else createAllAction(missing.map(UTXODb(_, 0, isChange = false)))
+      else createAllAction(missing.map(UTXODb(_, 1, isChange = false)))
     }
 
     safeDatabase.runVec(q)
@@ -59,9 +59,9 @@ case class UTXODAO()(implicit
     val changeDbOpt = change.map(c => UTXODb(c, anonSet, isChange = true))
 
     val q = findByPrimaryKeys(inputs).result.flatMap { prev =>
-      val minPrevAnonSet = prev.map(_.anonSet).minOption.getOrElse(0)
+      val minPrevAnonSet = prev.map(_.anonSet).minOption.getOrElse(1)
       val newAnonSet = minPrevAnonSet + anonSet - 1
-      val outputDb = UTXODb(output, newAnonSet, isChange = false)
+      val outputDb = UTXODb(output, Math.min(1, newAnonSet), isChange = false)
       val newDbs = outputDb +: changeDbOpt.toVector
 
       upsertAllAction(newDbs)
