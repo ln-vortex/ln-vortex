@@ -15,8 +15,10 @@ object Generators {
       amt <- CurrencyUnitGenerator.positiveSatoshis
       outpoint <- TransactionGenerators.outPoint
       confirmed <- NumberGenerator.bool
+      anonSet <- NumberGenerator.positiveInts
+      change <- NumberGenerator.bool
     } yield {
-      UnspentCoin(addr, amt, outpoint, confirmed)
+      UnspentCoin(addr, amt, outpoint, confirmed, anonSet, change)
     }
   }
 

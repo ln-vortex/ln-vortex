@@ -42,7 +42,12 @@ object Daemon extends App with Logging {
     }
   }
 
-  val clientF = configStartF.flatMap(_ => client.start())
+  val clientF = configStartF.flatMap { _ =>
+    for {
+      _ <- client.config.start()
+      _ <- client.start()
+    } yield ()
+  }
 
   val f = for {
     _ <- clientF

@@ -79,7 +79,9 @@ case class LndVortexWallet(lndRpcClient: LndRpcClient)(implicit
       UnspentCoin(utxo.address,
                   utxo.amount,
                   utxo.outPointOpt.get,
-                  utxo.confirmations > 0)
+                  utxo.confirmations > 0,
+                  anonSet = 0,
+                  isChange = false)
     })
   }
 

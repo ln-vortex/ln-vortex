@@ -82,7 +82,9 @@ case class BitcoindVortexWallet(
       UnspentCoin(utxo.address.get,
                   utxo.amount,
                   outPoint,
-                  utxo.confirmations > 0)
+                  utxo.confirmations > 0,
+                  anonSet = 0,
+                  isChange = false)
     })
   }
 

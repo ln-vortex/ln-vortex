@@ -148,6 +148,15 @@ case class PSBTSigned(
     TransactionOutPoint(txId, vout)
   }
 
+  val changeOutpointOpt: Option[TransactionOutPoint] =
+    initDetails.changeSpkOpt.map { spk =>
+      val txId = psbt.transaction.txId
+      val vout =
+        UInt32(psbt.transaction.outputs.indexWhere(_.scriptPubKey == spk))
+
+      TransactionOutPoint(txId, vout)
+    }
+
   def nextStage: NoDetails.type = NoDetails
 }
 
