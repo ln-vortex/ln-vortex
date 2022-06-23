@@ -9,12 +9,12 @@ import org.bitcoins.core.psbt.PSBT
 import org.bitcoins.core.script.ScriptType
 import org.bitcoins.crypto._
 import org.bitcoins.testkit.fixtures.BitcoinSFixture
-import org.bitcoins.testkit.rpc.CachedBitcoindV21
+import org.bitcoins.testkit.rpc.CachedBitcoindV23
 import org.scalatest.FutureOutcome
 
 import scala.concurrent.Future
 
-class BitcoindVortexWalletTest extends BitcoinSFixture with CachedBitcoindV21 {
+class BitcoindVortexWalletTest extends BitcoinSFixture with CachedBitcoindV23 {
 
   override type FixtureParam = BitcoindVortexWallet
 

@@ -3,10 +3,10 @@ package com.lnvortex.testkit
 import org.bitcoins.lnd.rpc.LndRpcClient
 import org.bitcoins.rpc.client.v21.BitcoindV21RpcClient
 import org.bitcoins.testkit.fixtures.BitcoinSFixture
-import org.bitcoins.testkit.rpc.CachedBitcoindV21
+import org.bitcoins.testkit.rpc.CachedBitcoindV23
 import org.scalatest.FutureOutcome
 
-trait LndChannelOpenerFixture extends BitcoinSFixture with CachedBitcoindV21 {
+trait LndChannelOpenerFixture extends BitcoinSFixture with CachedBitcoindV23 {
 
   override type FixtureParam =
     (BitcoindV21RpcClient, LndRpcClient, LndRpcClient)

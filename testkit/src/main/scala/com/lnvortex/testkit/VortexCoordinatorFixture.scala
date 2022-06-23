@@ -4,14 +4,14 @@ import com.lnvortex.server.config.VortexCoordinatorAppConfig
 import com.lnvortex.server.coordinator.VortexCoordinator
 import org.bitcoins.testkit.EmbeddedPg
 import org.bitcoins.testkit.fixtures.BitcoinSFixture
-import org.bitcoins.testkit.rpc.CachedBitcoindV21
+import org.bitcoins.testkit.rpc.CachedBitcoindV23
 import org.scalatest.FutureOutcome
 
 import scala.reflect.io.Directory
 
 trait VortexCoordinatorFixture
     extends BitcoinSFixture
-    with CachedBitcoindV21
+    with CachedBitcoindV23
     with LnVortexTestUtils
     with EmbeddedPg {
 

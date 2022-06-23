@@ -6,10 +6,10 @@ import org.bitcoins.core.number.UInt32
 import org.bitcoins.testkit.async.TestAsyncUtil
 import org.bitcoins.testkit.fixtures.BitcoinSFixture
 import org.bitcoins.testkit.lnd.LndRpcTestClient
-import org.bitcoins.testkit.rpc.CachedBitcoindV21
+import org.bitcoins.testkit.rpc.CachedBitcoindV23
 import org.scalatest.FutureOutcome
 
-trait LndVortexWalletFixture extends BitcoinSFixture with CachedBitcoindV21 {
+trait LndVortexWalletFixture extends BitcoinSFixture with CachedBitcoindV23 {
 
   override type FixtureParam = LndVortexWallet
 

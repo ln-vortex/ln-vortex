@@ -9,12 +9,12 @@ import org.bitcoins.testkit.EmbeddedPg
 import org.bitcoins.testkit.async.TestAsyncUtil
 import org.bitcoins.testkit.fixtures.BitcoinSFixture
 import org.bitcoins.testkit.lnd.LndRpcTestClient
-import org.bitcoins.testkit.rpc.CachedBitcoindV21
+import org.bitcoins.testkit.rpc.CachedBitcoindV23
 import org.scalatest.FutureOutcome
 
 trait VortexClientFixture
     extends BitcoinSFixture
-    with CachedBitcoindV21
+    with CachedBitcoindV23
     with LnVortexTestUtils
     with EmbeddedPg {
 
