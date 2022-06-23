@@ -295,7 +295,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       case ScriptType.SCRIPTHASH            => AddressType.P2SHSegwit
       case ScriptType.WITNESS_V0_KEYHASH    => AddressType.Bech32
       case ScriptType.WITNESS_V0_SCRIPTHASH => AddressType.Bech32
-      case ScriptType.WITNESS_V1_TAPROOT    => AddressType.Bech32 // fixme
+      case ScriptType.WITNESS_V1_TAPROOT    => AddressType.Bech32m
     }
 
     for {

@@ -9,14 +9,14 @@ import org.bitcoins.testkit.EmbeddedPg
 import org.bitcoins.testkit.async.TestAsyncUtil
 import org.bitcoins.testkit.fixtures.BitcoinSFixture
 import org.bitcoins.testkit.lnd.LndRpcTestUtil
-import org.bitcoins.testkit.rpc.CachedBitcoindV21
+import org.bitcoins.testkit.rpc.CachedBitcoindV23
 import org.scalatest.FutureOutcome
 
 import scala.reflect.io.Directory
 
 trait DualClientFixture
     extends BitcoinSFixture
-    with CachedBitcoindV21
+    with CachedBitcoindV23
     with LnVortexTestUtils
     with EmbeddedPg {
   def isNetworkingTest: Boolean

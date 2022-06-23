@@ -5,14 +5,14 @@ import org.bitcoins.core.currency.Bitcoins
 import org.bitcoins.testkit.async.TestAsyncUtil
 import org.bitcoins.testkit.clightning._
 import org.bitcoins.testkit.fixtures.BitcoinSFixture
-import org.bitcoins.testkit.rpc.CachedBitcoindV21
+import org.bitcoins.testkit.rpc.CachedBitcoindV23
 import org.scalatest.FutureOutcome
 
 import scala.concurrent.duration.DurationInt
 
 trait CLightningVortexWalletFixture
     extends BitcoinSFixture
-    with CachedBitcoindV21 {
+    with CachedBitcoindV23 {
 
   override type FixtureParam = CLightningVortexWallet
 

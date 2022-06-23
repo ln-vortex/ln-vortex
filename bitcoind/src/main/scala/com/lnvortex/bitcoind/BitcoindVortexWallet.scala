@@ -3,10 +3,7 @@ package com.lnvortex.bitcoind
 import akka.actor.ActorSystem
 import com.lnvortex.core.api._
 import com.lnvortex.core.{InputReference, UnspentCoin}
-import org.bitcoins.commons.jsonmodels.bitcoind.RpcOpts.{
-  AddressType,
-  LockUnspentOutputParameter
-}
+import org.bitcoins.commons.jsonmodels.bitcoind.RpcOpts._
 import org.bitcoins.core.config.BitcoinNetwork
 import org.bitcoins.core.currency.CurrencyUnit
 import org.bitcoins.core.number.UInt32
@@ -48,7 +45,7 @@ case class BitcoindVortexWallet(
       case ScriptType.SCRIPTHASH            => AddressType.P2SHSegwit
       case ScriptType.WITNESS_V0_KEYHASH    => AddressType.Bech32
       case ScriptType.WITNESS_V0_SCRIPTHASH => AddressType.Bech32
-      case ScriptType.WITNESS_V1_TAPROOT    => AddressType.Bech32 // fixme
+      case ScriptType.WITNESS_V1_TAPROOT    => AddressType.Bech32m
     }
   }
 
