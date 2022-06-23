@@ -7,7 +7,6 @@ import org.bitcoins.core.script.ScriptType._
 import org.bitcoins.crypto.{CryptoUtil, ECPrivateKey, Sha256Digest}
 import org.bitcoins.testkit.EmbeddedPg
 import org.bitcoins.testkit.async.TestAsyncUtil
-import scodec.bits._
 
 import scala.concurrent.duration.DurationInt
 
@@ -20,20 +19,15 @@ class RemixTest
   override val outputScriptType: ScriptType = WITNESS_V0_KEYHASH
 
   val testActor: TestActorRef[Nothing] = TestActorRef("Remix-test")
-  val peerIdA: Sha256Digest = Sha256Digest(ByteVector.low(32))
-  val peerIdB: Sha256Digest = Sha256Digest(ByteVector.high(32))
 
-  val peerIdA2: Sha256Digest =
-    CryptoUtil.sha256(ECPrivateKey.freshPrivateKey.bytes)
-
-  val peerIdB2: Sha256Digest =
+  def peerId: Sha256Digest =
     CryptoUtil.sha256(ECPrivateKey.freshPrivateKey.bytes)
 
   it must "complete the remix" in { case (clientA, clientB, coordinator) =>
     for {
       tx <- completeOnChainRound(None,
-                                 peerIdA,
-                                 peerIdB,
+                                 peerId,
+                                 peerId,
                                  clientA,
                                  clientB,
                                  coordinator)
@@ -43,8 +37,8 @@ class RemixTest
       _ = clientB.setRound(coordinator.mixDetails)
 
       _ <- completeOnChainRound(Some(tx.txIdBE),
-                                peerIdA2,
-                                peerIdB2,
+                                peerId,
+                                peerId,
                                 clientA,
                                 clientB,
                                 coordinator)

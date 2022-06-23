@@ -80,7 +80,7 @@ case class LndVortexWallet(lndRpcClient: LndRpcClient)(implicit
                   utxo.amount,
                   utxo.outPointOpt.get,
                   utxo.confirmations > 0,
-                  anonSet = 0,
+                  anonSet = 1,
                   isChange = false)
     })
   }

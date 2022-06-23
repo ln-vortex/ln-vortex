@@ -83,7 +83,7 @@ case class BitcoindVortexWallet(
                   utxo.amount,
                   outPoint,
                   utxo.confirmations > 0,
-                  anonSet = 0,
+                  anonSet = 1,
                   isChange = false)
     })
   }
