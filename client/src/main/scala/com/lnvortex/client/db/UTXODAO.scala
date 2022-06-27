@@ -43,7 +43,8 @@ case class UTXODAO()(implicit
   def createMissing(
       outpoints: Vector[TransactionOutPoint]): Future[Vector[UTXODb]] = {
     val q = findByPrimaryKeys(outpoints).result.flatMap { existing =>
-      val missing = outpoints.filterNot(existing.contains)
+      val missing =
+        outpoints.filterNot(out => existing.exists(_.outPoint == out))
       if (missing.isEmpty) DBIO.successful(Vector.empty)
       else createAllAction(missing.map(UTXODb(_, 1, isChange = false)))
     }
