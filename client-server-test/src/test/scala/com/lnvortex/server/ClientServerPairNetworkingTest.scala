@@ -14,6 +14,8 @@ class ClientServerPairNetworkingTest
     with LnVortexTestUtils {
   override val isNetworkingTest = true
   override val outputScriptType: ScriptType = WITNESS_V0_SCRIPTHASH
+  override val inputScriptType: ScriptType = WITNESS_V0_KEYHASH
+  override val changeScriptType: ScriptType = WITNESS_V0_KEYHASH
 
   val interval: FiniteDuration =
     if (torEnabled) 500.milliseconds else 100.milliseconds

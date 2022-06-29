@@ -27,6 +27,8 @@ trait DualClientFixture
       VortexCoordinator)
 
   def outputScriptType: ScriptType
+  def changeScriptType: ScriptType
+  def inputScriptType: ScriptType
 
   override def withFixture(test: OneArgAsyncTest): FutureOutcome = {
     makeDependentFixture[(
@@ -35,8 +37,12 @@ trait DualClientFixture
         VortexCoordinator)](
       () => {
         val scriptTypeConfig =
-          ConfigFactory.parseString(
-            s"coordinator.outputScriptType = $outputScriptType")
+          ConfigFactory
+            .parseString(s"""
+                            |coordinator.outputScriptType = $outputScriptType
+                            |coordinator.changeScriptType = $changeScriptType
+                            |coordinator.inputScriptType = $inputScriptType
+                            |""".stripMargin)
         implicit val (_, serverConf) = getTestConfigs(Vector(scriptTypeConfig))
 
         for {
@@ -59,7 +65,7 @@ trait DualClientFixture
           _ <- clientConfigA.start()
           _ <- clientConfigB.start()
 
-          (lndA, lndB) <- LndTestUtils.createNodePair(bitcoind)
+          (lndA, lndB) <- LndTestUtils.createNodePair(bitcoind, inputScriptType)
           clientA = VortexClient(LndVortexWallet(lndA))(system, clientConfigA)
           _ <- clientA.start()
           clientB = VortexClient(LndVortexWallet(lndB))(system, clientConfigB)

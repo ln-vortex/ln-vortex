@@ -1,10 +1,13 @@
 package com.lnvortex.core
 
+import org.bitcoins.core.crypto.TxSigComponent
 import org.bitcoins.core.currency._
 import org.bitcoins.core.number._
+import org.bitcoins.core.policy.Policy
 import org.bitcoins.core.protocol.script._
 import org.bitcoins.core.protocol.tlv.TLVUtil
 import org.bitcoins.core.protocol.transaction._
+import org.bitcoins.core.script.PreExecutionScriptProgram
 import org.bitcoins.core.script.interpreter.ScriptInterpreter
 import org.bitcoins.crypto._
 import scodec.bits._
@@ -78,6 +81,12 @@ object InputReference extends Factory[InputReference] {
       .toWitnessTx(tx)
       .updateWitness(0, inputReference.inputProof)
 
-    ScriptInterpreter.verifyInputScript(wtx, 0, inputReference.output)
+    val sigComponent = TxSigComponent(
+      wtx,
+      UInt32.zero,
+      inputReference.output,
+      Policy.standardFlags.init
+    )
+    ScriptInterpreter.runVerify(PreExecutionScriptProgram(sigComponent))
   }
 }

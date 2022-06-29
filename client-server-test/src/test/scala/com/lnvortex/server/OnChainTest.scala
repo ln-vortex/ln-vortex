@@ -18,7 +18,9 @@ class OnChainTest
     with ClientServerTestUtils
     with EmbeddedPg {
   override val isNetworkingTest = false
-  override val outputScriptType: ScriptType = WITNESS_V0_KEYHASH
+  override val outputScriptType: ScriptType = WITNESS_V1_TAPROOT
+  override val changeScriptType: ScriptType = WITNESS_V1_TAPROOT
+  override val inputScriptType: ScriptType = WITNESS_V1_TAPROOT
 
   val testActor: TestActorRef[Nothing] = TestActorRef("OnChainTest-test")
   val peerId: Sha256Digest = Sha256Digest.empty
