@@ -81,6 +81,7 @@ object InputReference extends Factory[InputReference] {
       .toWitnessTx(tx)
       .updateWitness(0, inputReference.inputProof)
 
+    // todo revert
     val sigComponent = TxSigComponent(
       wtx,
       UInt32.zero,
