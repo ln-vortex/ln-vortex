@@ -705,11 +705,11 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
           case Some(unsignedPsbt) =>
             val correctNumInputs = inputs.size == aliceDb.numInputs
             val sameTx = unsignedPsbt.transaction == psbt.transaction
-            lazy val validSigs = true // fixme
-//              Try(
-//                inputs
-//                  .map(_.indexOpt.get)
-//                  .forall(psbt.verifyFinalizedInput)).getOrElse(false)
+            lazy val validSigs =
+              Try(
+                inputs
+                  .map(_.indexOpt.get)
+                  .forall(psbt.verifyFinalizedInput)).getOrElse(false)
 
             if (correctNumInputs && sameTx && validSigs) {
               // mark successful

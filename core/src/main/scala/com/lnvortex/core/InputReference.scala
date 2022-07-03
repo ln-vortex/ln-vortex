@@ -81,11 +81,15 @@ object InputReference extends Factory[InputReference] {
       .toWitnessTx(tx)
       .updateWitness(0, inputReference.inputProof)
 
+    val outputMap = Map(tx.inputs.head.previousOutput -> inputReference.output,
+                        tx.inputs.last.previousOutput -> EmptyTransactionOutput)
+
     // todo revert
     val sigComponent = TxSigComponent(
       wtx,
       UInt32.zero,
       inputReference.output,
+      outputMap,
       Policy.standardFlags.init
     )
     ScriptInterpreter.runVerify(PreExecutionScriptProgram(sigComponent))
