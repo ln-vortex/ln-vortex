@@ -1,14 +1,12 @@
 package com.lnvortex.core
 
-import org.bitcoins.core.crypto.TxSigComponent
 import org.bitcoins.core.currency._
 import org.bitcoins.core.number._
-import org.bitcoins.core.policy.Policy
 import org.bitcoins.core.protocol.script._
 import org.bitcoins.core.protocol.tlv.TLVUtil
 import org.bitcoins.core.protocol.transaction._
-import org.bitcoins.core.script.PreExecutionScriptProgram
 import org.bitcoins.core.script.interpreter.ScriptInterpreter
+import org.bitcoins.core.script.util.PreviousOutputMap
 import org.bitcoins.crypto._
 import scodec.bits._
 
@@ -84,14 +82,10 @@ object InputReference extends Factory[InputReference] {
     val outputMap = Map(tx.inputs.head.previousOutput -> inputReference.output,
                         tx.inputs.last.previousOutput -> EmptyTransactionOutput)
 
-    // todo revert
-    val sigComponent = TxSigComponent(
-      wtx,
-      UInt32.zero,
-      inputReference.output,
-      outputMap,
-      Policy.standardFlags.init
-    )
-    ScriptInterpreter.runVerify(PreExecutionScriptProgram(sigComponent))
+    ScriptInterpreter.verifyInputScript(transaction = wtx,
+                                        inputIndex = 0,
+                                        outputMap =
+                                          PreviousOutputMap(outputMap),
+                                        prevOut = inputReference.output)
   }
 }
