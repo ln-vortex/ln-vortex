@@ -3,20 +3,23 @@ package com.lnvortex.lnd
 import akka.actor.ActorSystem
 import com.lnvortex.core.api._
 import com.lnvortex.core.{InputReference, UnspentCoin}
+import com.lnvortex.lnd.LndVortexWallet.getSignMethod
 import lnrpc.{AddressType, NewAddressRequest, NodeInfoRequest}
 import org.bitcoins.core.config.{BitcoinNetwork, BitcoinNetworks}
-import org.bitcoins.core.currency.{CurrencyUnit, Satoshis}
+import org.bitcoins.core.currency._
+import org.bitcoins.core.number.UInt32
 import org.bitcoins.core.protocol.BitcoinAddress
 import org.bitcoins.core.protocol.ln.channel.ShortChannelId
 import org.bitcoins.core.protocol.ln.node.NodeId
-import org.bitcoins.core.protocol.script.ScriptWitness
+import org.bitcoins.core.protocol.script._
 import org.bitcoins.core.protocol.transaction._
-import org.bitcoins.core.psbt.PSBT
+import org.bitcoins.core.psbt._
 import org.bitcoins.core.script.ScriptType
 import org.bitcoins.crypto._
 import org.bitcoins.lnd.rpc.LndRpcClient
 import org.bitcoins.lnd.rpc.LndUtils._
 import scodec.bits.ByteVector
+import signrpc.{SignDescriptor, SignMethod, SignReq}
 import walletrpc.LabelTransactionRequest
 
 import java.net.InetSocketAddress
@@ -42,28 +45,9 @@ case class LndVortexWallet(lndRpcClient: LndRpcClient)(implicit
     lndRpcClient.getInfo.map(_.blockHeight.toInt)
   }
 
-  private def addressTypeFromScriptType(scriptType: ScriptType): AddressType = {
-    scriptType match {
-      case ScriptType.PUBKEY | ScriptType.PUBKEYHASH | ScriptType.NONSTANDARD |
-          ScriptType.MULTISIG | ScriptType.CLTV | ScriptType.CSV |
-          ScriptType.NONSTANDARD_IF_CONDITIONAL |
-          ScriptType.NOT_IF_CONDITIONAL | ScriptType.MULTISIG_WITH_TIMEOUT |
-          ScriptType.PUBKEY_WITH_TIMEOUT | ScriptType.NULLDATA |
-          ScriptType.WITNESS_UNKNOWN | ScriptType.WITNESS_COMMITMENT =>
-        throw new IllegalArgumentException("Unknown address type")
-      case ScriptType.SCRIPTHASH => AddressType.NESTED_PUBKEY_HASH
-      case ScriptType.WITNESS_V0_KEYHASH =>
-        AddressType.WITNESS_PUBKEY_HASH
-      case ScriptType.WITNESS_V0_SCRIPTHASH =>
-        throw new IllegalArgumentException("Unknown address type")
-      case ScriptType.WITNESS_V1_TAPROOT =>
-        throw new IllegalArgumentException("Waiting on 0.15-beta")
-    }
-  }
-
   override def getNewAddress(scriptType: ScriptType): Future[BitcoinAddress] = {
     val req: NewAddressRequest = NewAddressRequest(
-      addressTypeFromScriptType(scriptType))
+      LndVortexWallet.addressTypeFromScriptType(scriptType))
 
     lndRpcClient.lnd
       .newAddress(req)
@@ -90,8 +74,19 @@ case class LndVortexWallet(lndRpcClient: LndRpcClient)(implicit
       outputRef: OutputReference): Future[ScriptWitness] = {
     val tx = InputReference.constructInputProofTx(outputRef, nonce)
 
+    val (signMethod, hashType) = getSignMethod(outputRef.output)
+
+    val signDescriptor = SignDescriptor(output = Some(outputRef.output),
+                                        sighash = UInt32(hashType.num),
+                                        signMethod = signMethod,
+                                        inputIndex = 0)
+
+    // Add input's prev out and a fake prev out for the fake input
+    val prevOuts = Vector(outputRef.output, EmptyTransactionOutput)
+    val signReq = SignReq(tx.bytes, Vector(signDescriptor), prevOuts)
+
     for {
-      (_, scriptWit) <- lndRpcClient.computeInputScript(tx, 0, outputRef.output)
+      (_, scriptWit) <- lndRpcClient.computeInputScript(signReq).map(_.head)
       _ <- lndRpcClient.leaseOutput(outputRef.outPoint, 3600)
     } yield scriptWit
   }
@@ -100,17 +95,32 @@ case class LndVortexWallet(lndRpcClient: LndRpcClient)(implicit
       unsigned: PSBT,
       inputs: Vector[OutputReference]): Future[PSBT] = {
     val txOutpoints = unsigned.transaction.inputs.map(_.previousOutput)
+    val prevOuts =
+      unsigned.inputMaps
+        .map(_.witnessUTXOOpt.map(_.witnessUTXO))
+        .map(_.getOrElse(
+          throw new RuntimeException("Missing witness UTXO in psbt")))
 
-    val sigFs = inputs.map { input =>
+    require(prevOuts.size == unsigned.transaction.inputs.size,
+            "Number of previous outputs does not match number of inputs")
+
+    val signDescriptors = inputs.map { input =>
       val idx = txOutpoints.indexOf(input.outPoint)
-      lndRpcClient
-        .computeInputScript(unsigned.transaction, idx, input.output)
-        .map { case (scriptSig, witness) => (scriptSig, witness, idx) }
+      val (signMethod, hashType) = getSignMethod(input.output)
+
+      SignDescriptor(output = Some(input.output),
+                     sighash = UInt32(hashType.num),
+                     signMethod = signMethod,
+                     inputIndex = idx)
     }
 
-    Future.sequence(sigFs).map { sigs =>
-      sigs.foldLeft(unsigned) { case (psbt, (scriptSig, witness, idx)) =>
-        psbt.addFinalizedScriptWitnessToInput(scriptSig, witness, idx)
+    val signReq = SignReq(unsigned.transaction.bytes, signDescriptors, prevOuts)
+
+    lndRpcClient.computeInputScript(signReq).map { sigs =>
+      val indexes = signDescriptors.map(_.inputIndex)
+      sigs.zip(indexes).foldLeft(unsigned) {
+        case (psbt, ((scriptSig, witness), idx)) =>
+          psbt.addFinalizedScriptWitnessToInput(scriptSig, witness, idx)
       }
     }
   }
@@ -194,5 +204,48 @@ case class LndVortexWallet(lndRpcClient: LndRpcClient)(implicit
 
         Future.sequence(fs)
       }
+  }
+}
+
+object LndVortexWallet {
+
+  def addressTypeFromScriptType(scriptType: ScriptType): AddressType = {
+    scriptType match {
+      case ScriptType.PUBKEY | ScriptType.PUBKEYHASH | ScriptType.NONSTANDARD |
+          ScriptType.MULTISIG | ScriptType.CLTV | ScriptType.CSV |
+          ScriptType.NONSTANDARD_IF_CONDITIONAL |
+          ScriptType.NOT_IF_CONDITIONAL | ScriptType.MULTISIG_WITH_TIMEOUT |
+          ScriptType.PUBKEY_WITH_TIMEOUT | ScriptType.NULLDATA |
+          ScriptType.WITNESS_UNKNOWN | ScriptType.WITNESS_COMMITMENT =>
+        throw new IllegalArgumentException("Unknown address type")
+      case ScriptType.SCRIPTHASH => AddressType.NESTED_PUBKEY_HASH
+      case ScriptType.WITNESS_V0_KEYHASH =>
+        AddressType.WITNESS_PUBKEY_HASH
+      case ScriptType.WITNESS_V0_SCRIPTHASH =>
+        throw new IllegalArgumentException("Unknown address type")
+      case ScriptType.WITNESS_V1_TAPROOT =>
+        AddressType.TAPROOT_PUBKEY
+    }
+  }
+
+  def getSignMethod(output: TransactionOutput): (SignMethod, HashType) = {
+    output.scriptPubKey.scriptType match {
+      case ScriptType.PUBKEY | ScriptType.PUBKEYHASH | ScriptType.NONSTANDARD |
+          ScriptType.MULTISIG | ScriptType.CLTV | ScriptType.CSV |
+          ScriptType.NONSTANDARD_IF_CONDITIONAL |
+          ScriptType.NOT_IF_CONDITIONAL | ScriptType.MULTISIG_WITH_TIMEOUT |
+          ScriptType.PUBKEY_WITH_TIMEOUT | ScriptType.NULLDATA |
+          ScriptType.WITNESS_UNKNOWN | ScriptType.WITNESS_COMMITMENT =>
+        (SignMethod.SIGN_METHOD_WITNESS_V0, HashType.sigHashAll)
+      case ScriptType.SCRIPTHASH =>
+        (SignMethod.SIGN_METHOD_WITNESS_V0, HashType.sigHashAll)
+      case ScriptType.WITNESS_V0_KEYHASH =>
+        (SignMethod.SIGN_METHOD_WITNESS_V0, HashType.sigHashAll)
+      case ScriptType.WITNESS_V0_SCRIPTHASH =>
+        (SignMethod.SIGN_METHOD_WITNESS_V0, HashType.sigHashAll)
+      case ScriptType.WITNESS_V1_TAPROOT =>
+        (SignMethod.SIGN_METHOD_TAPROOT_KEY_SPEND_BIP0086,
+         HashType.sigHashDefault)
+    }
   }
 }

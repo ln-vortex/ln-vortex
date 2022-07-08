@@ -27,6 +27,8 @@ trait ClientServerPairFixture
   def isNetworkingTest: Boolean
 
   def outputScriptType: ScriptType
+  def changeScriptType: ScriptType
+  def inputScriptType: ScriptType
 
   override def withFixture(test: OneArgAsyncTest): FutureOutcome = {
     makeDependentFixture[(
@@ -35,8 +37,12 @@ trait ClientServerPairFixture
         LndRpcClient)](
       () => {
         val scriptTypeConfig =
-          ConfigFactory.parseString(
-            s"coordinator.outputScriptType = $outputScriptType")
+          ConfigFactory
+            .parseString(s"""
+                            |coordinator.outputScriptType = $outputScriptType
+                            |coordinator.changeScriptType = $changeScriptType
+                            |coordinator.inputScriptType = $inputScriptType
+                            |""".stripMargin)
         implicit val (_, serverConf) = getTestConfigs(Vector(scriptTypeConfig))
 
         for {
@@ -57,7 +63,8 @@ trait ClientServerPairFixture
           clientConfig = getTestConfigs(Vector(netConfig))._1
           _ <- clientConfig.start()
 
-          (lnd, peerLnd) <- LndTestUtils.createNodePair(bitcoind)
+          (lnd, peerLnd) <- LndTestUtils.createNodePair(bitcoind,
+                                                        inputScriptType)
           client = VortexClient(LndVortexWallet(lnd))(system, clientConfig)
           _ <- client.start()
 

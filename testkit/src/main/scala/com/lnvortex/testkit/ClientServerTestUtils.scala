@@ -263,7 +263,9 @@ trait ClientServerTestUtils {
       all <- client.listCoins()
       psbt <- signPSBT(peerId, client, coordinator)
 
-      _ <- coordinator.registerPSBTSignatures(peerId, psbt)
+      tx <- coordinator.registerPSBTSignatures(peerId, psbt)
+
+      _ <- coordinator.bitcoind.sendRawTransaction(tx)
 
       // Mine some blocks
       _ <- coordinator.bitcoind.getNewAddress.flatMap(
@@ -294,8 +296,12 @@ trait ClientServerTestUtils {
       regAF = coordinator.registerPSBTSignatures(peerIdA, psbtA)
       regBF = coordinator.registerPSBTSignatures(peerIdB, psbtB)
 
-      _ <- regAF
-      _ <- regBF
+      tx <- regAF
+      tx2 <- regBF
+
+      _ = require(tx == tx2)
+
+      _ <- coordinator.bitcoind.sendRawTransaction(tx)
 
       // Mine some blocks
       _ <- coordinator.bitcoind.getNewAddress.flatMap(

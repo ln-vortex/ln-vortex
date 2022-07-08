@@ -4,7 +4,7 @@ import akka.testkit.TestActorRef
 import com.lnvortex.core.RoundDetails.getInitDetailsOpt
 import com.lnvortex.testkit._
 import org.bitcoins.core.script.ScriptType
-import org.bitcoins.core.script.ScriptType.WITNESS_V0_SCRIPTHASH
+import org.bitcoins.core.script.ScriptType._
 import org.bitcoins.crypto.Sha256Digest
 import org.bitcoins.testkit.EmbeddedPg
 import scodec.bits.ByteVector
@@ -15,6 +15,8 @@ class DualClientTest
     with EmbeddedPg {
   override val isNetworkingTest = false
   override val outputScriptType: ScriptType = WITNESS_V0_SCRIPTHASH
+  override val inputScriptType: ScriptType = WITNESS_V0_KEYHASH
+  override val changeScriptType: ScriptType = WITNESS_V0_KEYHASH
 
   override val testActor: TestActorRef[Nothing] = TestActorRef(
     "DualClientTest-test")

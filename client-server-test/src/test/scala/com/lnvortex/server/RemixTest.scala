@@ -16,7 +16,9 @@ class RemixTest
     with EmbeddedPg {
   override lazy val pgEnabled: Boolean = true
   override val isNetworkingTest = false
-  override val outputScriptType: ScriptType = WITNESS_V0_KEYHASH
+  override val outputScriptType: ScriptType = WITNESS_V1_TAPROOT
+  override val changeScriptType: ScriptType = WITNESS_V1_TAPROOT
+  override val inputScriptType: ScriptType = WITNESS_V1_TAPROOT
 
   val testActor: TestActorRef[Nothing] = TestActorRef("Remix-test")
 

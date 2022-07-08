@@ -6,6 +6,7 @@ import org.bitcoins.core.protocol.script._
 import org.bitcoins.core.protocol.tlv.TLVUtil
 import org.bitcoins.core.protocol.transaction._
 import org.bitcoins.core.script.interpreter.ScriptInterpreter
+import org.bitcoins.core.script.util.PreviousOutputMap
 import org.bitcoins.crypto._
 import scodec.bits._
 
@@ -78,6 +79,13 @@ object InputReference extends Factory[InputReference] {
       .toWitnessTx(tx)
       .updateWitness(0, inputReference.inputProof)
 
-    ScriptInterpreter.verifyInputScript(wtx, 0, inputReference.output)
+    val outputMap = Map(tx.inputs.head.previousOutput -> inputReference.output,
+                        tx.inputs.last.previousOutput -> EmptyTransactionOutput)
+
+    ScriptInterpreter.verifyInputScript(transaction = wtx,
+                                        inputIndex = 0,
+                                        outputMap =
+                                          PreviousOutputMap(outputMap),
+                                        prevOut = inputReference.output)
   }
 }

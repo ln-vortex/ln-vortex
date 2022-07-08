@@ -11,14 +11,17 @@ import org.bitcoins.core.script.ScriptType
 import org.bitcoins.crypto._
 
 import scala.concurrent.Future
+import scala.util.{Failure, Success}
 
 class LndVortexWalletTest extends LndVortexWalletFixture {
 
-  it must "correctly sign a psbt" in { wallet =>
+  it must "correctly sign a psbt with segwitV0 inputs" in { wallet =>
     for {
-      utxos <- wallet.listCoins()
+      utxos <- wallet
+        .listCoins()
+        .map(_.filter(_.address.scriptPubKey.isInstanceOf[P2WPKHWitnessSPKV0]))
       refs = utxos.map(_.outputReference)
-      addr <- wallet.getNewAddress(ScriptType.WITNESS_V0_KEYHASH)
+      addr <- wallet.getNewAddress(ScriptType.WITNESS_V1_TAPROOT)
 
       inputs = utxos
         .map(_.outPoint)
@@ -36,7 +39,73 @@ class LndVortexWalletTest extends LndVortexWalletFixture {
       }
 
       signed <- wallet.signPSBT(psbt, refs)
-    } yield assert(signed.extractTransactionAndValidate.isSuccess)
+      _ <- wallet.broadcastTransaction(signed.extractTransaction)
+    } yield signed.extractTransactionAndValidate match {
+      case Failure(exception) => fail(exception)
+      case Success(_)         => succeed
+    }
+  }
+
+  it must "correctly sign a psbt with taproot inputs" in { wallet =>
+    for {
+      utxos <- wallet
+        .listCoins()
+        .map(_.filter(_.address.scriptPubKey.isInstanceOf[TaprootScriptPubKey]))
+      refs = utxos.map(_.outputReference)
+      addr <- wallet.getNewAddress(ScriptType.WITNESS_V1_TAPROOT)
+
+      inputs = utxos
+        .map(_.outPoint)
+        .map(TransactionInput(_, EmptyScriptSignature, UInt32.zero))
+
+      output = {
+        val amt = utxos.map(_.amount).sum - Satoshis(300)
+        TransactionOutput(amt, addr.scriptPubKey)
+      }
+
+      tx = BaseTransaction(Int32.two, inputs, Vector(output), UInt32.zero)
+      unsigned = PSBT.fromUnsignedTx(tx)
+      psbt = inputs.zipWithIndex.foldLeft(unsigned) {
+        case (psbt, (input, idx)) =>
+          val prevOut =
+            utxos.find(_.outPoint == input.previousOutput).get.output
+          psbt.addWitnessUTXOToInput(prevOut, idx)
+      }
+
+      signed <- wallet.signPSBT(psbt, refs)
+      _ <- wallet.broadcastTransaction(signed.extractTransaction)
+    } yield signed.extractTransactionAndValidate match {
+      case Failure(exception) => fail(exception)
+      case Success(_)         => succeed
+    }
+  }
+
+  it must "correctly sign a psbt of mixed input types" in { wallet =>
+    for {
+      utxos <- wallet.listCoins()
+      refs = utxos.map(_.outputReference)
+      addr <- wallet.getNewAddress(ScriptType.WITNESS_V1_TAPROOT)
+
+      inputs = utxos
+        .map(_.outPoint)
+        .map(TransactionInput(_, EmptyScriptSignature, UInt32.max))
+
+      output = {
+        val amt = utxos.map(_.amount).sum - Satoshis(300)
+        TransactionOutput(amt, addr.scriptPubKey)
+      }
+
+      tx = BaseTransaction(Int32.two, inputs, Vector(output), UInt32.zero)
+      unsigned = PSBT.fromUnsignedTx(tx)
+      psbt = refs.zipWithIndex.foldLeft(unsigned) { case (psbt, (utxo, idx)) =>
+        psbt.addWitnessUTXOToInput(utxo.output, idx)
+      }
+
+      signed <- wallet.signPSBT(psbt, refs)
+    } yield signed.extractTransactionAndValidate match {
+      case Failure(exception) => fail(exception)
+      case Success(_)         => succeed
+    }
   }
 
   it must "correctly create input proofs" in { wallet =>

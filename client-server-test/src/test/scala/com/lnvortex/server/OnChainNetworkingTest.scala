@@ -1,19 +1,21 @@
 package com.lnvortex.server
 
-import com.lnvortex.testkit.{ClientServerPairFixture, LnVortexTestUtils}
+import com.lnvortex.testkit._
 import org.bitcoins.core.script.ScriptType
 import org.bitcoins.core.script.ScriptType._
 import org.bitcoins.testkit.EmbeddedPg
 import org.bitcoins.testkit.async.TestAsyncUtil
 
-import scala.concurrent.duration.{DurationInt, FiniteDuration}
+import scala.concurrent.duration._
 
 class OnChainNetworkingTest
     extends ClientServerPairFixture
     with EmbeddedPg
     with LnVortexTestUtils {
   override val isNetworkingTest = true
-  override val outputScriptType: ScriptType = WITNESS_V0_KEYHASH
+  override val outputScriptType: ScriptType = WITNESS_V1_TAPROOT
+  override val changeScriptType: ScriptType = WITNESS_V1_TAPROOT
+  override val inputScriptType: ScriptType = WITNESS_V1_TAPROOT
 
   val interval: FiniteDuration =
     if (torEnabled) 500.milliseconds else 100.milliseconds

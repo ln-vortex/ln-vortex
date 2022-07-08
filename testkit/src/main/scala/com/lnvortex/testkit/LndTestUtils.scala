@@ -1,7 +1,9 @@
 package com.lnvortex.testkit
 
 import akka.actor.ActorSystem
+import com.lnvortex.lnd.LndVortexWallet
 import org.bitcoins.core.currency._
+import org.bitcoins.core.script.ScriptType
 import org.bitcoins.lnd.rpc.LndRpcClient
 import org.bitcoins.rpc.client.common.BitcoindRpcClient
 import org.bitcoins.testkit.async.TestAsyncUtil
@@ -12,18 +14,22 @@ import scala.concurrent._
 
 trait LndTestUtils {
 
+  val lndVersion: Option[String] = Some("20220628-01")
+
   def fundLndNodes(
       bitcoind: BitcoindRpcClient,
       client: LndRpcClient,
-      otherClient: LndRpcClient)(implicit
-      ec: ExecutionContext): Future[Unit] = {
+      otherClient: LndRpcClient,
+      scriptType: ScriptType)(implicit ec: ExecutionContext): Future[Unit] = {
+    val addressType = LndVortexWallet.addressTypeFromScriptType(scriptType)
+
     for {
-      addrA <- client.getNewAddress
-      addrB <- client.getNewAddress
-      addrC <- client.getNewAddress
-      addrD <- otherClient.getNewAddress
-      addrE <- otherClient.getNewAddress
-      addrF <- otherClient.getNewAddress
+      addrA <- client.getNewAddress(addressType)
+      addrB <- client.getNewAddress(addressType)
+      addrC <- client.getNewAddress(addressType)
+      addrD <- otherClient.getNewAddress(addressType)
+      addrE <- otherClient.getNewAddress(addressType)
+      addrF <- otherClient.getNewAddress(addressType)
 
       _ <- bitcoind.sendMany(
         Map(addrA -> Bitcoins(1), addrB -> Bitcoins(2), addrC -> Bitcoins(3)))
@@ -33,17 +39,17 @@ trait LndTestUtils {
     } yield ()
   }
 
-  def createNodePair(bitcoind: BitcoindRpcClient)(implicit
-      ec: ExecutionContext): Future[(LndRpcClient, LndRpcClient)] = {
+  def createNodePair(bitcoind: BitcoindRpcClient, inputType: ScriptType)(
+      implicit ec: ExecutionContext): Future[(LndRpcClient, LndRpcClient)] = {
     val actorSystemA =
       ActorSystem.create("bitcoin-s-lnd-test-" + FileUtil.randomDirName)
-    val clientA = LndRpcTestClient
-      .fromSbtDownload(Some(bitcoind))(actorSystemA)
+    val clientA =
+      LndRpcTestClient.fromSbtDownload(Some(bitcoind), lndVersion)(actorSystemA)
 
     val actorSystemB =
       ActorSystem.create("bitcoin-s-lnd-test-" + FileUtil.randomDirName)
-    val clientB = LndRpcTestClient
-      .fromSbtDownload(Some(bitcoind))(actorSystemB)
+    val clientB =
+      LndRpcTestClient.fromSbtDownload(Some(bitcoind), lndVersion)(actorSystemB)
 
     val clientsF = for {
       a <- clientA.start()
@@ -68,7 +74,7 @@ trait LndTestUtils {
     for {
       (client, otherClient) <- clientsF
 
-      _ <- fundLndNodes(bitcoind, client, otherClient)
+      _ <- fundLndNodes(bitcoind, client, otherClient, inputType)
 
       _ <- TestAsyncUtil.awaitConditionF(() => isSynced)
       _ <- TestAsyncUtil.awaitConditionF(() => isFunded)
