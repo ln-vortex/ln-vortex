@@ -14,7 +14,7 @@ import scala.concurrent._
 
 trait LndTestUtils {
 
-  private val lndVersion = Some("20220628-01")
+  val lndVersion: Option[String] = Some("20220628-01")
 
   def fundLndNodes(
       bitcoind: BitcoindRpcClient,

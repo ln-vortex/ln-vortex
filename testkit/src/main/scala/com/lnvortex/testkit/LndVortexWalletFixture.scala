@@ -1,6 +1,7 @@
 package com.lnvortex.testkit
 
 import com.lnvortex.lnd.LndVortexWallet
+import com.lnvortex.testkit.LndTestUtils.lndVersion
 import org.bitcoins.core.currency.Bitcoins
 import org.bitcoins.core.number.UInt32
 import org.bitcoins.testkit.async.TestAsyncUtil
@@ -8,6 +9,7 @@ import org.bitcoins.testkit.fixtures.BitcoinSFixture
 import org.bitcoins.testkit.lnd.LndRpcTestClient
 import org.bitcoins.testkit.rpc.CachedBitcoindV23
 import org.scalatest.FutureOutcome
+import lnrpc.AddressType
 
 trait LndVortexWalletFixture extends BitcoinSFixture with CachedBitcoindV23 {
 
@@ -19,12 +21,12 @@ trait LndVortexWalletFixture extends BitcoinSFixture with CachedBitcoindV23 {
         for {
           bitcoind <- cachedBitcoindWithFundsF
 
-          client = LndRpcTestClient.fromSbtDownload(Some(bitcoind))
+          client = LndRpcTestClient.fromSbtDownload(Some(bitcoind), lndVersion)
           lnd <- client.start()
 
-          addrA <- lnd.getNewAddress
-          addrB <- lnd.getNewAddress
-          addrC <- lnd.getNewAddress
+          addrA <- lnd.getNewAddress(AddressType.WITNESS_PUBKEY_HASH)
+          addrB <- lnd.getNewAddress(AddressType.TAPROOT_PUBKEY)
+          addrC <- lnd.getNewAddress(AddressType.TAPROOT_PUBKEY)
 
           _ <- bitcoind.sendMany(
             Map(addrA -> Bitcoins(1),
@@ -45,7 +47,7 @@ trait LndVortexWalletFixture extends BitcoinSFixture with CachedBitcoindV23 {
 
           // Await utxos
           _ <- TestAsyncUtil.awaitConditionF(() =>
-            lnd.listUnspent.map(_.nonEmpty))
+            lnd.listUnspent.map(_.size == 3))
 
         } yield LndVortexWallet(lnd)
       },

@@ -74,11 +74,12 @@ case class LndVortexWallet(lndRpcClient: LndRpcClient)(implicit
       outputRef: OutputReference): Future[ScriptWitness] = {
     val tx = InputReference.constructInputProofTx(outputRef, nonce)
 
-    val signDescriptor =
-      SignDescriptor(output = Some(outputRef.output),
-                     sighash = UInt32(HashType.sigHashDefault.num),
-                     signMethod = getSignMethod(outputRef.output),
-                     inputIndex = 0)
+    val (signMethod, hashType) = getSignMethod(outputRef.output)
+
+    val signDescriptor = SignDescriptor(output = Some(outputRef.output),
+                                        sighash = UInt32(hashType.num),
+                                        signMethod = signMethod,
+                                        inputIndex = 0)
 
     // Add input's prev out and a fake prev out for the fake input
     val prevOuts = Vector(outputRef.output, EmptyTransactionOutput)
@@ -95,33 +96,31 @@ case class LndVortexWallet(lndRpcClient: LndRpcClient)(implicit
       inputs: Vector[OutputReference]): Future[PSBT] = {
     val txOutpoints = unsigned.transaction.inputs.map(_.previousOutput)
     val prevOuts =
-      unsigned.inputMaps.flatMap(_.witnessUTXOOpt).map(_.witnessUTXO)
+      unsigned.inputMaps
+        .map(_.witnessUTXOOpt.map(_.witnessUTXO))
+        .map(_.getOrElse(
+          throw new RuntimeException("Missing witness UTXO in psbt")))
 
     require(prevOuts.size == unsigned.transaction.inputs.size,
             "Number of previous outputs does not match number of inputs")
 
-    // todo use single call of computeInputScript
-    val sigFs = inputs.map { input =>
+    val signDescriptors = inputs.map { input =>
       val idx = txOutpoints.indexOf(input.outPoint)
+      val (signMethod, hashType) = getSignMethod(input.output)
 
-      val signDescriptor =
-        SignDescriptor(output = Some(input.output),
-                       sighash = UInt32(HashType.sigHashDefault.num),
-                       signMethod = getSignMethod(input.output),
-                       inputIndex = idx)
-
-      val signReq =
-        SignReq(unsigned.transaction.bytes, Vector(signDescriptor), prevOuts)
-
-      lndRpcClient
-        .computeInputScript(signReq)
-        .map(_.head)
-        .map { case (scriptSig, witness) => (scriptSig, witness, idx) }
+      SignDescriptor(output = Some(input.output),
+                     sighash = UInt32(hashType.num),
+                     signMethod = signMethod,
+                     inputIndex = idx)
     }
 
-    Future.sequence(sigFs).map { sigs =>
-      sigs.foldLeft(unsigned) { case (psbt, (scriptSig, witness, idx)) =>
-        psbt.addFinalizedScriptWitnessToInput(scriptSig, witness, idx)
+    val signReq = SignReq(unsigned.transaction.bytes, signDescriptors, prevOuts)
+
+    lndRpcClient.computeInputScript(signReq).map { sigs =>
+      val indexes = signDescriptors.map(_.inputIndex)
+      sigs.zip(indexes).foldLeft(unsigned) {
+        case (psbt, ((scriptSig, witness), idx)) =>
+          psbt.addFinalizedScriptWitnessToInput(scriptSig, witness, idx)
       }
     }
   }
@@ -229,7 +228,7 @@ object LndVortexWallet {
     }
   }
 
-  def getSignMethod(output: TransactionOutput): SignMethod = {
+  def getSignMethod(output: TransactionOutput): (SignMethod, HashType) = {
     output.scriptPubKey.scriptType match {
       case ScriptType.PUBKEY | ScriptType.PUBKEYHASH | ScriptType.NONSTANDARD |
           ScriptType.MULTISIG | ScriptType.CLTV | ScriptType.CSV |
@@ -237,15 +236,16 @@ object LndVortexWallet {
           ScriptType.NOT_IF_CONDITIONAL | ScriptType.MULTISIG_WITH_TIMEOUT |
           ScriptType.PUBKEY_WITH_TIMEOUT | ScriptType.NULLDATA |
           ScriptType.WITNESS_UNKNOWN | ScriptType.WITNESS_COMMITMENT =>
-        SignMethod.SIGN_METHOD_WITNESS_V0
+        (SignMethod.SIGN_METHOD_WITNESS_V0, HashType.sigHashAll)
       case ScriptType.SCRIPTHASH =>
-        SignMethod.SIGN_METHOD_WITNESS_V0
+        (SignMethod.SIGN_METHOD_WITNESS_V0, HashType.sigHashAll)
       case ScriptType.WITNESS_V0_KEYHASH =>
-        SignMethod.SIGN_METHOD_WITNESS_V0
+        (SignMethod.SIGN_METHOD_WITNESS_V0, HashType.sigHashAll)
       case ScriptType.WITNESS_V0_SCRIPTHASH =>
-        SignMethod.SIGN_METHOD_WITNESS_V0
+        (SignMethod.SIGN_METHOD_WITNESS_V0, HashType.sigHashAll)
       case ScriptType.WITNESS_V1_TAPROOT =>
-        SignMethod.SIGN_METHOD_TAPROOT_KEY_SPEND_BIP0086
+        (SignMethod.SIGN_METHOD_TAPROOT_KEY_SPEND_BIP0086,
+         HashType.sigHashDefault)
     }
   }
 }
