@@ -7,6 +7,7 @@ import akka.util.ByteString
 import com.lnvortex.core.{VortexMessage, VortexMessageParser}
 import com.lnvortex.server.coordinator.VortexCoordinator
 import grizzled.slf4j.Logging
+import org.bitcoins.crypto.{CryptoUtil, ECPrivateKey}
 import scodec.bits.ByteVector
 
 class ServerConnectionHandler(
@@ -16,7 +17,11 @@ class ServerConnectionHandler(
     extends Actor
     with ActorLogging {
 
-  private val handler = dataHandlerFactory(coordinator, context, self)
+  import context.dispatcher
+
+  private val id = CryptoUtil.sha256(ECPrivateKey.freshPrivateKey.bytes)
+
+  private val handler = dataHandlerFactory(coordinator, id, context, self)
 
   override def preStart(): Unit = {
     context.watch(connection)
@@ -85,9 +90,19 @@ class ServerConnectionHandler(
     case ServerConnectionHandler.CloseConnection =>
       connection ! Tcp.Close
     case _: Tcp.ConnectionClosed =>
-      context.stop(self)
+      coordinator
+        .cancelRegistration(Right(id), coordinator.getCurrentRoundId)
+        .map { _ =>
+          context.stop(self)
+        }
+      ()
     case Terminated(actor) if actor == connection =>
-      context.stop(self)
+      coordinator
+        .cancelRegistration(Right(id), coordinator.getCurrentRoundId)
+        .map { _ =>
+          context.stop(self)
+        }
+      ()
   }
 }
 
