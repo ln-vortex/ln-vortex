@@ -91,7 +91,10 @@ case class LnVortexRoutes(client: VortexClient[VortexWalletApi])(implicit
               }
             }
 
-            f.map(_ => RpcServer.httpSuccess(id, JsNull))
+            f.recoverWith { case ex: Throwable =>
+              client.cancelRegistration().recover(_ => ())
+              Future.failed(ex)
+            }.map(_ => RpcServer.httpSuccess(id, JsNull))
           }
       }
   }
