@@ -39,7 +39,8 @@ object VortexPicklers {
     (c: NodeId) => JsString(c.hex)
 
   implicit val InetWrites: Writes[InetSocketAddress] =
-    (c: InetSocketAddress) => JsString(c.toString)
+    (c: InetSocketAddress) =>
+      JsString(c.toString.replaceAll("/<unresolved>", ""))
 
   implicit val currentUnitWrites: Writes[CurrencyUnit] =
     (c: CurrencyUnit) => JsNumber(c.satoshis.toLong)
