@@ -13,13 +13,11 @@ import scala.concurrent._
 
 class ServerDataHandler(
     coordinator: VortexCoordinator,
+    id: Sha256Digest,
     connectionHandler: ActorRef)
     extends Actor
     with Logging {
   implicit val ec: ExecutionContextExecutor = context.system.dispatcher
-
-  private val id: Sha256Digest =
-    CryptoUtil.sha256(ECPrivateKey.freshPrivateKey.bytes)
 
   override def preStart(): Unit = {
     val _ = context.watch(connectionHandler)
@@ -76,24 +74,27 @@ class ServerDataHandler(
           connectionHandler ! SignedTxMessage(signedTx)
         }
       case cancel: CancelRegistrationMessage =>
-        coordinator.cancelRegistration(cancel.nonce, cancel.roundId)
+        coordinator.cancelRegistration(Left(cancel.nonce), cancel.roundId)
     }
   }
 }
 
 object ServerDataHandler {
 
-  type Factory = (VortexCoordinator, ActorContext, ActorRef) => ActorRef
+  type Factory =
+    (VortexCoordinator, Sha256Digest, ActorContext, ActorRef) => ActorRef
 
   def defaultFactory(
       vortexClient: VortexCoordinator,
+      id: Sha256Digest,
       context: ActorContext,
       connectionHandler: ActorRef): ActorRef = {
-    context.actorOf(props(vortexClient, connectionHandler))
+    context.actorOf(props(vortexClient, id, connectionHandler))
   }
 
   def props(
       vortexClient: VortexCoordinator,
+      id: Sha256Digest,
       connectionHandler: ActorRef): Props =
-    Props(new ServerDataHandler(vortexClient, connectionHandler))
+    Props(new ServerDataHandler(vortexClient, id, connectionHandler))
 }

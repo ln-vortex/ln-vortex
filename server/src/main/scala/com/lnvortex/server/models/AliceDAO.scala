@@ -34,6 +34,19 @@ case class AliceDAO()(implicit
       ts: Vector[AliceDb]): Query[AliceTable, AliceDb, Seq] =
     findByPrimaryKeys(ts.map(_.peerId))
 
+  def findByEitherAction(
+      either: Either[SchnorrNonce, Sha256Digest]): DBIOAction[
+    Option[AliceDb],
+    NoStream,
+    Effect.Read] = {
+    either match {
+      case Left(nonce) =>
+        table.filter(_.nonce === nonce).result.headOption
+      case Right(peerId) =>
+        table.filter(_.peerId === peerId).result.headOption
+    }
+  }
+
   def findByNonceAction(nonce: SchnorrNonce): DBIOAction[
     Option[AliceDb],
     NoStream,

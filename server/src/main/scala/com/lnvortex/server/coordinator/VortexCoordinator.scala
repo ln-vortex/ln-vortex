@@ -366,17 +366,16 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
   }
 
   def cancelRegistration(
-      nonce: SchnorrNonce,
+      either: Either[SchnorrNonce, Sha256Digest],
       roundId: DoubleSha256Digest): Future[Unit] = {
     require(roundId == currentRoundId,
             "Attempted to cancel a previous registration")
     val action = for {
-      aliceDbOpt <- aliceDAO.findByNonceAction(nonce)
+      aliceDbOpt <- aliceDAO.findByEitherAction(either)
       aliceDb = aliceDbOpt match {
         case Some(db) => db
         case None =>
-          throw new IllegalArgumentException(
-            s"No alice found with nonce $nonce")
+          throw new IllegalArgumentException(s"No alice found with $either")
       }
       _ = logger.info(s"Alice ${aliceDb.peerId} canceling registration")
 
