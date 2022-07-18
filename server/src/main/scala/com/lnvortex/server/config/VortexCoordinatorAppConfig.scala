@@ -8,6 +8,7 @@ import org.bitcoins.commons.config._
 import org.bitcoins.core.currency.Satoshis
 import org.bitcoins.core.hd.HDPurposes
 import org.bitcoins.core.script.ScriptType
+import org.bitcoins.core.util.FutureUtil
 import org.bitcoins.core.wallet.keymanagement.KeyManagerParams
 import org.bitcoins.crypto._
 import org.bitcoins.db._
@@ -49,7 +50,7 @@ case class VortexCoordinatorAppConfig(
 
   override val baseDatadir: Path = directory
 
-  override def start(): Future[Unit] = {
+  override def start(): Future[Unit] = FutureUtil.makeAsync { () =>
     logger.info(s"Initializing coordinator")
 
     if (Files.notExists(baseDatadir)) {
@@ -60,8 +61,6 @@ case class VortexCoordinatorAppConfig(
     logger.debug(s"Applied $numMigrations")
 
     initialize()
-
-    Future.unit
   }
 
   override def stop(): Future[Unit] = Future.unit

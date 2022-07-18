@@ -22,8 +22,10 @@ trait VortexCoordinatorFixture
       () => {
         implicit val conf: VortexCoordinatorAppConfig = getTestConfigs()._2
         for {
-          _ <- conf.start()
           bitcoind <- cachedBitcoindWithFundsF
+          addr <- bitcoind.getNewAddress
+          _ <- bitcoind.generateToAddress(6, addr)
+          _ <- conf.start()
           coordinator = VortexCoordinator(bitcoind)
           _ <- coordinator.start()
         } yield coordinator

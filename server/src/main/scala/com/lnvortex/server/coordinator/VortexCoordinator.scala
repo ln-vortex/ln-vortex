@@ -274,14 +274,24 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       updated = roundDb.copy(status = RegisterOutputs)
       _ <- roundDAO.updateAction(updated)
 
-      peerSigMap <- aliceDAO.getPeerIdSigMapAction(currentRoundId)
+      alices <- aliceDAO.findRegisteredForRoundAction(currentRoundId)
     } yield {
+      val numRemixes = alices.count(_.isRemix)
+      val numNewEntrants = alices.count(!_.isRemix)
+
+      if (numRemixes < config.minRemixPeers) {
+        throw new RuntimeException("Not enough remixes")
+      } else if (numNewEntrants < config.minNewPeers) {
+        throw new RuntimeException("Not enough new entrants")
+      }
+
       system.scheduler.scheduleOnce(config.outputRegistrationTime) {
         outputsRegisteredP.success(())
         ()
       }
 
-      logger.info(s"Sending blinded sigs to ${peerSigMap.size} peers")
+      logger.info(s"Sending blinded sigs to ${alices.size} peers")
+      val peerSigMap = alices.map(t => (t.peerId, t.blindOutputSigOpt.get))
       peerSigMap.foreach { case (peerId, sig) =>
         val sendT = Try(connectionHandlerMap(peerId) ! BlindedSig(sig))
         sendT match {
