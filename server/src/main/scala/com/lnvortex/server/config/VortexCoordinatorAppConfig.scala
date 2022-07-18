@@ -56,7 +56,7 @@ case class VortexCoordinatorAppConfig(
       Files.createDirectories(baseDatadir)
     }
 
-    val numMigrations = migrate()
+    val numMigrations = migrate().migrationsExecuted
     logger.debug(s"Applied $numMigrations")
 
     initialize()
@@ -104,9 +104,19 @@ case class VortexCoordinatorAppConfig(
     ScriptType.fromString(str)
   }
 
+  lazy val minRemixPeers: Int = {
+    config.getInt(s"$moduleName.minRemixPeers")
+  }
+
+  lazy val minNewPeers: Int = {
+    config.getInt(s"$moduleName.minNewPeers")
+  }
+
   lazy val maxPeers: Int = {
     config.getInt(s"$moduleName.maxPeers")
   }
+
+  lazy val minPeers: Int = minRemixPeers + minNewPeers
 
   lazy val mixAmount: Satoshis = {
     val long = config.getLong(s"$moduleName.mixAmount")

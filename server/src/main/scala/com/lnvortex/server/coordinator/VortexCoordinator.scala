@@ -170,10 +170,15 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
         })
 
       // handling sending blinded sig to alices
-      inputsRegisteredP.future.flatMap(_ => beginOutputRegistration())
+      inputsRegisteredP.future
+        .flatMap(_ => beginOutputRegistration())
+        .recoverWith(_ => reconcileRound())
 
       // handle sending psbt when all outputs registered
-      outputsRegisteredP.future.flatMap(_ => sendUnsignedPSBT())
+      outputsRegisteredP.future
+        .flatMap(_ => sendUnsignedPSBT())
+        .map(_ => ())
+        .recoverWith(_ => reconcileRound())
 
       completedTxP.future
         .flatMap(onCompletedTransaction)
@@ -237,7 +242,16 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
     } yield {
       beginOutputRegistrationCancellable = Some(
         system.scheduler.scheduleOnce(config.inputRegistrationTime) {
-          inputsRegisteredP.success(())
+          aliceDAO.numRegisteredForRound(roundDb.roundId).map { numRegistered =>
+            if (numRegistered >= config.minPeers) {
+              inputsRegisteredP.success(())
+            } else {
+              logger.error(
+                s"Not enough peers registered for round ${roundDb.roundId.hex}")
+              inputsRegisteredP.failure(new RuntimeException(
+                s"Not enough peers registered for round ${roundDb.roundId.hex}"))
+            }
+          }
           ()
         }
       )
@@ -614,6 +628,13 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
 
           val numRemixes = aliceDbs.count(_.isRemix)
           val numNewEntrants = aliceDbs.count(!_.isRemix)
+
+          if (numRemixes < config.minRemixPeers) {
+            throw new RuntimeException("Not enough remixes")
+          } else if (numNewEntrants < config.minNewPeers) {
+            throw new RuntimeException("Not enough new entrants")
+          }
+
           val changeOutputResults = aliceDbs.map { db =>
             calculateChangeOutput(
               roundDb = roundDb,
