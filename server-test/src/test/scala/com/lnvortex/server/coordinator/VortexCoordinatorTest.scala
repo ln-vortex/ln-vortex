@@ -19,24 +19,13 @@ import org.bitcoins.rpc.BitcoindException.InvalidAddressOrKey
 import org.bitcoins.testkit.EmbeddedPg
 import org.bitcoins.testkitcore.Implicits.GeneratorOps
 
-import scala.concurrent.duration.DurationInt
-import scala.concurrent.{Await, Future}
+import scala.concurrent.Future
 
 class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
   behavior of "VortexCoordinator"
 
   val badPeerId: Sha256Digest = Sha256Digest(
     "ded8ab0e14ee02492b1008f72a0a3a5abac201c731b7e71a92d36dc2db160d53")
-
-  before {
-    val f = for {
-      bitcoind <- cachedBitcoindWithFundsF
-      addr <- bitcoind.getNewAddress
-      _ <- bitcoind.generateToAddress(6, addr)
-    } yield ()
-
-    Await.result(f, 30.seconds)
-  }
 
   it must "has the proper variable set after creating a new round" in {
     coordinator =>
@@ -606,7 +595,44 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
   }
 
   it must "fail to register an output with an invalid sig" in { coordinator =>
+    val bitcoind = coordinator.bitcoind
     for {
+      aliceDb <- coordinator.getNonce(Sha256Digest.empty,
+                                      TestActorRef("test"),
+                                      AskNonce(coordinator.getCurrentRoundId))
+      _ <- coordinator.beginInputRegistration()
+
+      utxo <- bitcoind.listUnspent.map(_.head)
+      outputRef = {
+        val outpoint = TransactionOutPoint(utxo.txid, UInt32(utxo.vout))
+        val output = TransactionOutput(utxo.amount, utxo.scriptPubKey.get)
+        OutputReference(outpoint, output)
+      }
+      tx = InputReference.constructInputProofTx(outputRef, aliceDb.nonce)
+      signed <- bitcoind.walletProcessPSBT(PSBT.fromUnsignedTx(tx))
+      proof =
+        signed.psbt.inputMaps.head.finalizedScriptWitnessOpt.get.scriptWitness
+
+      inputRef = InputReference(outputRef, proof)
+      addr <- bitcoind.getNewAddress
+
+      tweaks = freshBlindingTweaks(signerPubKey = coordinator.publicKey,
+                                   signerNonce = aliceDb.nonce)
+
+      p2wsh = P2WSHWitnessSPKV0(EmptyScriptPubKey)
+      mixOutput = TransactionOutput(coordinator.config.mixAmount, p2wsh)
+      challenge = RegisterMixOutput.calculateChallenge(
+        mixOutput,
+        coordinator.getCurrentRoundId)
+      blind = BlindSchnorrUtil.generateChallenge(coordinator.publicKey,
+                                                 aliceDb.nonce,
+                                                 tweaks,
+                                                 challenge)
+
+      registerInputs = RegisterInputs(Vector(inputRef),
+                                      blind,
+                                      Some(addr.scriptPubKey))
+      _ <- coordinator.registerAlice(Sha256Digest.empty, registerInputs)
       _ <- coordinator.beginOutputRegistration()
       p2wsh = P2WSHWitnessSPKV0(EmptyScriptPubKey)
       mixOutput = TransactionOutput(coordinator.config.mixAmount, p2wsh)
@@ -883,12 +909,12 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
         .map(_ => CryptoUtil.sha256(ECPrivateKey.freshPrivateKey.bytes))
         .toVector
 
+    val aliceDbFs = peerIds.map(peerId =>
+      coordinator.getNonce(peerId,
+                           TestActorRef(peerId.hex),
+                           AskNonce(coordinator.getCurrentRoundId)))
+
     for {
-      _ <- coordinator.beginOutputRegistration()
-      aliceDbFs = peerIds.map(peerId =>
-        coordinator.getNonce(peerId,
-                             TestActorRef(peerId.hex),
-                             AskNonce(coordinator.getCurrentRoundId)))
       aliceDbs <- Future.sequence(aliceDbFs)
       updatedAliceDbs = aliceDbs.map { db =>
         val spk = P2WPKHWitnessSPKV0(ECPublicKey.freshPublicKey)
@@ -901,6 +927,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
         )
       }
       _ <- coordinator.aliceDAO.updateAll(updatedAliceDbs)
+      _ <- coordinator.beginOutputRegistration()
 
       inputDbs = peerIds.map { id =>
         val outPoint = TransactionOutPoint(
@@ -963,7 +990,6 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
     val bitcoind = coordinator.bitcoind
 
     for {
-      _ <- coordinator.beginOutputRegistration()
       aliceDb <- coordinator.getNonce(peerId,
                                       TestActorRef(peerId.hex),
                                       AskNonce(coordinator.getCurrentRoundId))
@@ -994,6 +1020,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
                           peerId = peerId)
       }
       _ <- coordinator.inputsDAO.create(inputDb)
+      _ <- coordinator.beginOutputRegistration()
 
       outputDb = {
         val raw = P2PKHScriptPubKey(ECPublicKey.freshPublicKey)
@@ -1020,7 +1047,6 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
     val bitcoind = coordinator.bitcoind
 
     for {
-      _ <- coordinator.beginOutputRegistration()
       aliceDb <- coordinator.getNonce(peerId,
                                       TestActorRef(peerId.hex),
                                       AskNonce(coordinator.getCurrentRoundId))
@@ -1038,6 +1064,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
         )
       }
       _ <- coordinator.aliceDAO.update(updatedAliceDbs)
+      _ <- coordinator.beginOutputRegistration()
 
       inputDb = {
         val spk = unspent.scriptPubKey.get
@@ -1084,7 +1111,6 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
     val bitcoind = coordinator.bitcoind
 
     for {
-      _ <- coordinator.beginOutputRegistration()
       aliceDb <- coordinator.getNonce(peerId,
                                       TestActorRef(peerId.hex),
                                       AskNonce(coordinator.getCurrentRoundId))
@@ -1101,6 +1127,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
                                 ECPrivateKey.freshPrivateKey.fieldElement)
       }
       _ <- coordinator.aliceDAO.update(updatedAliceDbs)
+      _ <- coordinator.beginOutputRegistration()
 
       inputDb = {
         val spk = unspent.scriptPubKey.get
@@ -1141,7 +1168,6 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
     val bitcoind = coordinator.bitcoind
 
     for {
-      _ <- coordinator.beginOutputRegistration()
       aliceDb <- coordinator.getNonce(peerId,
                                       TestActorRef(peerId.hex),
                                       AskNonce(coordinator.getCurrentRoundId))
@@ -1157,6 +1183,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
                                 ECPrivateKey.freshPrivateKey.fieldElement)
       }
       _ <- coordinator.aliceDAO.update(updatedAliceDbs)
+      _ <- coordinator.beginOutputRegistration()
 
       inputDb = {
         val spk = unspent.scriptPubKey.get
