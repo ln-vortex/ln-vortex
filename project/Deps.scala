@@ -27,7 +27,7 @@ object Deps {
     val scalaFxV = "16.0.0-R25"
     val javaFxV = "17-ea+8"
 
-    val bitcoinsV = "1.9.2-69-f8f4facd-SNAPSHOT"
+    val bitcoinsV = "1.9.2-88-d4210fad-SNAPSHOT"
 
     val scoptV = "4.0.1"
 
