@@ -172,17 +172,17 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       // handling sending blinded sig to alices
       inputsRegisteredP.future
         .flatMap(_ => beginOutputRegistration())
-        .recoverWith(_ => reconcileRound())
+        .recoverWith(_ => reconcileRound(true))
 
       // handle sending psbt when all outputs registered
       outputsRegisteredP.future
         .flatMap(_ => sendUnsignedPSBT())
         .map(_ => ())
-        .recoverWith(_ => reconcileRound())
+        .recoverWith(_ => reconcileRound(true))
 
       completedTxP.future
         .flatMap(onCompletedTransaction)
-        .recoverWith(_ => reconcileRound())
+        .recoverWith(_ => reconcileRound(false))
 
       // return round
       created
@@ -809,7 +809,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
     }
   }
 
-  def reconcileRound(): Future[Unit] = {
+  def reconcileRound(isNewRound: Boolean): Future[Unit] = {
     val action = for {
       // cancel round
       round <- currentRoundAction()
@@ -843,17 +843,20 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       // restart round with good alices
       newRound <- newRound(disconnect = false)
 
-      // change state so they can begin registering inputs
-      _ <- beginInputRegistration()
-
-      // send messages
-      _ <- FutureUtil.sequentially(signedPeerIds) { id =>
-        val connectionHandler = oldMap(id)
-        getNonce(id, oldMap(id), AskNonce(newRound.roundId)).map { db =>
-          val nonceMsg = NonceMessage(db.nonce)
-          connectionHandler ! RestartRoundMessage(mixDetails, nonceMsg)
+      _ <-
+        if (isNewRound) Future.unit
+        else {
+          // change state so they can begin registering inputs
+          beginInputRegistration().flatMap { _ =>
+            FutureUtil.sequentially(signedPeerIds) { id =>
+              val connectionHandler = oldMap(id)
+              getNonce(id, oldMap(id), AskNonce(newRound.roundId)).map { db =>
+                val nonceMsg = NonceMessage(db.nonce)
+                connectionHandler ! RestartRoundMessage(mixDetails, nonceMsg)
+              }
+            }
+          }
         }
-      }
     } yield ()
   }
 
