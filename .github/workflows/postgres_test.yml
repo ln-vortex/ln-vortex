@@ -24,5 +24,5 @@ jobs:
             ~/.ivy2/cache
             ~/.sbt
           key: ${{ runner.os }}-cache
-      - name: Run postgres server tests
-        run: sbt downloadBitcoind downloadLnd serverTest/test clientServerTest/test
+      - name: Run postgres tests
+        run: sbt downloadBitcoind downloadLnd serverTest/test clientTest/test clientServerTest/test
