@@ -379,13 +379,13 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
 
           aliceDb = AliceDbs.newAlice(peerId, currentRoundId, path, nonce)
 
-          _ = connectionHandlerMap.put(peerId, connectionHandler)
-
           db <- aliceDAO.createAction(aliceDb)
         } yield db
     }
 
     safeDatabase.run(aliceDbA).flatMap { db =>
+      connectionHandlerMap.put(peerId, connectionHandler)
+
       if (connectionHandlerMap.values.size >= config.maxPeers) {
         beginInputRegistration().map(_ => db)
       } else Future.successful(db)
