@@ -63,8 +63,6 @@ case class VortexCoordinatorAppConfig(
     initialize()
   }
 
-  override def stop(): Future[Unit] = Future.unit
-
   lazy val torConf: TorAppConfig =
     TorAppConfig(directory, None, configOverrides)
 

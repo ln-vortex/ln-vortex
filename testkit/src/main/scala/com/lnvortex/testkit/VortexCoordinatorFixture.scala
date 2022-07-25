@@ -31,7 +31,10 @@ trait VortexCoordinatorFixture
         } yield coordinator
       },
       { coordinator =>
+        val config = coordinator.config
+
         for {
+          _ <- config.dropAll().map(_ => config.clean())
           _ <- coordinator.stop()
           _ <- coordinator.config.stop()
         } yield {

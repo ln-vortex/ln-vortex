@@ -85,6 +85,7 @@ trait ClientServerPairFixture
           _ <- client.stop()
           _ <- client.config.stop()
 
+          _ <- coordinator.config.dropAll().map(_ => coordinator.config.clean())
           _ <- coordinator.stop()
           _ <- coordinator.config.stop()
         } yield {

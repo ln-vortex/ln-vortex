@@ -363,7 +363,6 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
     f
   }
 
-  // todo make this use DBIO actions
   def getNonce(
       peerId: Sha256Digest,
       connectionHandler: ActorRef,
@@ -371,21 +370,25 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
     logger.info(s"Alice ${peerId.hex} asked for a nonce")
     require(askNonce.roundId == currentRoundId,
             "Alice asked for nonce of a different roundId")
-    aliceDAO.read(peerId).flatMap {
-      case Some(alice) =>
-        Future.successful(alice)
+
+    val aliceDbA = aliceDAO.findByPrimaryKeyAction(peerId).flatMap {
+      case Some(alice) => DBIO.successful(alice)
       case None =>
-        val (nonce, path) = km.nextNonce()
+        for {
+          (nonce, path) <- km.nextNonce()
 
-        val aliceDb = AliceDbs.newAlice(peerId, currentRoundId, path, nonce)
+          aliceDb = AliceDbs.newAlice(peerId, currentRoundId, path, nonce)
 
-        connectionHandlerMap.put(peerId, connectionHandler)
+          _ = connectionHandlerMap.put(peerId, connectionHandler)
 
-        aliceDAO.create(aliceDb).flatMap { db =>
-          if (connectionHandlerMap.values.size >= config.maxPeers) {
-            beginInputRegistration().map(_ => db)
-          } else Future.successful(db)
-        }
+          db <- aliceDAO.createAction(aliceDb)
+        } yield db
+    }
+
+    safeDatabase.run(aliceDbA).flatMap { db =>
+      if (connectionHandlerMap.values.size >= config.maxPeers) {
+        beginInputRegistration().map(_ => db)
+      } else Future.successful(db)
     }
   }
 

@@ -13,7 +13,6 @@ import org.bitcoins.keymanager._
 
 import java.util.concurrent.atomic.AtomicInteger
 import scala.concurrent._
-import scala.concurrent.duration.DurationInt
 
 class CoordinatorKeyManager()(implicit
     ec: ExecutionContext,
@@ -21,6 +20,8 @@ class CoordinatorKeyManager()(implicit
     extends Logging {
 
   private[server] val aliceDAO = AliceDAO()
+
+  import aliceDAO.profile.api._
 
   /** The root private key for this coordinator */
   private[this] lazy val extPrivateKey: ExtPrivateKeyHardened =
@@ -34,33 +35,39 @@ class CoordinatorKeyManager()(implicit
   private val pubKeyPath = BIP32Path.fromHardenedString(
     s"m/${CoordinatorKeyManager.PURPOSE.constant}'/${coinType.toInt}'/0'")
 
-  private lazy val nonceCounter: AtomicInteger = {
-    val f = aliceDAO.nextNonceIndex()
-    f.failed.foreach { e: Throwable =>
-      e.printStackTrace()
+  private lazy val nonceCounter: DBIOAction[
+    AtomicInteger,
+    NoStream,
+    Effect.Read] = {
+    aliceDAO.nextNonceIndexAction().map { index =>
+      new AtomicInteger(index)
     }
-    val startingIndex = Await.result(f, 10.seconds)
-    new AtomicInteger(startingIndex)
   }
 
-  private def nextNoncePath(): BIP32Path = {
-    val purpose = HDPurposes.Legacy
-    val coin = HDCoin(purpose, coinType)
-    val account = HDAccount(coin, 0)
-    val hdChain = HDChain(HDChainType.External, account)
-    val path = HDAddress(hdChain, nonceCounter.getAndIncrement()).toPath
-    // make hardened for security
-    // this is very important, otherwise can leak key data
-    val hardened = path.map(_.copy(hardened = true))
+  private def nextNoncePath(): DBIOAction[BIP32Path, NoStream, Effect.Read] = {
+    nonceCounter.map { counter =>
+      val purpose = HDPurposes.Legacy
+      val coin = HDCoin(purpose, coinType)
+      val account = HDAccount(coin, 0)
+      val hdChain = HDChain(HDChainType.External, account)
+      val path = HDAddress(hdChain, counter.getAndIncrement()).toPath
+      // make hardened for security
+      // this is very important, otherwise can leak key data
+      val hardened = path.map(_.copy(hardened = true))
 
-    BIP32Path(hardened.toVector)
+      BIP32Path(hardened.toVector)
+    }
   }
 
-  final private[server] def nextNonce(): (SchnorrNonce, BIP32Path) = {
-    val path = nextNoncePath()
-    val nonce = extPrivateKey.deriveChildPrivKey(path).key.schnorrNonce
+  final private[server] def nextNonce(): DBIOAction[
+    (SchnorrNonce, BIP32Path),
+    NoStream,
+    Effect.Read] = {
+    nextNoncePath().map { path =>
+      val nonce = extPrivateKey.deriveChildPrivKey(path).key.schnorrNonce
 
-    (nonce, path)
+      (nonce, path)
+    }
   }
 
   private[this] lazy val privKey: ECPrivateKey =
