@@ -5,7 +5,10 @@ import com.lnvortex.client.config.VortexAppConfig
 import com.lnvortex.server.config.VortexCoordinatorAppConfig
 import com.typesafe.config.{Config, ConfigFactory}
 import org.bitcoins.rpc.util.RpcUtil
-import org.bitcoins.testkit.BitcoinSTestAppConfig.configWithEmbeddedDb
+import org.bitcoins.testkit.BitcoinSTestAppConfig.{
+  configWithEmbeddedDb,
+  ProjectType
+}
 import org.bitcoins.testkit.EmbeddedPg
 import org.bitcoins.testkit.util.FileUtil
 
@@ -49,10 +52,21 @@ trait LnVortexTestUtils { self: EmbeddedPg =>
       """.stripMargin
     }
 
-    val pg = configWithEmbeddedDb(None, () => pgUrl())
-    val clientConf = VortexAppConfig(dir, Vector(pg, overrideConf) ++ config)
+    val clientPg =
+      configWithEmbeddedDb(
+        Some(ProjectType.Unknown(VortexAppConfig.moduleName)),
+        () => pgUrl())
+
+    val serverPg = configWithEmbeddedDb(
+      Some(ProjectType.Unknown(VortexCoordinatorAppConfig.moduleName)),
+      () => pgUrl())
+
+    val clientConf =
+      VortexAppConfig(dir, Vector(clientPg, serverPg, overrideConf) ++ config)
     val serverConf =
-      VortexCoordinatorAppConfig(dir, Vector(pg, overrideConf) ++ config)
+      VortexCoordinatorAppConfig(
+        dir,
+        Vector(clientPg, serverPg, overrideConf) ++ config)
 
     (clientConf, serverConf)
   }

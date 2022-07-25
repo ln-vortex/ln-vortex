@@ -92,6 +92,7 @@ trait DualClientFixture
           _ <- clientB.stop()
           _ <- clientB.config.stop()
 
+          _ <- coordinator.config.dropAll().map(_ => coordinator.config.clean())
           _ <- coordinator.stop()
           _ <- coordinator.config.stop()
         } yield {

@@ -113,13 +113,15 @@ case class AliceDAO()(implicit
       .map(_.toVector)
   }
 
-  def nextNonceIndex(): Future[Int] = {
-    val query = table.map(_.nonceIndex).max
-
-    safeDatabase.run(query.result).map {
+  def nextNonceIndexAction(): DBIOAction[Int, NoStream, Effect.Read] = {
+    table.map(_.nonceIndex).max.result.map {
       case None        => 0
       case Some(value) => value + 1
     }
+  }
+
+  def nextNonceIndex(): Future[Int] = {
+    safeDatabase.run(nextNonceIndexAction())
   }
 
   class AliceTable(tag: Tag) extends Table[AliceDb](tag, schemaName, "alices") {
