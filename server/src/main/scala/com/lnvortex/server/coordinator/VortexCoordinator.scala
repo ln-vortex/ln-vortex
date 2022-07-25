@@ -421,61 +421,64 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
     logger.info(s"Alice ${peerId.hex} is registering inputs")
     logger.debug(s"Alice's ${peerId.hex} inputs $registerInputs")
 
-    val roundDbF = currentRound().map { roundDb =>
+    val roundDbA = currentRoundAction().map { roundDb =>
       if (roundDb.status != RegisterAlices)
         throw new IllegalStateException(
           s"Round in incorrect state ${roundDb.status}")
       roundDb
     }
 
-    val aliceDbF = aliceDAO.read(peerId)
-
-    val otherInputDbsF =
-      roundDbF.flatMap(db => inputsDAO.findByRoundId(db.roundId))
-
-    val isRemixF = if (registerInputs.inputs.size == 1) {
+    val isRemixA = if (registerInputs.inputs.size == 1) {
       val inputRef = registerInputs.inputs.head
-      roundDAO.hasTxId(inputRef.outPoint.txIdBE).map { isPrevRound =>
+      roundDAO.hasTxIdAction(inputRef.outPoint.txIdBE).map { isPrevRound =>
         // make sure it wasn't a change output
         val isMixUtxo = inputRef.output.value == config.mixAmount
         val noChange = registerInputs.changeSpkOpt.isEmpty
         isPrevRound && isMixUtxo && noChange
       }
-    } else Future.successful(false)
+    } else DBIO.successful(false)
+
+    val action = for {
+      roundDb <- roundDbA
+      aliceDb <- aliceDAO.findByPrimaryKeyAction(peerId)
+      otherInputDbs <- inputsDAO.findByRoundIdAction(roundDb.roundId)
+      isRemix <- isRemixA
+    } yield (roundDb, aliceDb, otherInputDbs, isRemix)
+
+    val dbF = safeDatabase.run(action)
 
     val init: Option[InvalidInputsException] = None
     val validInputsF = FutureUtil.foldLeftAsync(init, registerInputs.inputs) {
       case (accum, inputRef) =>
         if (accum.isEmpty) {
           for {
-            isRemix <- isRemixF
+            (_, aliceDb, otherInputDbs, isRemix) <- dbF
             errorOpt <- validateAliceInput(inputRef,
                                            isRemix,
-                                           aliceDbF,
-                                           otherInputDbsF)
+                                           aliceDb,
+                                           otherInputDbs)
           } yield errorOpt
         } else Future.successful(accum)
     }
 
     val f = for {
-      isRemix <- isRemixF
+      (roundDb, aliceDbOpt, otherInputDbs, isRemix) <- dbF
       validInputs <- validInputsF
-      otherInputDbs <- otherInputDbsF
-      roundDb <- roundDbF
-    } yield (isRemix, validInputs, otherInputDbs, roundDb)
+    } yield (isRemix, aliceDbOpt, validInputs, otherInputDbs, roundDb)
 
-    f.flatMap { case (isRemix, inputsErrorOpt, otherInputDbs, roundDb) =>
-      lazy val changeErrorOpt =
-        validateAliceChange(isRemix, roundDb, registerInputs, otherInputDbs)
+    f.flatMap {
+      case (isRemix, aliceDbOpt, inputsErrorOpt, otherInputDbs, roundDb) =>
+        lazy val changeErrorOpt =
+          validateAliceChange(isRemix, roundDb, registerInputs, otherInputDbs)
 
-      // condense to one error option
-      val errorOpt: Option[VortexServerException] =
-        inputsErrorOpt.orElse(changeErrorOpt)
+        // condense to one error option
+        val errorOpt: Option[VortexServerException] =
+          inputsErrorOpt.orElse(changeErrorOpt)
 
-      errorOpt match {
-        case None =>
-          // .get is safe, validInputs will be false
-          aliceDbF.map(_.get).flatMap { aliceDb =>
+        errorOpt match {
+          case None =>
+            // .get is safe, validInputs will be false
+            val aliceDb = aliceDbOpt.get
             val sig =
               km.createBlindSig(registerInputs.blindedOutput, aliceDb.noncePath)
 
@@ -483,12 +486,13 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
               RegisteredInputDbs.fromInputReference(_, currentRoundId, peerId))
 
             val updated =
-              aliceDb.setOutputValues(
-                isRemix = isRemix,
-                numInputs = inputDbs.size,
-                blindedOutput = registerInputs.blindedOutput,
-                changeSpkOpt = registerInputs.changeSpkOpt,
-                blindOutputSig = sig)
+              aliceDb.setOutputValues(isRemix = isRemix,
+                                      numInputs = inputDbs.size,
+                                      blindedOutput =
+                                        registerInputs.blindedOutput,
+                                      changeSpkOpt =
+                                        registerInputs.changeSpkOpt,
+                                      blindOutputSig = sig)
 
             val action = for {
               _ <- aliceDAO.updateAction(updated)
@@ -503,10 +507,9 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
               }
             } yield sig
             safeDatabase.run(action)
-          }
-        case Some(banError) =>
-          banInputs(registerInputs, banError, roundDb.roundId)
-      }
+          case Some(banError) =>
+            banInputs(registerInputs, banError, roundDb.roundId)
+        }
     }
   }
 

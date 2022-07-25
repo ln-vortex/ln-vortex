@@ -20,8 +20,8 @@ trait PeerValidation extends Logging { self: VortexCoordinator =>
   def validateAliceInput(
       inputRef: InputReference,
       isRemix: Boolean,
-      aliceDbF: Future[Option[AliceDb]],
-      otherInputsF: Future[Vector[RegisteredInputDb]]): Future[
+      aliceDb: Option[AliceDb],
+      otherInputs: Vector[RegisteredInputDb]): Future[
     Option[InvalidInputsException]] = {
     val outPoint = inputRef.outPoint
     val output = inputRef.output
@@ -48,7 +48,6 @@ trait PeerValidation extends Logging { self: VortexCoordinator =>
       isConfirmed = txResult.confirmations.exists(_ > 0)
       validConfs = isConfirmed || isRemix
 
-      aliceDb <- aliceDbF
       peerNonce = aliceDb match {
         case Some(db) => db.nonce
         case None =>
@@ -56,7 +55,6 @@ trait PeerValidation extends Logging { self: VortexCoordinator =>
       }
       validProof = InputReference.verifyInputProof(inputRef, peerNonce)
 
-      otherInputs <- otherInputsF
       uniqueSpk = !otherInputs
         .map(_.output.scriptPubKey)
         .contains(output.scriptPubKey)
