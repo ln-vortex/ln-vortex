@@ -45,14 +45,11 @@ case class RoundDAO()(implicit
       ts: Vector[RoundDb]): Query[RoundTable, RoundDb, Seq] =
     findByPrimaryKeys(ts.map(_.roundId))
 
-  def hasTxId(txId: DoubleSha256Digest): Future[Boolean] = {
-    hasTxId(txId.flip)
-  }
-
-  def hasTxId(txId: DoubleSha256DigestBE): Future[Boolean] = {
-    val query = table.filter(_.txIdOpt === txId)
-
-    safeDatabase.run(query.result).map(_.nonEmpty)
+  def hasTxIdAction(txId: DoubleSha256DigestBE): DBIOAction[
+    Boolean,
+    NoStream,
+    Effect.Read] = {
+    table.filter(_.txIdOpt === txId).result.map(_.nonEmpty)
   }
 
   class RoundTable(tag: Tag) extends Table[RoundDb](tag, schemaName, "rounds") {
