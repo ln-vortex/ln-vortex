@@ -753,8 +753,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
                   Await.result(Future.sequence(signedFs), config.signingTime)
 
                 val combined = psbts.reduce(_ combinePSBT _)
-                // todo extractTransactionAndValidate
-                Try(combined.extractTransaction)
+                combined.extractTransactionAndValidate
               }.flatten
 
               // make promise complete
