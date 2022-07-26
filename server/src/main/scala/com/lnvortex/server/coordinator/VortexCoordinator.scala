@@ -1,6 +1,7 @@
 package com.lnvortex.server.coordinator
 
 import akka.actor._
+import akka.stream.scaladsl.Source
 import com.lnvortex.core.RoundStatus._
 import com.lnvortex.core._
 import com.lnvortex.server.VortexServerException
@@ -166,23 +167,24 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       beginInputRegistrationCancellable = Some(
         system.scheduler.scheduleOnce(config.mixInterval) {
           beginInputRegistration()
+            .recoverWith(_ => reconcileRound(isNewRound = true))
           ()
         })
 
       // handling sending blinded sig to alices
       inputsRegisteredP.future
         .flatMap(_ => beginOutputRegistration())
-        .recoverWith(_ => reconcileRound(true))
+        .recoverWith(_ => reconcileRound(isNewRound = true))
 
       // handle sending psbt when all outputs registered
       outputsRegisteredP.future
         .flatMap(_ => sendUnsignedPSBT())
         .map(_ => ())
-        .recoverWith(_ => reconcileRound(true))
+        .recoverWith(_ => reconcileRound(isNewRound = true))
 
       completedTxP.future
         .flatMap(onCompletedTransaction)
-        .recoverWith(_ => reconcileRound(false))
+        .recoverWith(_ => reconcileRound(isNewRound = false))
 
       // return round
       created
@@ -228,38 +230,54 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
   private[lnvortex] def beginInputRegistration(): Future[AskInputs] = {
     logger.info("Starting input registration")
 
-    val feeRateF = updateFeeRate()
-
     beginInputRegistrationCancellable.foreach(_.cancel())
     beginInputRegistrationCancellable = None
     inputRegStartTime = TimeUtil.currentEpochSecond
 
-    for {
-      roundDb <- currentRound()
-      feeRate <- feeRateF
-      updated = roundDb.copy(status = RegisterAlices, feeRate = feeRate)
-      _ <- roundDAO.update(updated)
-    } yield {
-      beginOutputRegistrationCancellable = Some(
-        system.scheduler.scheduleOnce(config.inputRegistrationTime) {
-          aliceDAO.numRegisteredForRound(roundDb.roundId).map { numRegistered =>
-            if (numRegistered >= config.minPeers) {
-              inputsRegisteredP.success(())
-            } else {
-              logger.error(
-                s"Not enough peers registered for round ${roundDb.roundId.hex}")
-              inputsRegisteredP.failure(new RuntimeException(
-                s"Not enough peers registered for round ${roundDb.roundId.hex}"))
+    updateFeeRate().flatMap { feeRate =>
+      val action = for {
+        roundDb <- currentRoundAction()
+        updated = roundDb.copy(status = RegisterAlices, feeRate = feeRate)
+        res <- roundDAO.updateAction(updated)
+        alices <- aliceDAO.findByRoundIdAction(roundDb.roundId)
+      } yield (res, alices.size)
+
+      safeDatabase.run(action).flatMap { case (roundDb, numAlices) =>
+        if (numAlices >= config.minPeers) {
+          // Create Output Registration timer
+          beginOutputRegistrationCancellable = Some(
+            system.scheduler.scheduleOnce(config.inputRegistrationTime) {
+              aliceDAO.numRegisteredForRound(roundDb.roundId).map {
+                numRegistered =>
+                  // todo check against min new entrants & min remix
+                  if (numRegistered >= config.minPeers) {
+                    inputsRegisteredP.success(())
+                  } else {
+                    logger.error(
+                      s"Not enough peers registered for round ${roundDb.roundId.hex}")
+                    inputsRegisteredP.failure(new RuntimeException(
+                      s"Not enough peers registered for round ${roundDb.roundId.hex}"))
+                  }
+              }
+              ()
             }
-          }
-          ()
+          )
+
+          val msg = AskInputs(currentRoundId, inputFee, outputFee)
+          // send messages async
+          val parallelism = FutureUtil.getParallelism
+          Source(connectionHandlerMap.values.toVector)
+            .mapAsync(parallelism = parallelism) { peer =>
+              FutureUtil.makeAsync { () =>
+                peer ! msg
+              }
+            }
+            .run()
+            .map(_ => msg)
+        } else {
+          Future.failed(new RuntimeException("Not enough peers registered."))
         }
-      )
-
-      val msg = AskInputs(currentRoundId, inputFee, outputFee)
-      connectionHandlerMap.values.foreach(_ ! msg)
-
-      msg
+      }
     }
   }
 
