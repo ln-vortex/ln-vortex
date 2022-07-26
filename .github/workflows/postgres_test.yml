@@ -25,4 +25,4 @@ jobs:
             ~/.sbt
           key: ${{ runner.os }}-cache
       - name: Run postgres tests
-        run: sbt downloadBitcoind downloadLnd serverTest/test clientTest/test clientServerTest/test
+        run: sbt serverTest/test clientTest/test clientServerTest/test

@@ -25,4 +25,4 @@
 #            ~/.sbt
 #          key: ${{ runner.os }}-cache
 #      - name: Run tor tests
-#        run: sbt downloadBitcoind downloadLnd downloadCLightning clientServerTest/test
+#        run: sbt clientServerTest/test
