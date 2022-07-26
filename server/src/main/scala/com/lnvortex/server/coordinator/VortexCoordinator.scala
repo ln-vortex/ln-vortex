@@ -238,27 +238,16 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       val action = for {
         roundDb <- currentRoundAction()
         updated = roundDb.copy(status = RegisterAlices, feeRate = feeRate)
-        res <- roundDAO.updateAction(updated)
+        _ <- roundDAO.updateAction(updated)
         alices <- aliceDAO.findByRoundIdAction(roundDb.roundId)
-      } yield (res, alices.size)
+      } yield alices.size
 
-      safeDatabase.run(action).flatMap { case (roundDb, numAlices) =>
+      safeDatabase.run(action).flatMap { numAlices =>
         if (numAlices >= config.minPeers) {
           // Create Output Registration timer
           beginOutputRegistrationCancellable = Some(
             system.scheduler.scheduleOnce(config.inputRegistrationTime) {
-              aliceDAO.numRegisteredForRound(roundDb.roundId).map {
-                numRegistered =>
-                  // todo check against min new entrants & min remix
-                  if (numRegistered >= config.minPeers) {
-                    inputsRegisteredP.success(())
-                  } else {
-                    logger.error(
-                      s"Not enough peers registered for round ${roundDb.roundId.hex}")
-                    inputsRegisteredP.failure(new RuntimeException(
-                      s"Not enough peers registered for round ${roundDb.roundId.hex}"))
-                  }
-              }
+              inputsRegisteredP.success(())
               ()
             }
           )
