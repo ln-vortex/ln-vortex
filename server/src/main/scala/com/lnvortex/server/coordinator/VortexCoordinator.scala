@@ -98,7 +98,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
           ScriptType.WITNESS_UNKNOWN | ScriptType.WITNESS_COMMITMENT |
           ScriptType.WITNESS_V0_SCRIPTHASH =>
         throw new IllegalArgumentException("Unknown address type")
-      case ScriptType.PUBKEY             => 148
+      case ScriptType.PUBKEY             => 113
       case ScriptType.PUBKEYHASH         => 148
       case ScriptType.SCRIPTHASH         => 91
       case ScriptType.WITNESS_V0_KEYHASH => 68
