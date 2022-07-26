@@ -1,5 +1,6 @@
 package com.lnvortex.coordinator.rpc
 
+import com.lnvortex.coordinator.config.LnVortexRpcServerConfig
 import com.typesafe.config.{Config, ConfigFactory}
 import org.bitcoins.commons.config.AppConfig
 import org.bitcoins.core.config._
@@ -84,15 +85,16 @@ case class ServerArgParser(commandLineArgs: Vector[String]) {
     * flag to the config file as that is self referential
     */
   def toConfig: Config = {
+    val moduleName = LnVortexRpcServerConfig.moduleName
     val rpcPortString = rpcPortOpt match {
       case Some(rpcPort) =>
-        s"bitcoin-s.server.rpcport=$rpcPort\n"
+        s"$moduleName.rpcPort=$rpcPort\n"
       case None => s""
     }
 
     val rpcBindString = rpcBindOpt match {
       case Some(rpcbind) =>
-        s"bitcoin-s.server.rpcbind=$rpcbind\n"
+        s"$moduleName.rpcBind=$rpcbind\n"
       case None => s""
     }
 
@@ -103,12 +105,19 @@ case class ServerArgParser(commandLineArgs: Vector[String]) {
     }
 
     // omitting configOpt as i don't know if we can do anything with that?
-    val all =
+    val concat =
       rpcPortString +
         rpcBindString +
         datadirString
 
-    ConfigFactory.parseString(all)
+    val all = ConfigFactory.parseString(concat)
+
+    configOpt match {
+      case Some(file) =>
+        val fromFile = ConfigFactory.parseFile(file.toFile)
+        all.withFallback(fromFile)
+      case None => all
+    }
   }
 
 }
