@@ -23,4 +23,4 @@ jobs:
             ~/.sbt
           key: ${{ runner.os }}-cache
       - name: Run tests
-        run: sbt downloadBitcoind downloadLnd downloadCLightning lndTest/test bitcoindTest/test clightningTest/test
+        run: sbt lndTest/test bitcoindTest/test clightningTest/test
