@@ -78,9 +78,50 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
   private def roundAddressLabel: String = s"Vortex Round: ${currentRoundId.hex}"
 
   private[coordinator] def inputFee: CurrencyUnit =
-    feeRate * 149 // p2wpkh input size
+    feeRate * getScriptTypeInputSize(config.inputScriptType)
+
   private[coordinator] def outputFee: CurrencyUnit =
-    feeRate * 43 // p2wsh output size
+    feeRate * getScriptTypeOutputSize(config.outputScriptType)
+
+  private[coordinator] def changeOutputFee: CurrencyUnit =
+    feeRate * getScriptTypeOutputSize(config.changeScriptType)
+
+  /** Returns the expected size of an input for the script type in vbytes */
+  private def getScriptTypeInputSize(scriptType: ScriptType): Int = {
+    val inputBase = 32 + 4 + 1 + 4
+    scriptType match {
+      case ScriptType.NONSTANDARD | ScriptType.MULTISIG | ScriptType.CLTV |
+          ScriptType.CSV | ScriptType.NONSTANDARD_IF_CONDITIONAL |
+          ScriptType.NOT_IF_CONDITIONAL | ScriptType.MULTISIG_WITH_TIMEOUT |
+          ScriptType.PUBKEY_WITH_TIMEOUT | ScriptType.NULLDATA |
+          ScriptType.WITNESS_UNKNOWN | ScriptType.WITNESS_COMMITMENT |
+          ScriptType.WITNESS_V0_SCRIPTHASH =>
+        throw new IllegalArgumentException("Unknown address type")
+      case ScriptType.PUBKEY             => inputBase + 108 // todo check witness discount
+      case ScriptType.PUBKEYHASH         => inputBase + 108
+      case ScriptType.SCRIPTHASH         => inputBase + 108 + 33
+      case ScriptType.WITNESS_V0_KEYHASH => inputBase + 108
+      case ScriptType.WITNESS_V1_TAPROOT => inputBase + 64
+    }
+  }
+
+  /** Returns the expected size of an output for the script type in vbytes */
+  private def getScriptTypeOutputSize(scriptType: ScriptType): Int = {
+    scriptType match {
+      case ScriptType.NONSTANDARD | ScriptType.MULTISIG | ScriptType.CLTV |
+          ScriptType.CSV | ScriptType.NONSTANDARD_IF_CONDITIONAL |
+          ScriptType.NOT_IF_CONDITIONAL | ScriptType.MULTISIG_WITH_TIMEOUT |
+          ScriptType.PUBKEY_WITH_TIMEOUT | ScriptType.NULLDATA |
+          ScriptType.WITNESS_UNKNOWN | ScriptType.WITNESS_COMMITMENT =>
+        throw new IllegalArgumentException("Unknown address type")
+      case ScriptType.PUBKEY                => 44
+      case ScriptType.PUBKEYHASH            => 34
+      case ScriptType.SCRIPTHASH            => 32
+      case ScriptType.WITNESS_V0_KEYHASH    => 31
+      case ScriptType.WITNESS_V0_SCRIPTHASH => 43
+      case ScriptType.WITNESS_V1_TAPROOT    => 43
+    }
+  }
 
   private var beginInputRegistrationCancellable: Option[Cancellable] =
     None
@@ -159,6 +200,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
         mixFee = config.mixFee,
         inputFee = inputFee,
         outputFee = outputFee,
+        changeFee = changeOutputFee,
         amount = config.mixAmount
       )
       created <- roundDAO.create(roundDb)
@@ -263,7 +305,8 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
             }
           )
 
-          val msg = AskInputs(currentRoundId, inputFee, outputFee)
+          val msg =
+            AskInputs(currentRoundId, inputFee, outputFee, changeOutputFee)
           // send messages async
           val parallelism = FutureUtil.getParallelism
           Source(connectionHandlerMap.values.toVector)

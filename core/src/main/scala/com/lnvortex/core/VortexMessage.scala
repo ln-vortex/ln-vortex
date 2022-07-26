@@ -287,12 +287,16 @@ object NonceMessage extends VortexMessageFactory[NonceMessage] {
 case class AskInputs(
     roundId: DoubleSha256Digest,
     inputFee: CurrencyUnit,
-    outputFee: CurrencyUnit)
+    outputFee: CurrencyUnit,
+    changeOutputFee: CurrencyUnit)
     extends ServerVortexMessage {
   override val tpe: BigSizeUInt = AskInputs.tpe
 
   override val value: ByteVector = {
-    roundId.bytes ++ inputFee.satoshis.toUInt64.bytes ++ outputFee.satoshis.toUInt64.bytes
+    roundId.bytes ++
+      inputFee.satoshis.toUInt64.bytes ++
+      outputFee.satoshis.toUInt64.bytes ++
+      changeOutputFee.satoshis.toUInt64.bytes
   }
 }
 
@@ -306,8 +310,9 @@ object AskInputs extends VortexMessageFactory[AskInputs] {
     val roundId = DoubleSha256Digest(iter.take(32))
     val inputFee = iter.takeSats()
     val outputFee = iter.takeSats()
+    val changeOutputFee = iter.takeSats()
 
-    AskInputs(roundId, inputFee, outputFee)
+    AskInputs(roundId, inputFee, outputFee, changeOutputFee)
   }
 }
 

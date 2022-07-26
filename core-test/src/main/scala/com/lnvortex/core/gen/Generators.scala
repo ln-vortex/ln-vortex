@@ -83,7 +83,8 @@ object Generators {
       roundId <- CryptoGenerators.doubleSha256Digest
       inFee <- CurrencyUnitGenerator.positiveSatoshis
       outFee <- CurrencyUnitGenerator.positiveSatoshis
-    } yield AskInputs(roundId, inFee, outFee)
+      changeOutputFee <- CurrencyUnitGenerator.positiveSatoshis
+    } yield AskInputs(roundId, inFee, outFee, changeOutputFee)
   }
 
   def inputReference: Gen[InputReference] = {

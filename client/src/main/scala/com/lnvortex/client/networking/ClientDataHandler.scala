@@ -63,11 +63,12 @@ class ClientDataHandler(
       case NonceMessage(schnorrNonce) =>
         vortexClient.storeNonce(schnorrNonce)
         Future.unit
-      case AskInputs(roundId, inputFee, outputFee) =>
-        vortexClient.registerCoins(roundId, inputFee, outputFee).map {
-          registerInputs =>
+      case AskInputs(roundId, inputFee, outputFee, changeOutputFee) =>
+        vortexClient
+          .registerCoins(roundId, inputFee, outputFee, changeOutputFee)
+          .map { registerInputs =>
             connectionHandler ! registerInputs
-        }
+          }
       case BlindedSig(blindOutputSig) =>
         val msg = vortexClient.processBlindOutputSig(blindOutputSig)
         vortexClient.sendOutputMessageAsBob(msg)
