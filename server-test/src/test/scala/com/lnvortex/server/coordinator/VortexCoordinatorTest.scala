@@ -440,6 +440,9 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
   it must "fail to register inputs that don't exist" in { coordinator =>
     val genInputs = Generators.registerInputs.sampleSome
     for {
+      _ <- coordinator.getNonce(Sha256Digest.empty,
+                                TestActorRef("test"),
+                                AskNonce(coordinator.getCurrentRoundId))
       _ <- coordinator.beginInputRegistration()
       res <- recoverToSucceededIf[InvalidAddressOrKey](
         coordinator.registerAlice(Sha256Digest.empty, genInputs))
