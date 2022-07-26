@@ -7,7 +7,7 @@ class VortexMessageSerializationTest extends BitcoinSUnitTest {
 
   it must "have unique types" in {
     val allTypes = VortexMessage.allFactories.map(_.tpe)
-    assert(allTypes.distinct == allTypes)
+    assert(allTypes.distinct.size == allTypes.size)
   }
 
   "Ping" must "have serialization symmetry" in {

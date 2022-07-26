@@ -107,6 +107,7 @@ class VortexClientTest extends VortexClientFixture {
       testState = MixOutputRegistered(dummyMix,
                                       Satoshis.zero,
                                       Satoshis.zero,
+                                      Satoshis.zero,
                                       nonce,
                                       testDetails)
       _ = vortexClient.setRoundDetails(testState)
@@ -145,6 +146,7 @@ class VortexClientTest extends VortexClientFixture {
         tweaks = dummyTweaks
       )
       testState = MixOutputRegistered(dummyMix,
+                                      Satoshis.zero,
                                       Satoshis.zero,
                                       Satoshis.zero,
                                       nonce,
@@ -188,6 +190,7 @@ class VortexClientTest extends VortexClientFixture {
         testState = MixOutputRegistered(dummyMix,
                                         Satoshis.zero,
                                         Satoshis.zero,
+                                        Satoshis.zero,
                                         nonce,
                                         testDetails)
         _ = vortexClient.setRoundDetails(testState)
@@ -227,6 +230,7 @@ class VortexClientTest extends VortexClientFixture {
           tweaks = dummyTweaks
         )
         testState = MixOutputRegistered(dummyMix,
+                                        Satoshis.zero,
                                         Satoshis.zero,
                                         Satoshis.zero,
                                         nonce,
@@ -270,6 +274,7 @@ class VortexClientTest extends VortexClientFixture {
       testState = MixOutputRegistered(dummyMix,
                                       Satoshis.zero,
                                       Satoshis.zero,
+                                      Satoshis.zero,
                                       nonce,
                                       testDetails)
       _ = vortexClient.setRoundDetails(testState)
@@ -310,6 +315,7 @@ class VortexClientTest extends VortexClientFixture {
           tweaks = dummyTweaks
         )
         testState = MixOutputRegistered(dummyMix,
+                                        Satoshis.zero,
                                         Satoshis.zero,
                                         Satoshis.zero,
                                         nonce,

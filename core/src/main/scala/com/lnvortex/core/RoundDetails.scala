@@ -60,8 +60,14 @@ case class InputsScheduled(
   def nextStage(
       initDetails: InitDetails,
       inputFee: CurrencyUnit,
-      outputFee: CurrencyUnit): InputsRegistered =
-    InputsRegistered(round, inputFee, outputFee, nonce, initDetails)
+      outputFee: CurrencyUnit,
+      changeOutputFee: CurrencyUnit): InputsRegistered =
+    InputsRegistered(round = round,
+                     inputFee = inputFee,
+                     outputFee = outputFee,
+                     changeOutputFee = changeOutputFee,
+                     nonce = nonce,
+                     initDetails = initDetails)
 }
 
 sealed trait InitializedRound extends RoundDetails {
@@ -69,25 +75,27 @@ sealed trait InitializedRound extends RoundDetails {
   def round: MixDetails
   def inputFee: CurrencyUnit
   def outputFee: CurrencyUnit
+  def changeOutputFee: CurrencyUnit
   def nonce: SchnorrNonce
   def initDetails: InitDetails
 
   // todo add tests
   def expectedAmtBackOpt(
       numRemixes: Int,
-      numNewEntrants: Int): Option[CurrencyUnit] =
+      numNewEntrants: Int): Option[CurrencyUnit] = {
     initDetails.changeSpkOpt.flatMap { _ =>
       val totalNewEntrantFee = Satoshis(numRemixes) * (inputFee + outputFee)
       val newEntrantFee = totalNewEntrantFee / Satoshis(numNewEntrants)
 
       val excessAfterChange =
         initDetails.inputAmt - round.amount - round.mixFee - (Satoshis(
-          initDetails.inputs.size) * inputFee) - outputFee - outputFee - newEntrantFee
+          initDetails.inputs.size) * inputFee) - outputFee - changeOutputFee - newEntrantFee
 
       if (excessAfterChange > Policy.dustThreshold)
         Some(excessAfterChange)
       else None
     }
+  }
 
   def restartRound(round: MixDetails, nonce: SchnorrNonce): InputsScheduled =
     InputsScheduled(
@@ -104,6 +112,7 @@ case class InputsRegistered(
     round: MixDetails,
     inputFee: CurrencyUnit,
     outputFee: CurrencyUnit,
+    changeOutputFee: CurrencyUnit,
     nonce: SchnorrNonce,
     initDetails: InitDetails)
     extends InitializedRound {
@@ -111,13 +120,19 @@ case class InputsRegistered(
   override val status: ClientStatus = ClientStatus.InputsRegistered
 
   def nextStage: MixOutputRegistered =
-    MixOutputRegistered(round, inputFee, outputFee, nonce, initDetails)
+    MixOutputRegistered(round,
+                        inputFee,
+                        outputFee,
+                        changeOutputFee,
+                        nonce,
+                        initDetails)
 }
 
 case class MixOutputRegistered(
     round: MixDetails,
     inputFee: CurrencyUnit,
     outputFee: CurrencyUnit,
+    changeOutputFee: CurrencyUnit,
     nonce: SchnorrNonce,
     initDetails: InitDetails)
     extends InitializedRound {
@@ -125,13 +140,20 @@ case class MixOutputRegistered(
   override val status: ClientStatus = ClientStatus.MixOutputRegistered
 
   def nextStage(psbt: PSBT): PSBTSigned =
-    PSBTSigned(round, inputFee, outputFee, nonce, initDetails, psbt)
+    PSBTSigned(round,
+               inputFee,
+               outputFee,
+               changeOutputFee,
+               nonce,
+               initDetails,
+               psbt)
 }
 
 case class PSBTSigned(
     round: MixDetails,
     inputFee: CurrencyUnit,
     outputFee: CurrencyUnit,
+    changeOutputFee: CurrencyUnit,
     nonce: SchnorrNonce,
     initDetails: InitDetails,
     psbt: PSBT)

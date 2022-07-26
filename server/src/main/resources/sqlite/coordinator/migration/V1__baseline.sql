@@ -14,6 +14,7 @@ CREATE TABLE `rounds`
     `mix_fee`     INTEGER                  NOT NULL,
     `input_fee`   INTEGER                  NOT NULL,
     `output_fee`  INTEGER                  NOT NULL,
+    `change_fee`  INTEGER                  NOT NULL,
     `amount`      INTEGER                  NOT NULL,
     `psbt`        VARCHAR(254),
     `transaction` VARCHAR(254),

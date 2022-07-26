@@ -68,6 +68,8 @@ case class RoundDAO()(implicit
 
     def outputFee: Rep[CurrencyUnit] = column("output_fee")
 
+    def changeOutputFee: Rep[CurrencyUnit] = column("change_fee")
+
     def amount: Rep[CurrencyUnit] = column("amount")
 
     def psbtOpt: Rep[Option[PSBT]] = column("psbt")
@@ -86,6 +88,7 @@ case class RoundDAO()(implicit
        mixFee,
        inputFee,
        outputFee,
+       changeOutputFee,
        amount,
        psbtOpt,
        transactionOpt,

@@ -51,7 +51,8 @@ trait ClientServerTestUtils {
 
       registerInputs <- client.registerCoins(msg.roundId,
                                              msg.inputFee,
-                                             msg.outputFee)
+                                             msg.outputFee,
+                                             msg.changeOutputFee)
       blindSig <- coordinator.registerAlice(peerId, registerInputs)
     } yield blindSig
   }
@@ -72,7 +73,8 @@ trait ClientServerTestUtils {
 
       registerInputs <- client.registerCoins(msg.roundId,
                                              msg.inputFee,
-                                             msg.outputFee)
+                                             msg.outputFee,
+                                             msg.changeOutputFee)
       blindSig <- coordinator.registerAlice(peerId, registerInputs)
     } yield blindSig
   }
@@ -102,12 +104,14 @@ trait ClientServerTestUtils {
 
       registerInputsA <- clientA.registerCoins(msg.roundId,
                                                msg.inputFee,
-                                               msg.outputFee)
+                                               msg.outputFee,
+                                               msg.changeOutputFee)
       blindSigA <- coordinator.registerAlice(peerIdA, registerInputsA)
 
       registerInputsB <- clientB.registerCoins(msg.roundId,
                                                msg.inputFee,
-                                               msg.outputFee)
+                                               msg.outputFee,
+                                               msg.changeOutputFee)
       blindSigB <- coordinator.registerAlice(peerIdB, registerInputsB)
     } yield (blindSigA, blindSigB)
   }
@@ -370,10 +374,12 @@ trait ClientServerTestUtils {
 
       registerInputsA <- clientA.registerCoins(msg.roundId,
                                                msg.inputFee,
-                                               msg.outputFee)
+                                               msg.outputFee,
+                                               msg.changeOutputFee)
       registerInputsB <- clientB.registerCoins(msg.roundId,
                                                msg.inputFee,
-                                               msg.outputFee)
+                                               msg.outputFee,
+                                               msg.changeOutputFee)
       blindSigA <- coordinator.registerAlice(peerIdA, registerInputsA)
       blindSigB <- coordinator.registerAlice(peerIdB, registerInputsB)
 

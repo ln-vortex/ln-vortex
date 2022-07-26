@@ -295,7 +295,8 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
   private[lnvortex] def registerCoins(
       roundId: DoubleSha256Digest,
       inputFee: CurrencyUnit,
-      outputFee: CurrencyUnit): Future[RegisterInputs] = {
+      outputFee: CurrencyUnit,
+      changeOutputFee: CurrencyUnit): Future[RegisterInputs] = {
     roundDetails match {
       case state @ (NoDetails | _: KnownRound | _: ReceivedNonce |
           _: InitializedRound) =>
@@ -310,8 +311,7 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
         val outputRefs = scheduled.inputs
         val selectedAmt = outputRefs.map(_.output.value).sum
         val inputFees = Satoshis(outputRefs.size) * inputFee
-        val outputFees = Satoshis(2) * outputFee
-        val onChainFees = inputFees + outputFees
+        val onChainFees = inputFees + outputFee + changeOutputFee
         val changeAmt = selectedAmt - round.amount - round.mixFee - onChainFees
 
         val needsChange = changeAmt > Policy.dustThreshold
@@ -385,7 +385,8 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
             tweaks = tweaks
           )
 
-          roundDetails = scheduled.nextStage(details, inputFee, outputFee)
+          roundDetails =
+            scheduled.nextStage(details, inputFee, outputFee, changeOutputFee)
 
           RegisterInputs(inputRefs,
                          challenge,

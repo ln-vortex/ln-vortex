@@ -18,6 +18,7 @@ case class RoundDb(
     mixFee: CurrencyUnit,
     inputFee: CurrencyUnit,
     outputFee: CurrencyUnit,
+    changeFee: CurrencyUnit,
     amount: CurrencyUnit,
     psbtOpt: Option[PSBT],
     transactionOpt: Option[Transaction],
@@ -48,6 +49,7 @@ object RoundDbs {
       mixFee: CurrencyUnit,
       inputFee: CurrencyUnit,
       outputFee: CurrencyUnit,
+      changeFee: CurrencyUnit,
       amount: CurrencyUnit
   ): RoundDb = {
     RoundDb(
@@ -58,6 +60,7 @@ object RoundDbs {
       mixFee = mixFee,
       inputFee = inputFee,
       outputFee = outputFee,
+      changeFee = changeFee,
       amount = amount,
       psbtOpt = None,
       transactionOpt = None,
