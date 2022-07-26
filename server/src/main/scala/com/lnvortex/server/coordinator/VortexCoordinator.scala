@@ -86,9 +86,10 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
   private[coordinator] def changeOutputFee: CurrencyUnit =
     feeRate * getScriptTypeOutputSize(config.changeScriptType)
 
-  /** Returns the expected size of an input for the script type in vbytes */
+  /** Returns the expected size of an input for the script type in vbytes
+    * @see https://twitter.com/murchandamus/status/1262062602298916865/photo/1
+    */
   private def getScriptTypeInputSize(scriptType: ScriptType): Int = {
-    val inputBase = 32 + 4 + 1 + 4
     scriptType match {
       case ScriptType.NONSTANDARD | ScriptType.MULTISIG | ScriptType.CLTV |
           ScriptType.CSV | ScriptType.NONSTANDARD_IF_CONDITIONAL |
@@ -97,15 +98,17 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
           ScriptType.WITNESS_UNKNOWN | ScriptType.WITNESS_COMMITMENT |
           ScriptType.WITNESS_V0_SCRIPTHASH =>
         throw new IllegalArgumentException("Unknown address type")
-      case ScriptType.PUBKEY             => inputBase + 108 // todo check witness discount
-      case ScriptType.PUBKEYHASH         => inputBase + 108
-      case ScriptType.SCRIPTHASH         => inputBase + 108 + 33
-      case ScriptType.WITNESS_V0_KEYHASH => inputBase + 108
-      case ScriptType.WITNESS_V1_TAPROOT => inputBase + 64
+      case ScriptType.PUBKEY             => 148
+      case ScriptType.PUBKEYHASH         => 148
+      case ScriptType.SCRIPTHASH         => 91
+      case ScriptType.WITNESS_V0_KEYHASH => 68
+      case ScriptType.WITNESS_V1_TAPROOT => 58
     }
   }
 
-  /** Returns the expected size of an output for the script type in vbytes */
+  /** Returns the expected size of an output for the script type in vbytes
+    * @see https://twitter.com/murchandamus/status/1262062602298916865/photo/1
+    */
   private def getScriptTypeOutputSize(scriptType: ScriptType): Int = {
     scriptType match {
       case ScriptType.NONSTANDARD | ScriptType.MULTISIG | ScriptType.CLTV |
