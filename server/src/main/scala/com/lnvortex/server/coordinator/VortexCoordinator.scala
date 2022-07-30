@@ -26,7 +26,7 @@ import org.bitcoins.core.util._
 import org.bitcoins.core.wallet.builder._
 import org.bitcoins.core.wallet.fee.SatoshisPerVirtualByte
 import org.bitcoins.crypto._
-import org.bitcoins.feeprovider.MempoolSpaceProvider
+import org.bitcoins.feeprovider._
 import org.bitcoins.feeprovider.MempoolSpaceTarget.FastestFeeTarget
 import org.bitcoins.rpc.client.common.BitcoindRpcClient
 import slick.dbio._
@@ -64,6 +64,9 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
 
   private val feeProvider: MempoolSpaceProvider =
     MempoolSpaceProvider(FastestFeeTarget, config.network, None)
+
+  private val feeProviderBackup: BitcoinerLiveFeeRateProvider =
+    BitcoinerLiveFeeRateProvider(30, None)
 
   private var feeRate: SatoshisPerVirtualByte =
     SatoshisPerVirtualByte.fromLong(2)
@@ -921,7 +924,9 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
   private def updateFeeRate(): Future[SatoshisPerVirtualByte] = {
     val feeRateF = config.network match {
       case MainNet | TestNet3 | SigNet =>
-        feeProvider.getFeeRate()
+        feeProvider.getFeeRate().recoverWith { case _: Throwable =>
+          feeProviderBackup.getFeeRate()
+        }
       case RegTest =>
         // allow for offline testing
         Future.successful(SatoshisPerVirtualByte.fromLong(2))
