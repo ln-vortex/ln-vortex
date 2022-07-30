@@ -94,13 +94,14 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
     */
   private def getScriptTypeInputSize(scriptType: ScriptType): Int = {
     scriptType match {
-      case ScriptType.NONSTANDARD | ScriptType.MULTISIG | ScriptType.CLTV |
-          ScriptType.CSV | ScriptType.NONSTANDARD_IF_CONDITIONAL |
+      case tpe @ (ScriptType.NONSTANDARD | ScriptType.MULTISIG |
+          ScriptType.CLTV | ScriptType.CSV |
+          ScriptType.NONSTANDARD_IF_CONDITIONAL |
           ScriptType.NOT_IF_CONDITIONAL | ScriptType.MULTISIG_WITH_TIMEOUT |
           ScriptType.PUBKEY_WITH_TIMEOUT | ScriptType.NULLDATA |
           ScriptType.WITNESS_UNKNOWN | ScriptType.WITNESS_COMMITMENT |
-          ScriptType.WITNESS_V0_SCRIPTHASH =>
-        throw new IllegalArgumentException("Unknown address type")
+          ScriptType.WITNESS_V0_SCRIPTHASH) =>
+        throw new IllegalArgumentException(s"Unknown address type $tpe")
       case ScriptType.PUBKEY             => 113
       case ScriptType.PUBKEYHASH         => 148
       case ScriptType.SCRIPTHASH         => 91
@@ -114,12 +115,13 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
     */
   private def getScriptTypeOutputSize(scriptType: ScriptType): Int = {
     scriptType match {
-      case ScriptType.NONSTANDARD | ScriptType.MULTISIG | ScriptType.CLTV |
-          ScriptType.CSV | ScriptType.NONSTANDARD_IF_CONDITIONAL |
+      case tpe @ (ScriptType.NONSTANDARD | ScriptType.MULTISIG |
+          ScriptType.CLTV | ScriptType.CSV |
+          ScriptType.NONSTANDARD_IF_CONDITIONAL |
           ScriptType.NOT_IF_CONDITIONAL | ScriptType.MULTISIG_WITH_TIMEOUT |
           ScriptType.PUBKEY_WITH_TIMEOUT | ScriptType.NULLDATA |
-          ScriptType.WITNESS_UNKNOWN | ScriptType.WITNESS_COMMITMENT =>
-        throw new IllegalArgumentException("Unknown address type")
+          ScriptType.WITNESS_UNKNOWN | ScriptType.WITNESS_COMMITMENT) =>
+        throw new IllegalArgumentException(s"Unknown address type $tpe")
       case ScriptType.PUBKEY                => 44
       case ScriptType.PUBKEYHASH            => 34
       case ScriptType.SCRIPTHASH            => 32
@@ -364,17 +366,18 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
   private[lnvortex] def sendUnsignedPSBT(): Future[PSBT] = {
     logger.info("Sending unsigned PSBT to peers")
     val addressType = config.changeScriptType match {
-      case ScriptType.NONSTANDARD | ScriptType.MULTISIG | ScriptType.CLTV |
-          ScriptType.CSV | ScriptType.NONSTANDARD_IF_CONDITIONAL |
+      case tpe @ (ScriptType.NONSTANDARD | ScriptType.MULTISIG |
+          ScriptType.CLTV | ScriptType.CSV |
+          ScriptType.NONSTANDARD_IF_CONDITIONAL |
           ScriptType.NOT_IF_CONDITIONAL | ScriptType.MULTISIG_WITH_TIMEOUT |
           ScriptType.PUBKEY_WITH_TIMEOUT | ScriptType.NULLDATA |
-          ScriptType.WITNESS_UNKNOWN | ScriptType.WITNESS_COMMITMENT =>
-        throw new IllegalArgumentException("Unknown address type")
+          ScriptType.WITNESS_UNKNOWN | ScriptType.WITNESS_COMMITMENT) =>
+        throw new IllegalArgumentException(s"Unknown address type $tpe")
       case ScriptType.PUBKEY                => AddressType.Legacy
       case ScriptType.PUBKEYHASH            => AddressType.Legacy
       case ScriptType.SCRIPTHASH            => AddressType.P2SHSegwit
       case ScriptType.WITNESS_V0_KEYHASH    => AddressType.Bech32
-      case ScriptType.WITNESS_V0_SCRIPTHASH => AddressType.Bech32
+      case ScriptType.WITNESS_V0_SCRIPTHASH => AddressType.Bech32m
       case ScriptType.WITNESS_V1_TAPROOT    => AddressType.Bech32m
     }
 

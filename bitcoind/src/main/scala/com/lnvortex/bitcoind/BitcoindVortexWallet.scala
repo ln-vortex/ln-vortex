@@ -34,12 +34,13 @@ case class BitcoindVortexWallet(
 
   private def addressTypeFromScriptType(scriptType: ScriptType): AddressType = {
     scriptType match {
-      case ScriptType.NONSTANDARD | ScriptType.MULTISIG | ScriptType.CLTV |
-          ScriptType.CSV | ScriptType.NONSTANDARD_IF_CONDITIONAL |
+      case tpe @ (ScriptType.NONSTANDARD | ScriptType.MULTISIG |
+          ScriptType.CLTV | ScriptType.CSV |
+          ScriptType.NONSTANDARD_IF_CONDITIONAL |
           ScriptType.NOT_IF_CONDITIONAL | ScriptType.MULTISIG_WITH_TIMEOUT |
           ScriptType.PUBKEY_WITH_TIMEOUT | ScriptType.NULLDATA |
-          ScriptType.WITNESS_UNKNOWN | ScriptType.WITNESS_COMMITMENT =>
-        throw new IllegalArgumentException("Unknown address type")
+          ScriptType.WITNESS_UNKNOWN | ScriptType.WITNESS_COMMITMENT) =>
+        throw new IllegalArgumentException(s"Unknown address type $tpe")
       case ScriptType.PUBKEY                => AddressType.Legacy
       case ScriptType.PUBKEYHASH            => AddressType.Legacy
       case ScriptType.SCRIPTHASH            => AddressType.P2SHSegwit

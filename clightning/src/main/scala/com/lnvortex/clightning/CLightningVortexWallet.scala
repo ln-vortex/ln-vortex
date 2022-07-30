@@ -36,20 +36,21 @@ case class CLightningVortexWallet(clightning: CLightningRpcClient)(implicit
 
   private def addressTypeFromScriptType(scriptType: ScriptType): AddressType = {
     scriptType match {
-      case ScriptType.PUBKEY | ScriptType.NONSTANDARD | ScriptType.MULTISIG |
-          ScriptType.CLTV | ScriptType.CSV |
+      case tpe @ (ScriptType.PUBKEY | ScriptType.NONSTANDARD |
+          ScriptType.MULTISIG | ScriptType.CLTV | ScriptType.CSV |
           ScriptType.NONSTANDARD_IF_CONDITIONAL |
           ScriptType.NOT_IF_CONDITIONAL | ScriptType.MULTISIG_WITH_TIMEOUT |
           ScriptType.PUBKEY_WITH_TIMEOUT | ScriptType.NULLDATA |
-          ScriptType.WITNESS_UNKNOWN | ScriptType.WITNESS_COMMITMENT =>
-        throw new IllegalArgumentException("Unknown address type")
+          ScriptType.WITNESS_UNKNOWN | ScriptType.WITNESS_COMMITMENT) =>
+        throw new IllegalArgumentException(s"Unknown address type $tpe")
       case ScriptType.PUBKEYHASH         => AddressType.Legacy
       case ScriptType.SCRIPTHASH         => AddressType.NestedSegWit
       case ScriptType.WITNESS_V0_KEYHASH => AddressType.SegWit
       case ScriptType.WITNESS_V0_SCRIPTHASH =>
-        throw new IllegalArgumentException("Unknown address type")
+        throw new IllegalArgumentException(
+          s"Unknown address type ${ScriptType.WITNESS_V0_SCRIPTHASH}")
       case ScriptType.WITNESS_V1_TAPROOT =>
-        throw new IllegalArgumentException("Waiting on 0.15-beta")
+        throw new IllegalArgumentException("Waiting on cln to support taproot")
     }
   }
 
