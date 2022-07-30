@@ -211,18 +211,19 @@ object LndVortexWallet {
 
   def addressTypeFromScriptType(scriptType: ScriptType): AddressType = {
     scriptType match {
-      case ScriptType.PUBKEY | ScriptType.PUBKEYHASH | ScriptType.NONSTANDARD |
-          ScriptType.MULTISIG | ScriptType.CLTV | ScriptType.CSV |
-          ScriptType.NONSTANDARD_IF_CONDITIONAL |
+      case tpe @ (ScriptType.PUBKEY | ScriptType.PUBKEYHASH |
+          ScriptType.NONSTANDARD | ScriptType.MULTISIG | ScriptType.CLTV |
+          ScriptType.CSV | ScriptType.NONSTANDARD_IF_CONDITIONAL |
           ScriptType.NOT_IF_CONDITIONAL | ScriptType.MULTISIG_WITH_TIMEOUT |
           ScriptType.PUBKEY_WITH_TIMEOUT | ScriptType.NULLDATA |
-          ScriptType.WITNESS_UNKNOWN | ScriptType.WITNESS_COMMITMENT =>
-        throw new IllegalArgumentException("Unknown address type")
+          ScriptType.WITNESS_UNKNOWN | ScriptType.WITNESS_COMMITMENT) =>
+        throw new IllegalArgumentException(s"Unknown address type $tpe")
       case ScriptType.SCRIPTHASH => AddressType.NESTED_PUBKEY_HASH
       case ScriptType.WITNESS_V0_KEYHASH =>
         AddressType.WITNESS_PUBKEY_HASH
       case ScriptType.WITNESS_V0_SCRIPTHASH =>
-        throw new IllegalArgumentException("Unknown address type")
+        throw new IllegalArgumentException(
+          s"Unknown address type ${ScriptType.WITNESS_V0_SCRIPTHASH}")
       case ScriptType.WITNESS_V1_TAPROOT =>
         AddressType.TAPROOT_PUBKEY
     }
