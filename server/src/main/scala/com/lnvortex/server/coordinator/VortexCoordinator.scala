@@ -88,8 +88,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
   private[coordinator] def outputFee: CurrencyUnit = {
     val outputSize = getScriptTypeOutputSize(config.outputScriptType)
 
-    val coordinatorOutputSize =
-      outputSize + getScriptTypeInputSize(config.changeScriptType)
+    val coordinatorOutputSize = getScriptTypeInputSize(config.changeScriptType)
     val txOverhead = 10
 
     val peerShare =
