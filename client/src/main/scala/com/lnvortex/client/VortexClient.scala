@@ -529,7 +529,7 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
           lazy val hasMixOutput =
             tx.outputs.contains(state.initDetails.mixOutput)
 
-          lazy val noDust = tx.outputs.forall(_.value > Policy.dustThreshold)
+          lazy val noDust = tx.outputs.forall(_.value >= Policy.dustThreshold)
 
           lazy val goodFeeRate = {
             if (unsigned.inputMaps.forall(_.witnessUTXOOpt.isDefined)) {
