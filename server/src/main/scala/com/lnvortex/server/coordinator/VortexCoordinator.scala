@@ -12,6 +12,7 @@ import com.lnvortex.server.models._
 import com.lnvortex.server.networking.ServerConnectionHandler.CloseConnection
 import com.lnvortex.server.networking.VortexServer
 import grizzled.slf4j.Logging
+import org.bitcoins.asyncutil.AsyncUtil
 import org.bitcoins.commons.jsonmodels.bitcoind.RpcOpts.AddressType
 import org.bitcoins.core.config._
 import org.bitcoins.core.currency._
@@ -35,6 +36,7 @@ import java.net.InetSocketAddress
 import java.time.Instant
 import scala.collection.mutable
 import scala.concurrent._
+import scala.concurrent.duration.DurationInt
 import scala.util._
 
 case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
@@ -284,7 +286,10 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
     beginInputRegistrationCancellable = None
     inputRegStartTime = TimeUtil.currentEpochSecond
 
-    updateFeeRate().flatMap { feeRate =>
+    val feeRateF =
+      AsyncUtil.nonBlockingSleep(3.seconds).flatMap(_ => updateFeeRate())
+
+    feeRateF.flatMap { feeRate =>
       val action = for {
         roundDb <- currentRoundAction()
         updated = roundDb.copy(status = RegisterAlices, feeRate = feeRate)
