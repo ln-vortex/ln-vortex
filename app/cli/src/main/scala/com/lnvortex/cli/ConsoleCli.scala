@@ -7,6 +7,7 @@ import com.lnvortex.config.VortexPicklers._
 import com.lnvortex.config._
 import org.bitcoins.commons.serializers.Picklers.{
   transactionOutPointPickler => _,
+  inetSocketAddress => _,
   _
 }
 import org.bitcoins.core.protocol.BitcoinAddress

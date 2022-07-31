@@ -106,10 +106,14 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
         for {
           handler <- handlerP.future
           _ = handler ! AskNonce(round.roundId)
-          _ <- AsyncUtil.awaitCondition(
-            () => getNonceOpt(roundDetails).isDefined,
-            interval = 100.milliseconds,
-            maxTries = 300)
+          _ <- AsyncUtil
+            .awaitCondition(() => getNonceOpt(roundDetails).isDefined,
+                            interval = 100.milliseconds,
+                            maxTries = 300)
+            .recover { case _: Throwable =>
+              throw new RuntimeException(
+                "Did not receive response from coordinator")
+            }
         } yield {
           val nonce = getNonceOpt(roundDetails).get
           logger.info(s"Got nonce from coordinator $nonce")
@@ -159,7 +163,16 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
             Future.failed(new IllegalArgumentException(
               s"Not connected to peer $nodeId, you must connect with them in order to open a channel to them"))
           case Some(peerAddr) =>
-            vortexWallet.connect(nodeId, peerAddr)
+            val peerStr = s"${peerAddr.getHostName}:${peerAddr.getPort}"
+            logger.info(s"Connecting to peer $peerStr")
+            vortexWallet
+              .connect(nodeId, peerAddr)
+              .map(_ => logger.info("Connected to peer"))
+              .recover { case ex: Throwable =>
+                logger.error(s"Failed to connect to peer $nodeId@$peerStr", ex)
+                throw new RuntimeException(
+                  s"Failed to connect to peer $nodeId@$peerStr")
+              }
         }
       } else Future.unit
     }
@@ -171,7 +184,7 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
                                                 amount,
                                                 privateChannel = true)
         _ <- vortexWallet.cancelPendingChannel(details.id)
-      } yield ()
+      } yield logger.debug("Peer has a correct min chan size")
 
       f.recover { case ex: Throwable =>
         logger.error(s"Error from ln node: ${ex.getMessage}", ex)
@@ -250,12 +263,14 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
             "This version of lnd only supports SegwitV0 channels")
         }
 
-        checkMinChanSize(receivedNonce.round.amount, nodeId, peerAddrOpt).map {
-          _ =>
-            roundDetails = receivedNonce.nextStage(inputs = outputRefs,
-                                                   addressOpt = None,
-                                                   nodeIdOpt = Some(nodeId),
-                                                   peerAddrOpt = peerAddrOpt)
+        checkMinChanSize(amount = receivedNonce.round.amount,
+                         nodeId = nodeId,
+                         peerAddrOpt = peerAddrOpt).map { _ =>
+          roundDetails = receivedNonce.nextStage(inputs = outputRefs,
+                                                 addressOpt = None,
+                                                 nodeIdOpt = Some(nodeId),
+                                                 peerAddrOpt = peerAddrOpt)
+          logger.info("Coins queued!")
         }
     }
   }
@@ -270,6 +285,8 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
         throw new IllegalStateException(
           s"At invalid state $state, cannot queue coins")
       case receivedNonce: ReceivedNonce =>
+        logger.info(
+          s"Queueing ${outputRefs.size} coins for collaborative transaction")
         if (
           !outputRefs.forall(
             _.output.scriptPubKey.scriptType == receivedNonce.round.inputType)
@@ -282,12 +299,11 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
           throw new InvalidMixedOutputException(
             s"Address must be of type ${receivedNonce.round.outputType}")
         } else {
-          logger.info(
-            s"Queueing ${outputRefs.size} coins for on-chain self-spend")
           roundDetails = receivedNonce.nextStage(inputs = outputRefs,
                                                  addressOpt = Some(address),
                                                  nodeIdOpt = None,
                                                  peerAddrOpt = None)
+          logger.info("Coins queued!")
         }
     }
   }
