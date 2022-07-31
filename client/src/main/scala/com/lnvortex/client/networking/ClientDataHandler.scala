@@ -64,10 +64,12 @@ class ClientDataHandler(
         vortexClient.storeNonce(schnorrNonce)
         Future.unit
       case AskInputs(roundId, inputFee, outputFee, changeOutputFee) =>
+        logger.info("Received AskInputs from coordinator")
         vortexClient
           .registerCoins(roundId, inputFee, outputFee, changeOutputFee)
           .map { registerInputs =>
             connectionHandler ! registerInputs
+            logger.info("Sent RegisterInputs to coordinator")
           }
       case BlindedSig(blindOutputSig) =>
         val msg = vortexClient.processBlindOutputSig(blindOutputSig)
