@@ -314,11 +314,25 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
       outputFee: CurrencyUnit,
       changeOutputFee: CurrencyUnit): Future[RegisterInputs] = {
     roundDetails match {
-      case state @ (NoDetails | _: KnownRound | _: ReceivedNonce |
-          _: InitializedRound) =>
+      case state @ (NoDetails | _: ReceivedNonce | _: InitializedRound) =>
         Future.failed(
           new IllegalStateException(
             s"At invalid state $state, cannot register coins"))
+      case _: KnownRound =>
+        // Sometimes we get the AskInputs before the round details + nonce,
+        // so we need to wait for the round details to be set.
+        AsyncUtil
+          .awaitCondition(
+            () => roundDetails.status == ClientStatus.InputsScheduled,
+            interval = 100.milliseconds,
+            maxTries = 300)
+          .recover { _ =>
+            throw new IllegalStateException(
+              s"At invalid state ${roundDetails.status}, cannot register coins")
+          }
+          .flatMap { _ =>
+            registerCoins(roundId, inputFee, outputFee, changeOutputFee)
+          }
       case scheduled: InputsScheduled =>
         val round = scheduled.round
         require(scheduled.round.roundId == roundId,
