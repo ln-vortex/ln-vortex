@@ -91,7 +91,7 @@ sealed trait InitializedRound extends RoundDetails {
         initDetails.inputAmt - round.amount - round.mixFee - (Satoshis(
           initDetails.inputs.size) * inputFee) - outputFee - changeOutputFee - newEntrantFee
 
-      if (excessAfterChange > Policy.dustThreshold)
+      if (excessAfterChange >= Policy.dustThreshold)
         Some(excessAfterChange)
       else None
     }
