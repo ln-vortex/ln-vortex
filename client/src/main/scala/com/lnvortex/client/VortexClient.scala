@@ -242,35 +242,40 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
         throw new IllegalStateException(
           s"At invalid state $state, cannot queue coins")
       case receivedNonce: ReceivedNonce =>
+        val round = receivedNonce.round
         logger.info(
           s"Queueing ${outputRefs.size} coins to open a channel to $nodeId")
         // todo check if peer supports taproot channel if needed
         if (
           !outputRefs.forall(
-            _.output.scriptPubKey.scriptType == receivedNonce.round.inputType)
+            _.output.scriptPubKey.scriptType == round.inputType)
         ) {
           throw new InvalidInputException(
-            s"Inputs must be of type ${receivedNonce.round.inputType}")
-        } else if (
-          outputRefs.map(_.output.value).sum < receivedNonce.round.amount
-        ) {
+            s"Inputs must be of type ${round.inputType}")
+        } else if (outputRefs.map(_.output.value).sum < round.amount) {
           throw new InvalidInputException(
-            s"Must select more inputs to find round, needed ${receivedNonce.round.amount}")
-        } else if (
-          receivedNonce.round.outputType != ScriptType.WITNESS_V0_SCRIPTHASH
-        ) {
+            s"Must select more inputs to find round, needed ${round.amount}")
+        } else if (round.outputType != ScriptType.WITNESS_V0_SCRIPTHASH) {
           throw new InvalidMixedOutputException(
             "This version of lnd only supports SegwitV0 channels")
-        }
-
-        checkMinChanSize(amount = receivedNonce.round.amount,
-                         nodeId = nodeId,
-                         peerAddrOpt = peerAddrOpt).map { _ =>
-          roundDetails = receivedNonce.nextStage(inputs = outputRefs,
-                                                 addressOpt = None,
-                                                 nodeIdOpt = Some(nodeId),
-                                                 peerAddrOpt = peerAddrOpt)
-          logger.info("Coins queued!")
+        } else if (
+          outputRefs.distinctBy(_.output.scriptPubKey).size != outputRefs.size
+        ) {
+          throw new InvalidInputException(
+            s"Cannot have inputs from duplicate addresses")
+        } else if (outputRefs.map(_.output.value).sum < round.amount) {
+          throw new InvalidInputException(
+            s"Must select more inputs to find round, needed ${round.amount}")
+        } else {
+          checkMinChanSize(amount = round.amount,
+                           nodeId = nodeId,
+                           peerAddrOpt = peerAddrOpt).map { _ =>
+            roundDetails = receivedNonce.nextStage(inputs = outputRefs,
+                                                   addressOpt = None,
+                                                   nodeIdOpt = Some(nodeId),
+                                                   peerAddrOpt = peerAddrOpt)
+            logger.info("Coins queued!")
+          }
         }
     }
   }
@@ -285,19 +290,26 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
         throw new IllegalStateException(
           s"At invalid state $state, cannot queue coins")
       case receivedNonce: ReceivedNonce =>
+        val round = receivedNonce.round
         logger.info(
           s"Queueing ${outputRefs.size} coins for collaborative transaction")
         if (
           !outputRefs.forall(
-            _.output.scriptPubKey.scriptType == receivedNonce.round.inputType)
+            _.output.scriptPubKey.scriptType == round.inputType)
         ) {
           throw new InvalidInputException(
-            s"Inputs must be of type ${receivedNonce.round.inputType}")
-        } else if (
-          address.scriptPubKey.scriptType != receivedNonce.round.outputType
-        ) {
+            s"Inputs must be of type ${round.inputType}")
+        } else if (address.scriptPubKey.scriptType != round.outputType) {
           throw new InvalidMixedOutputException(
-            s"Address must be of type ${receivedNonce.round.outputType}")
+            s"Address must be of type ${round.outputType}")
+        } else if (
+          outputRefs.distinctBy(_.output.scriptPubKey).size != outputRefs.size
+        ) {
+          throw new InvalidInputException(
+            s"Cannot have inputs from duplicate addresses")
+        } else if (outputRefs.map(_.output.value).sum < round.amount) {
+          throw new InvalidInputException(
+            s"Must select more inputs to find round, needed ${round.amount + round.mixFee}")
         } else {
           roundDetails = receivedNonce.nextStage(inputs = outputRefs,
                                                  addressOpt = Some(address),
