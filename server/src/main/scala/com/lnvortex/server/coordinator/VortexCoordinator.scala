@@ -969,6 +969,9 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
   override def start(): Future[Unit] = {
     val f = serverBindF
     for {
+      _ <- bitcoind
+        .loadWallet("vortex")
+        .recover(_ => ())
       _ <- newRound()
       _ <- f
     } yield ()
