@@ -42,6 +42,19 @@ object VortexPicklers {
     (c: InetSocketAddress) =>
       JsString(c.toString.replaceAll("/<unresolved>", ""))
 
+  implicit val inetSocketAddressRW: ReadWriter[InetSocketAddress] =
+    readwriter[String].bimap(
+      addr => addr.toString.replaceAll("/<unresolved>", ""),
+      str => {
+        if (str.contains(":")) {
+          val parts = str.split(":")
+          InetSocketAddress.createUnresolved(parts(0), parts(1).toInt)
+        } else {
+          InetSocketAddress.createUnresolved(str, 9735)
+        }
+      }
+    )
+
   implicit val currentUnitWrites: Writes[CurrencyUnit] =
     (c: CurrencyUnit) => JsNumber(c.satoshis.toLong)
 

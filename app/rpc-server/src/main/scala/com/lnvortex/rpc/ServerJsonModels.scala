@@ -1,10 +1,7 @@
 package com.lnvortex.rpc
 
 import com.lnvortex.config.VortexPicklers._
-import org.bitcoins.commons.serializers.Picklers.{
-  bitcoinAddressPickler,
-  inetSocketAddress
-}
+import org.bitcoins.commons.serializers.Picklers.bitcoinAddressPickler
 import org.bitcoins.commons.jsonmodels.bitcoind.RpcOpts._
 import org.bitcoins.core.api.wallet.CoinSelectionAlgo
 import org.bitcoins.core.protocol.BitcoinAddress
@@ -37,13 +34,24 @@ object QueueCoins extends ServerJsonModels {
       QueueCoins(
         up.read[Vector[TransactionOutPoint]](json("outpoints")),
         if (json.obj.contains("address")) {
-          Try(up.read[BitcoinAddress](json("address"))).toOption
+          val res = Try(up.read[BitcoinAddress](json("address"))).getOrElse(
+            throw new IllegalArgumentException(
+              "Invalid address: " + json("address")))
+
+          Some(res)
         } else None,
         if (json.obj.contains("nodeId")) {
-          Try(up.read[NodeId](json("nodeId"))).toOption
+          val res = Try(up.read[NodeId](json("nodeId"))).getOrElse(
+            throw new IllegalArgumentException(
+              "Invalid nodeId: " + json("nodeId")))
+
+          Some(res)
         } else None,
         if (json.obj.contains("peerAddr")) {
-          Try(up.read[InetSocketAddress](json("peerAddr"))).toOption
+          val res = Try(up.read[InetSocketAddress](json("peerAddr"))).getOrElse(
+            throw new IllegalArgumentException(
+              "Invalid peerAddr: " + json("peerAddr")))
+          Some(res)
         } else None
       ))
 
