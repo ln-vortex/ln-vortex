@@ -6,10 +6,7 @@ import com.lnvortex.client.VortexClient
 import com.lnvortex.core._
 import com.lnvortex.core.api.VortexWalletApi
 import grizzled.slf4j.Logging
-import org.bitcoins.crypto._
-import scodec.bits.ByteVector
 
-import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent._
 import scala.concurrent.duration.DurationInt
 
@@ -24,14 +21,11 @@ class ClientDataHandler(
     val _ = context.watch(connectionHandler)
   }
 
-  val lastPing = new AtomicReference(ByteVector.empty.toArray)
-
-  context.system.scheduler.scheduleAtFixedRate(30.seconds, 60.seconds) { () =>
-    val hash = CryptoUtil.sha256(ECPrivateKey.freshPrivateKey.bytes)
-    val ping = PingTLV()
-    lastPing.set(hash.bytes.toArray)
-    connectionHandler ! ping
-  }
+  private val cancellable: Cancellable =
+    context.system.scheduler.scheduleAtFixedRate(30.seconds, 60.seconds) { () =>
+      val ping = PingTLV()
+      connectionHandler ! ping
+    }
 
   override def receive: Receive = LoggingReceive {
     case _: PingTLV =>
@@ -51,6 +45,7 @@ class ClientDataHandler(
     case ClientConnectionHandler.WriteFailed(_) =>
       logger.error("Write failed")
     case Terminated(actor) if actor == connectionHandler =>
+      cancellable.cancel()
       context.stop(self)
   }
 
@@ -87,6 +82,11 @@ class ClientDataHandler(
         vortexClient.restartRound(msg)
         Future.unit
     }
+  }
+
+  override def postStop(): Unit = {
+    cancellable.cancel()
+    ()
   }
 }
 
