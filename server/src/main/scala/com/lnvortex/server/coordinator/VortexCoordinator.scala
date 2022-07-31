@@ -349,7 +349,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       }
 
       system.scheduler.scheduleOnce(config.outputRegistrationTime) {
-        outputsRegisteredP.success(())
+        Try(outputsRegisteredP.success(()))
         ()
       }
 
