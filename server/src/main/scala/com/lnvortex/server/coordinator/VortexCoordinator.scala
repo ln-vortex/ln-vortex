@@ -85,8 +85,18 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
   private[coordinator] def inputFee: CurrencyUnit =
     feeRate * getScriptTypeInputSize(config.inputScriptType)
 
-  private[coordinator] def outputFee: CurrencyUnit =
-    feeRate * getScriptTypeOutputSize(config.outputScriptType)
+  private[coordinator] def outputFee: CurrencyUnit = {
+    val outputSize = getScriptTypeOutputSize(config.outputScriptType)
+
+    val coordinatorOutputSize =
+      outputSize + getScriptTypeInputSize(config.changeScriptType)
+    val txOverhead = 10
+
+    val peerShare =
+      (coordinatorOutputSize + txOverhead) / config.minPeers.toDouble
+
+    feeRate * (outputSize + peerShare).ceil.toLong
+  }
 
   private[coordinator] def changeOutputFee: CurrencyUnit =
     feeRate * getScriptTypeOutputSize(config.changeScriptType)
@@ -675,7 +685,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
 
           val excessAfterChange = excess - changeCost
 
-          if (excessAfterChange > Policy.dustThreshold)
+          if (excessAfterChange >= Policy.dustThreshold)
             Right(TransactionOutput(excessAfterChange, changeSpk))
           else Left(excess)
         case None => Left(excess)
@@ -937,7 +947,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
         }
       case RegTest =>
         // allow for offline testing
-        Future.successful(SatoshisPerVirtualByte.fromLong(2))
+        Future.successful(SatoshisPerVirtualByte.fromLong(1))
     }
 
     feeRateF.map { res =>

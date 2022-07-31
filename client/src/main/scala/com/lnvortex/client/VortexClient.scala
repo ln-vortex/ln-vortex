@@ -356,7 +356,7 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
         val onChainFees = inputFees + outputFee + changeOutputFee
         val changeAmt = selectedAmt - round.amount - round.mixFee - onChainFees
 
-        val needsChange = changeAmt > Policy.dustThreshold
+        val needsChange = changeAmt >= Policy.dustThreshold
 
         for {
           inputProofs <- FutureUtil.sequentially(outputRefs)(
