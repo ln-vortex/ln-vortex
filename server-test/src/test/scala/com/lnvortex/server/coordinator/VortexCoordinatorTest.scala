@@ -34,7 +34,9 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
         dbOpt <- coordinator.roundDAO.read(coordinator.getCurrentRoundId)
       } yield {
         assert(dbOpt.isDefined)
-        assert(coordinator.outputFee != Satoshis.zero)
+        assert(coordinator.inputFee != Satoshis.zero)
+        assert(coordinator.outputFee() != Satoshis.zero)
+        assert(coordinator.changeOutputFee != Satoshis.zero)
       }
   }
 
