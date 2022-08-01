@@ -15,6 +15,8 @@ import org.bitcoins.core.wallet.fee.SatoshisPerVirtualByte
 import org.bitcoins.crypto.{DoubleSha256DigestBE, FieldElement, Sha256Digest}
 import org.bitcoins.lnd.rpc.LndRpcClient
 import org.bitcoins.testkit.async.TestAsyncUtil
+import org.scalactic.Tolerance.convertNumericToPlusOrMinusWrapper
+import org.scalatest.Assertions.convertToEqualizer
 
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{ExecutionContext, Future}
@@ -280,8 +282,9 @@ trait ClientServerTestUtils {
       inputUtxos = all.filter(t =>
         tx.inputs.map(_.previousOutput).contains(t.outPoint))
       inputAmt = inputUtxos.map(_.amount).sum
+      feePaid = (inputAmt - tx.totalOutput).satoshis.toLong
       // regtest uses 1 sat/vbyte fee
-      _ = assert(SatoshisPerVirtualByte.calc(inputAmt, tx).toLong == 1)
+      _ = assert(feePaid === tx.vsize +- 2, s"$feePaid != ${tx.vsize} +- 2")
 
       _ <- coordinator.bitcoind.sendRawTransaction(tx)
 
@@ -325,8 +328,9 @@ trait ClientServerTestUtils {
       inputUtxos = (utxosA ++ utxosB).filter(t =>
         tx.inputs.map(_.previousOutput).contains(t.outPoint))
       inputAmt = inputUtxos.map(_.amount).sum
+      feePaid = (inputAmt - tx.totalOutput).satoshis.toLong
       // regtest uses 1 sat/vbyte fee
-      _ = assert(SatoshisPerVirtualByte.calc(inputAmt, tx).toLong == 1)
+      _ = assert(feePaid === tx.vsize +- 1, s"$feePaid != ${tx.vsize} +- 1")
 
       _ <- coordinator.bitcoind.sendRawTransaction(tx)
 

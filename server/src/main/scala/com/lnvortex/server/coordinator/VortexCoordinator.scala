@@ -85,14 +85,16 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
   private[coordinator] def inputFee: CurrencyUnit =
     feeRate * getScriptTypeInputSize(config.inputScriptType)
 
-  private[coordinator] def outputFee: CurrencyUnit = {
+  private[coordinator] def outputFee(
+      feeRate: SatoshisPerVirtualByte = feeRate,
+      numPeers: Int = config.minPeers): CurrencyUnit = {
     val outputSize = getScriptTypeOutputSize(config.outputScriptType)
 
-    val coordinatorOutputSize = getScriptTypeInputSize(config.changeScriptType)
-    val txOverhead = 10
+    val coordinatorOutputSize = getScriptTypeOutputSize(config.changeScriptType)
+    val txOverhead = 10.5
 
     val peerShare =
-      (coordinatorOutputSize + txOverhead) / config.minPeers.toDouble
+      (coordinatorOutputSize + txOverhead) / numPeers.toDouble
 
     feeRate * (outputSize + peerShare).ceil.toLong
   }
@@ -218,7 +220,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
         feeRate = feeRate,
         mixFee = config.mixFee,
         inputFee = inputFee,
-        outputFee = outputFee,
+        outputFee = outputFee(),
         changeFee = changeOutputFee,
         amount = config.mixAmount
       )
@@ -317,7 +319,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
           )
 
           val msg =
-            AskInputs(currentRoundId, inputFee, outputFee, changeOutputFee)
+            AskInputs(currentRoundId, inputFee, outputFee(), changeOutputFee)
           // send messages async
           val parallelism = FutureUtil.getParallelism
           Source(connectionHandlerMap.values.toVector)
@@ -671,11 +673,13 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
     TransactionOutput] = {
     if (isRemix) Left(Satoshis.zero)
     else {
+      val numPeers = numRemixes + numNewEntrants
+      val updatedOutputFee = outputFee(roundDb.feeRate, numPeers)
       val totalNewEntrantFee =
-        Satoshis(numRemixes) * (roundDb.inputFee + roundDb.outputFee)
+        Satoshis(numRemixes) * (roundDb.inputFee + updatedOutputFee)
       val newEntrantFee = totalNewEntrantFee / Satoshis(numNewEntrants)
       val excess = inputAmount - roundDb.amount - roundDb.mixFee - (Satoshis(
-        numInputs) * roundDb.inputFee) - roundDb.outputFee - newEntrantFee
+        numInputs) * roundDb.inputFee) - updatedOutputFee - newEntrantFee
 
       changeSpkOpt match {
         case Some(changeSpk) =>
