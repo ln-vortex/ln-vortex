@@ -2,8 +2,8 @@
 
 LnVortex runs a JSON RPC server. For this:
 
-- All responses return a json object containing a `result` or an `error`, these can both be json objects.
-- All requests must have an id that is either a `string` or a `number`
+- All responses return a JSON object containing a `result` or an `error`.
+- All requests must have an ID that is either a `string` or a `number`
 - All requests must have a `method` that is a `string`
 - When a request has parameters it must have a `params` field that is a json object.
 
@@ -21,7 +21,7 @@ Example request:
 }
 ```
 
-RPC calls all must have a basic Authorization header, you can read more [here](https://swagger.io/docs/specification/authentication/basic-authentication/)
+Every RPC call must have a basic Authorization header, you can read more [here](https://swagger.io/docs/specification/authentication/basic-authentication/).
 
 ## Methods
 
@@ -53,10 +53,10 @@ None
 Round:
 - version: Number
 - roundId: String - id for the round
-- amount: Number - Denomination for the round
-- mixFee: Number - Fee in satoshis for the round
-- publicKey: String - Coordinator's public key
-- time: Number - When the round with execute, in epoch seconds
+- amount: Number - denomination for the round
+- mixFee: Number - fee in satoshis for the round
+- publicKey: String - coordinator's public key
+- time: Number - when the round will execute, in epoch seconds
 
 ### List UTXOs
 
@@ -72,7 +72,7 @@ list of utxos:
 
 - address: String - bitcoin address
 - amount: Number - in satoshis
-- outPoint: String - The transaction outpoint in format `txid:vout`
+- outPoint: String - the transaction outpoint in `txid:vout` format
 - confirmed: Boolean - if the transaction is confirmed or not
 
 ### Get Balance
@@ -100,7 +100,7 @@ None
 list of transactions:
 
 - txId: String
-- tx: String - Transaction in network serialization
+- tx: String - transaction in network serialization
 - numConfirmations: Number
 - blockHeight: Number
 - label: String
@@ -120,9 +120,9 @@ list of channels:
 - alias: String
 - remotePubkey: String
 - shortChannelId: String
-- public: Boolean - If this is a public or private channel
-- amount: Number - Size of channel in satoshis
-- active: Boolean - if the channel is currently active
+- public: Boolean - if this is a public or private channel
+- amount: Number - size of channel in satoshis
+- active: Boolean - if the channel is currently active or not
 
 ### Queue Coins
 
@@ -130,16 +130,16 @@ method: `queuecoins`
 
 #### Params
 
-You can set `address` to give an address to do the collaborative transaction to.
+You can set `address` to specify an address to do the collaborative transaction to.
 
-You can set `nodeId` to for the pubkey of the node to open the channel to.
+You can set `nodeId` to specify the node's pubkey to open the channel to.
 
-Or you can set neither and Vortex will generate an address to do the collaborative transaction to.
+Or you can set neither and LnVortex will generate an address to do the collaborative transaction to.
 
-- outpoints: Array[String] - Outpoints should be in the format `txid:vout`
-- address: String - Optional, address to do the collaborative transaction to
-- nodeId: String - Optional, The pubkey of the node to open the channel to
-- peerAddr: String - Optional, IP or onion address of the peer
+- outpoints: Array[String] - outpoints should be in the `txid:vout` format
+- address: String - optional, address to do the collaborative transaction to
+- nodeId: String - optional, the node's pubkey to open the channel to
+- peerAddr: String - optional, IP or Onion Service's address of the peer
 
 #### Response
 
