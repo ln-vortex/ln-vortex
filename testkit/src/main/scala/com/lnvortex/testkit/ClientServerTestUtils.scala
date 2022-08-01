@@ -11,6 +11,7 @@ import org.bitcoins.core.currency.Satoshis
 import org.bitcoins.core.number.Int32
 import org.bitcoins.core.protocol.transaction.Transaction
 import org.bitcoins.core.psbt.PSBT
+import org.bitcoins.core.wallet.fee.SatoshisPerVirtualByte
 import org.bitcoins.crypto.{DoubleSha256DigestBE, FieldElement, Sha256Digest}
 import org.bitcoins.lnd.rpc.LndRpcClient
 import org.bitcoins.testkit.async.TestAsyncUtil
@@ -242,9 +243,16 @@ trait ClientServerTestUtils {
       coordinator: VortexCoordinator,
       peerLnd: LndRpcClient)(implicit ec: ExecutionContext): Future[Unit] = {
     for {
+      all <- client.listCoins()
       psbt <- signPSBT(peerId, client, coordinator, peerLnd)
 
-      _ <- coordinator.registerPSBTSignatures(peerId, psbt)
+      tx <- coordinator.registerPSBTSignatures(peerId, psbt)
+
+      inputUtxos = all.filter(t =>
+        tx.inputs.map(_.previousOutput).contains(t.outPoint))
+      inputAmt = inputUtxos.map(_.amount).sum
+      // regtest uses 1 sat/vbyte fee
+      _ = assert(SatoshisPerVirtualByte.calc(inputAmt, tx).toLong == 1)
 
       // Mine some blocks
       _ <- coordinator.bitcoind.getNewAddress.flatMap(
@@ -269,6 +277,12 @@ trait ClientServerTestUtils {
 
       tx <- coordinator.registerPSBTSignatures(peerId, psbt)
 
+      inputUtxos = all.filter(t =>
+        tx.inputs.map(_.previousOutput).contains(t.outPoint))
+      inputAmt = inputUtxos.map(_.amount).sum
+      // regtest uses 1 sat/vbyte fee
+      _ = assert(SatoshisPerVirtualByte.calc(inputAmt, tx).toLong == 1)
+
       _ <- coordinator.bitcoind.sendRawTransaction(tx)
 
       // Mine some blocks
@@ -290,6 +304,9 @@ trait ClientServerTestUtils {
       coordinator: VortexCoordinator)(implicit
       ec: ExecutionContext): Future[Unit] = {
     for {
+      utxosA <- clientA.listCoins()
+      utxosB <- clientB.listCoins()
+
       (psbtA, psbtB) <- signPSBT(peerIdA,
                                  peerIdB,
                                  clientA,
@@ -304,6 +321,12 @@ trait ClientServerTestUtils {
       tx2 <- regBF
 
       _ = require(tx == tx2)
+
+      inputUtxos = (utxosA ++ utxosB).filter(t =>
+        tx.inputs.map(_.previousOutput).contains(t.outPoint))
+      inputAmt = inputUtxos.map(_.amount).sum
+      // regtest uses 1 sat/vbyte fee
+      _ = assert(SatoshisPerVirtualByte.calc(inputAmt, tx).toLong == 1)
 
       _ <- coordinator.bitcoind.sendRawTransaction(tx)
 
@@ -408,6 +431,12 @@ trait ClientServerTestUtils {
       tx <- regAF
       tx2 <- regBF
       _ = assert(tx == tx2)
+
+      inputUtxos = (utxosA ++ utxosB).filter(t =>
+        tx.inputs.map(_.previousOutput).contains(t.outPoint))
+      inputAmt = inputUtxos.map(_.amount).sum
+      // regtest uses 1 sat/vbyte fee
+      _ = assert(SatoshisPerVirtualByte.calc(inputAmt, tx).toLong == 1)
 
       height <- coordinator.bitcoind.getBlockCount
 
