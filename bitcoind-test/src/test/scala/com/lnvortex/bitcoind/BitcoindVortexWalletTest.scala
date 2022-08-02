@@ -13,6 +13,7 @@ import org.bitcoins.testkit.rpc.CachedBitcoindV23
 import org.scalatest.FutureOutcome
 
 import scala.concurrent.Future
+import scala.concurrent.duration.DurationInt
 
 class BitcoindVortexWalletTest extends BitcoinSFixture with CachedBitcoindV23 {
 
@@ -58,7 +59,7 @@ class BitcoindVortexWalletTest extends BitcoinSFixture with CachedBitcoindV23 {
     for {
       utxos <- wallet.listCoins()
       outRefs = utxos.map(_.outputReference)
-      proofFs = outRefs.map(wallet.createInputProof(nonce, _))
+      proofFs = outRefs.map(wallet.createInputProof(nonce, _, 3600.seconds))
       proofs <- Future.sequence(proofFs)
     } yield {
       val inputRefs = outRefs.zip(proofs).map { case (outRef, proof) =>
