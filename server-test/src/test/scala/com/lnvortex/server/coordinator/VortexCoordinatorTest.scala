@@ -71,6 +71,39 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
     } yield succeed
   }
 
+  it must "fail to register inputs without minimal utxos" in { coordinator =>
+    val bitcoind = coordinator.bitcoind
+    for {
+      aliceDb <- coordinator.getNonce(Sha256Digest.empty,
+                                      TestActorRef("test"),
+                                      AskNonce(coordinator.getCurrentRoundId))
+      _ <- coordinator.beginInputRegistration()
+
+      utxos <- bitcoind.listUnspent.map(_.map { utxo =>
+        val outpoint = TransactionOutPoint(utxo.txid, UInt32(utxo.vout))
+        val output = TransactionOutput(utxo.amount, utxo.scriptPubKey.get)
+        OutputReference(outpoint, output)
+      })
+      inputRefFs = utxos.map { outputRef =>
+        val tx = InputReference.constructInputProofTx(outputRef, aliceDb.nonce)
+        bitcoind.walletProcessPSBT(PSBT.fromUnsignedTx(tx)).map { signed =>
+          val proof =
+            signed.psbt.inputMaps.head.finalizedScriptWitnessOpt.get.scriptWitness
+          InputReference(outputRef, proof)
+        }
+      }
+
+      inputRefs <- Future.sequence(inputRefFs)
+      addr <- bitcoind.getNewAddress
+
+      blind = ECPrivateKey.freshPrivateKey.fieldElement
+      registerInputs = RegisterInputs(inputRefs, blind, Some(addr.scriptPubKey))
+
+      res <- recoverToSucceededIf[NonMinimalInputsException](
+        coordinator.registerAlice(Sha256Digest.empty, registerInputs))
+    } yield res
+  }
+
   it must "fail to register inputs with duplicate change addresses" in {
     coordinator =>
       val bitcoind = coordinator.bitcoind

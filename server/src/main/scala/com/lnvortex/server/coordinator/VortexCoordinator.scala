@@ -512,7 +512,14 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
     val f = for {
       (roundDb, aliceDbOpt, otherInputDbs, isRemix) <- dbF
       validInputs <- validInputsF
-    } yield (isRemix, aliceDbOpt, validInputs, otherInputDbs, roundDb)
+      isMinimal = registerInputs.isMinimal(mixDetails.getTargetAmount(isRemix))
+      isMinimalErr =
+        if (isMinimal) None
+        else
+          Some(new NonMinimalInputsException(
+            "Inputs are not minimal, user is attempting to register too many coins"))
+      inputsErrorOpt = validInputs.orElse(isMinimalErr)
+    } yield (isRemix, aliceDbOpt, inputsErrorOpt, otherInputDbs, roundDb)
 
     f.flatMap {
       case (isRemix, aliceDbOpt, inputsErrorOpt, otherInputDbs, roundDb) =>

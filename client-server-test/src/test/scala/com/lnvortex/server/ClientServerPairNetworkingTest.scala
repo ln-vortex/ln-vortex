@@ -8,6 +8,7 @@ import org.bitcoins.testkit.EmbeddedPg
 import org.bitcoins.testkit.async.TestAsyncUtil
 
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
+import scala.util.Random
 
 class ClientServerPairNetworkingTest
     extends ClientServerPairFixture
@@ -28,7 +29,7 @@ class ClientServerPairNetworkingTest
         _ <- client.askNonce()
 
         // don't select all coins
-        utxos <- client.listCoins().map(_.tail)
+        utxos <- client.listCoins().map(c => Random.shuffle(c).take(1))
         _ <- client.queueCoins(utxos.map(_.outputReference), nodeId, None)
 
         _ <- client.cancelRegistration()
@@ -58,7 +59,7 @@ class ClientServerPairNetworkingTest
       roundId = coordinator.getCurrentRoundId
 
       // don't select all coins
-      utxos <- client.listCoins().map(_.tail)
+      utxos <- client.listCoins().map(c => Random.shuffle(c).take(1))
       _ <- client.queueCoins(utxos.map(_.outputReference), nodeId, None)
 
       _ <- coordinator.beginInputRegistration()

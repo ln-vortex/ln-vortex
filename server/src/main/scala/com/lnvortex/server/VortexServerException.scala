@@ -7,6 +7,9 @@ sealed abstract class VortexServerException(private val reason: String)
 
 object VortexServerException {
 
+  class NonMinimalInputsException(private val reason: String)
+      extends VortexServerException(reason)
+
   class InvalidInputsException(private val reason: String)
       extends VortexServerException(reason)
 

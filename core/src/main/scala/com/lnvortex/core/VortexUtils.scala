@@ -1,6 +1,7 @@
 package com.lnvortex.core
 
-import org.bitcoins.core.protocol.transaction.Transaction
+import org.bitcoins.core.currency.CurrencyUnit
+import org.bitcoins.core.protocol.transaction._
 
 trait VortexUtils {
 
@@ -11,6 +12,14 @@ trait VortexUtils {
 
     // Anonymity set cannot be larger than the number of inputs.
     Math.min(numInputs, equalOutputs)
+  }
+
+  def isMinimalSelection(
+      outputRefs: Vector[OutputReference],
+      target: CurrencyUnit): Boolean = {
+    val total = outputRefs.map(_.output.value).sum
+
+    !outputRefs.exists(o => total - o.output.value >= target)
   }
 }
 

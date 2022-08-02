@@ -252,7 +252,7 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
 
         val isRemix =
           outputRefs.size == 1 && outputRefs.head.output.value == round.amount
-        val roundFee = if (isRemix) Satoshis.zero else round.mixFee
+        val target = round.getTargetAmount(isRemix)
 
         logger.info(
           s"Queueing ${outputRefs.size} coins to open a channel to $nodeId")
@@ -274,11 +274,12 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
         ) {
           throw new InvalidInputException(
             s"Cannot have inputs from duplicate addresses")
-        } else if (
-          outputRefs.map(_.output.value).sum < round.amount + roundFee
-        ) {
+        } else if (outputRefs.map(_.output.value).sum < target) {
           throw new InvalidInputException(
-            s"Must select more inputs to find round, needed ${round.amount + roundFee}")
+            s"Must select more inputs to find round, needed $target")
+        } else if (!VortexUtils.isMinimalSelection(outputRefs, target)) {
+          throw new InvalidInputException(
+            s"Must select minimal inputs for target amount, please deselect some")
         } else {
           checkMinChanSize(amount = round.amount,
                            nodeId = nodeId,
@@ -304,9 +305,11 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
           s"At invalid state $state, cannot queue coins")
       case receivedNonce: ReceivedNonce =>
         val round = receivedNonce.round
+
         val isRemix =
           outputRefs.size == 1 && outputRefs.head.output.value == round.amount
-        val roundFee = if (isRemix) Satoshis.zero else round.mixFee
+        val target = round.getTargetAmount(isRemix)
+
         logger.info(
           s"Queueing ${outputRefs.size} coins for collaborative transaction")
         if (
@@ -323,11 +326,12 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
         ) {
           throw new InvalidInputException(
             s"Cannot have inputs from duplicate addresses")
-        } else if (
-          outputRefs.map(_.output.value).sum < round.amount + roundFee
-        ) {
+        } else if (outputRefs.map(_.output.value).sum < target) {
           throw new InvalidInputException(
-            s"Must select more inputs to find round, needed ${round.amount + roundFee}")
+            s"Must select more inputs to find round, needed $target")
+        } else if (!VortexUtils.isMinimalSelection(outputRefs, target)) {
+          throw new InvalidInputException(
+            s"Must select minimal inputs for target amount, please deselect some")
         } else {
           roundDetails = receivedNonce.nextStage(inputs = outputRefs,
                                                  addressOpt = Some(address),
