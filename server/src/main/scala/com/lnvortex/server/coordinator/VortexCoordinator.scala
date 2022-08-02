@@ -572,7 +572,8 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       registerInputs: RegisterInputs,
       banError: VortexServerException,
       roundId: DoubleSha256Digest): Future[Nothing] = {
-    val bannedUntil = TimeUtil.now.plusSeconds(3600) // 1 hour
+    val bannedUntil =
+      TimeUtil.now.plusSeconds(config.badInputsBanDuration.toSeconds)
 
     val banDbs = registerInputs.inputs
       .map(_.outPoint)
@@ -826,7 +827,9 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
                 signed <- Future.fromTry(signedT)
               } yield signed
             } else {
-              val bannedUntil = TimeUtil.now.plusSeconds(86400) // 1 day
+              val bannedUntil =
+                TimeUtil.now.plusSeconds(
+                  config.invalidSignatureBanDuration.toSeconds)
 
               val exception: Exception = if (!sameTx) {
                 new DifferentTransactionException(
@@ -885,7 +888,8 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       // ban inputs that didn't sign
       inputsToBan <- inputsDAO.findByPeerIdsAction(unsignedPeerIds,
                                                    round.roundId)
-      bannedUntil = TimeUtil.now.plusSeconds(86400) // 1 day
+      bannedUntil = TimeUtil.now.plusSeconds(
+        config.invalidSignatureBanDuration.toSeconds)
       banReason = s"Alice never signed in round ${round.roundId.hex}"
       banDbs = inputsToBan.map(db =>
         BannedUtxoDb(db.outPoint, bannedUntil, banReason))

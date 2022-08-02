@@ -149,6 +149,16 @@ case class VortexCoordinatorAppConfig(
     FiniteDuration(dur.getSeconds, SECONDS)
   }
 
+  lazy val badInputsBanDuration: FiniteDuration = {
+    val dur = config.getDuration(s"$moduleName.badInputsBanDuration")
+    FiniteDuration(dur.getSeconds, SECONDS)
+  }
+
+  lazy val invalidSignatureBanDuration: FiniteDuration = {
+    val dur = config.getDuration(s"$moduleName.invalidSignatureBanDuration")
+    FiniteDuration(dur.getSeconds, SECONDS)
+  }
+
   def initialize(): Unit = {
     if (!kmConf.seedExists()) {
       BIP39KeyManager.initialize(aesPasswordOpt = aesPasswordOpt,
