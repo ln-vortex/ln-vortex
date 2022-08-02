@@ -48,7 +48,13 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
 
   private[lnvortex] def setRound(adv: MixDetails): Unit = {
     if (VortexClient.knownVersions.contains(adv.version)) {
-      roundDetails = KnownRound(adv)
+      roundDetails match {
+        case NoDetails | _: ReceivedNonce | _: KnownRound |
+            _: InputsScheduled =>
+          roundDetails = KnownRound(adv)
+        case state: InitializedRound =>
+          throw new IllegalStateException(s"Cannot set round at state $state")
+      }
     } else {
       throw new RuntimeException(
         s"Received unknown mix version ${adv.version.toInt}, consider updating software")

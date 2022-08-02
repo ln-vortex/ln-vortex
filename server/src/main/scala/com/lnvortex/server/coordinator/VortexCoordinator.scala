@@ -130,7 +130,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
 
   private var inputRegStartTime = roundStartTime
 
-  def getInputRegStartTime: Long = inputRegStartTime
+  private[lnvortex] val allConnections = mutable.ListBuffer[ActorRef]()
 
   private[lnvortex] val connectionHandlerMap: mutable.Map[
     Sha256Digest,
@@ -145,7 +145,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
 
   private var completedTxP: Promise[Transaction] = Promise[Transaction]()
 
-  def newRound(disconnect: Boolean = true): Future[RoundDb] = {
+  def newRound(announce: Boolean = true): Future[RoundDb] = {
     val feeRateF = updateFeeRate()
     // generate new round id
     currentRoundId = genRoundId()
@@ -158,9 +158,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
     completedTxP = Promise[Transaction]()
 
     // disconnect peers so they all get new ids
-    if (disconnect) {
-      disconnectPeers()
-    }
+    disconnectPeers()
     // clear maps
     connectionHandlerMap.clear()
     signedPMap.clear()
@@ -192,17 +190,32 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       // handling sending blinded sig to alices
       inputsRegisteredP.future
         .flatMap(_ => beginOutputRegistration())
-        .recoverWith(_ => reconcileRound(isNewRound = true))
+        .recoverWith { case ex: Throwable =>
+          logger.info("Failed to complete input registration: ", ex)
+          reconcileRound(isNewRound = true)
+        }
 
       // handle sending psbt when all outputs registered
       outputsRegisteredP.future
         .flatMap(_ => sendUnsignedPSBT())
         .map(_ => ())
-        .recoverWith(_ => reconcileRound(isNewRound = true))
+        .recoverWith { ex: Throwable =>
+          logger.info("Failed to complete output registration: ", ex)
+          // todo, should we re-make to new round?
+          reconcileRound(isNewRound = true)
+        }
 
       completedTxP.future
         .flatMap(onCompletedTransaction)
         .recoverWith(_ => reconcileRound(isNewRound = false))
+
+      // Send round details to peers that were not in prev round
+      if (announce) {
+        logger.info("Sending new round details to peers")
+        allConnections.foreach { peer =>
+          peer ! mixDetails
+        }
+      }
 
       // return round
       created
@@ -212,7 +225,10 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
   private def disconnectPeers(): Unit = {
     if (connectionHandlerMap.values.nonEmpty) {
       logger.info("Disconnecting peers")
-      connectionHandlerMap.values.foreach(_ ! CloseConnection)
+      connectionHandlerMap.values.foreach { peer =>
+        allConnections -= peer
+        peer ! CloseConnection
+      }
     }
   }
 
@@ -252,6 +268,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
     beginInputRegistrationCancellable = None
     inputRegStartTime = TimeUtil.currentEpochSecond
 
+    // Wait 3 seconds to help prevent race conditions in clients
     val feeRateF =
       AsyncUtil.nonBlockingSleep(3.seconds).flatMap(_ => updateFeeRate())
 
@@ -877,7 +894,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       // save connectionHandlerMap because newRound() will clear it
       oldMap = connectionHandlerMap
       // restart round with good alices
-      newRound <- newRound(disconnect = false)
+      newRound <- newRound(announce = isNewRound)
 
       _ <-
         if (isNewRound) Future.unit

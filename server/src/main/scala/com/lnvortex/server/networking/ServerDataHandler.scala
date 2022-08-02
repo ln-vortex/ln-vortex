@@ -6,9 +6,7 @@ import com.lnvortex.core._
 import com.lnvortex.server.coordinator.VortexCoordinator
 import grizzled.slf4j.Logging
 import org.bitcoins.crypto._
-import scodec.bits.ByteVector
 
-import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent._
 
 class ServerDataHandler(
@@ -22,8 +20,6 @@ class ServerDataHandler(
   override def preStart(): Unit = {
     val _ = context.watch(connectionHandler)
   }
-
-  val lastPing = new AtomicReference(ByteVector.empty.toArray)
 
   override def receive: Receive = LoggingReceive {
     case _: PingTLV =>
@@ -52,6 +48,7 @@ class ServerDataHandler(
       case AskMixDetails(network) =>
         val currentNetwork = coordinator.config.network
         if (currentNetwork == network) {
+          coordinator.allConnections += connectionHandler
           connectionHandler ! coordinator.mixDetails
           Future.unit
         } else {

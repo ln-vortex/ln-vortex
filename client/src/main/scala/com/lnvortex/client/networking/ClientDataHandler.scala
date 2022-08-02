@@ -33,7 +33,7 @@ class ClientDataHandler(
       connectionHandler ! pong
     case _: PongTLV => ()
     case serverMessage: ServerVortexMessage =>
-      logger.info(s"Received VortexMessage ${serverMessage.typeName}")
+      logger.debug(s"Received VortexMessage ${serverMessage.typeName}")
       val f: Future[Unit] = handleVortexMessage(serverMessage)
       f.failed.foreach { err =>
         logger.error(s"Failed to process vortexMessage=$serverMessage", err)
@@ -53,6 +53,7 @@ class ClientDataHandler(
       message: ServerVortexMessage): Future[Unit] = {
     message match {
       case adv: MixDetails =>
+        logger.info(s"Received round details ${adv.roundId.hex}")
         vortexClient.setRound(adv)
         Future.unit
       case NonceMessage(schnorrNonce) =>
