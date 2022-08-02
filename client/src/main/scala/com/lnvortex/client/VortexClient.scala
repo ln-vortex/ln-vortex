@@ -167,7 +167,7 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
         peerAddrOpt match {
           case None =>
             Future.failed(new IllegalArgumentException(
-              s"Not connected to peer $nodeId, you must connect with them in order to open a channel to them"))
+              s"Not connected to peer $nodeId, you must first connect with them in order to open a channel"))
           case Some(peerAddr) =>
             val peerStr = s"${peerAddr.getHostName}:${peerAddr.getPort}"
             logger.info(s"Connecting to peer $peerStr")
@@ -190,11 +190,11 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
                                                 amount,
                                                 privateChannel = true)
         _ <- vortexWallet.cancelPendingChannel(details.id)
-      } yield logger.debug("Peer has a correct min chan size")
+      } yield logger.debug("Peer has a correct minimum channel size")
 
       f.recover { case ex: Throwable =>
-        logger.error(s"Error from ln node: ${ex.getMessage}", ex)
-        throw new RuntimeException(s"$amount is under peer's min chan size")
+        logger.error(s"Error from Lightning node: ${ex.getMessage}", ex)
+        throw new RuntimeException(s"$amount is under peer's minimum channel size")
       }
     }
   }
@@ -264,13 +264,13 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
             _.output.scriptPubKey.scriptType == round.inputType)
         ) {
           throw new InvalidInputException(
-            s"Inputs must be of type ${round.inputType}")
+            s"Error. Must use ${round.inputType} inputs")
         } else if (outputRefs.map(_.output.value).sum < round.amount) {
           throw new InvalidInputException(
             s"Must select more inputs to find round, needed ${round.amount}")
         } else if (round.outputType != ScriptType.WITNESS_V0_SCRIPTHASH) {
           throw new InvalidMixedOutputException(
-            "This version of lnd only supports SegwitV0 channels")
+            "This version of LND only supports SegwitV0 channels")
         } else if (
           outputRefs.distinctBy(_.output.scriptPubKey).size != outputRefs.size
         ) {
@@ -319,10 +319,10 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
             _.output.scriptPubKey.scriptType == round.inputType)
         ) {
           throw new InvalidInputException(
-            s"Inputs must be of type ${round.inputType}")
+            s"Error. Must use ${round.inputType} inputs")
         } else if (address.scriptPubKey.scriptType != round.outputType) {
           throw new InvalidMixedOutputException(
-            s"Address must be of type ${round.outputType}")
+            s"Error. Must use ${round.outputType} address")
         } else if (
           outputRefs.distinctBy(_.output.scriptPubKey).size != outputRefs.size
         ) {
@@ -412,7 +412,7 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
                     details.address.scriptPubKey.scriptType != round.outputType
                   ) {
                     throw new InvalidMixedOutputException(
-                      s"Channel type is invalid, need output of type ${round.outputType}")
+                      s"The channel is invalid, need a ${round.outputType} output")
                   } else details
                 }
             case None =>
@@ -422,7 +422,7 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
                     Future.successful(addr)
                   } else {
                     Future.failed(new InvalidMixedOutputException(
-                      s"Need address of type ${round.outputType}, got ${addr.scriptPubKey.scriptType}"))
+                      s"Need a ${round.outputType} address, got ${addr.scriptPubKey.scriptType}"))
                   }
                 case None => vortexWallet.getNewAddress(round.outputType)
               }
@@ -467,7 +467,7 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
   }
 
   def processBlindOutputSig(blindOutputSig: FieldElement): RegisterMixOutput = {
-    logger.info("Got blind sig from coordinator, processing..")
+    logger.info("Got blind signature from coordinator, processing...")
     roundDetails match {
       case state @ (NoDetails | _: KnownRound | _: ReceivedNonce |
           _: InputsScheduled | _: MixOutputRegistered | _: PSBTSigned) =>
@@ -506,7 +506,7 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
   }
 
   def validateAndSignPsbt(unsigned: PSBT): Future[PSBT] = {
-    logger.info("Received unsigned psbt from coordinator, verifying...")
+    logger.info("Received unsigned PSBT from coordinator, verifying...")
     roundDetails match {
       case state @ (NoDetails | _: KnownRound | _: ReceivedNonce |
           _: InputsScheduled | _: InputsRegistered | _: PSBTSigned) =>
@@ -547,11 +547,11 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
               case (None, None) => true
               case (Some(_), None) =>
                 logger.error(
-                  "Incorrect state expecting change when having no change address")
+                  "Incorrect state, expecting change when having no change address")
                 false
               case (None, Some(_)) =>
                 logger.error(
-                  "Incorrect state has change address when expecting no change")
+                  "Incorrect state, has change address when expecting no change")
                 false
             }
 
@@ -595,9 +595,9 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
               new DustOutputsException("Transaction contains dust outputs"))
           } else if (!goodFeeRate) {
             Future.failed(
-              new TooLowOfFeeException("Transaction has too low of a fee"))
+              new TooLowOfFeeException("Transaction has a too low fee"))
           } else {
-            logger.info("PSBT is valid, giving channel peer")
+            logger.info("PSBT is valid, giving channel peer...")
             for {
               // tell peer about funding psbt
               _ <- state.initDetails.nodeIdOpt match {
@@ -606,7 +606,7 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
                                                    unsigned)
                 case None => Future.unit // skip if on-chain
               }
-              _ = logger.info("Valid with channel peer, signing")
+              _ = logger.info("Valid with channel peer, signing...")
               // sign to be sent to coordinator
               signed <- vortexWallet.signPSBT(unsigned, inputs)
             } yield {
@@ -625,7 +625,7 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
         throw new IllegalStateException(
           s"At invalid state $state, cannot restartRound")
       case state: PSBTSigned =>
-        logger.info("Round restarted..")
+        logger.info("Round restarted...")
 
         val cancelF = state.initDetails.nodeIdOpt match {
           case Some(nodeId) =>
@@ -648,7 +648,7 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
           new IllegalStateException(
             s"At invalid state $state, cannot completeRound"))
       case state: PSBTSigned =>
-        logger.info("Round complete!!")
+        logger.info("Round complete!")
         val anonSet = VortexUtils.getAnonymitySet(
           signedTx,
           state.channelOutpoint.vout.toInt)
@@ -658,7 +658,7 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
         for {
           _ <- vortexWallet.broadcastTransaction(signedTx)
           _ <- vortexWallet
-            .labelTransaction(signedTx.txId, s"LnVortex Mix Anon set: $anonSet")
+            .labelTransaction(signedTx.txId, s"LnVortex Mix Anonimity set: $anonSet")
             .recover(_ => ())
           _ <- utxoDAO.setAnonSets(state.initDetails.inputs.map(_.outPoint),
                                    state.channelOutpoint,
