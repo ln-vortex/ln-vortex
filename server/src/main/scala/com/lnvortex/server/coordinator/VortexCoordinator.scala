@@ -201,7 +201,8 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
         .map(_ => ())
         .recoverWith { ex: Throwable =>
           logger.info("Failed to complete output registration: ", ex)
-          // todo, should we re-make to new round?
+          // We need to make a new round because we
+          // don't know which inputs didn't register
           reconcileRound(isNewRound = true)
         }
 
