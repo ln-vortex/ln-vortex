@@ -82,66 +82,21 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
 
   private def roundAddressLabel: String = s"Vortex Round: ${currentRoundId.hex}"
 
-  private[coordinator] def inputFee: CurrencyUnit =
-    feeRate * getScriptTypeInputSize(config.inputScriptType)
+  private[coordinator] def inputFee: CurrencyUnit = {
+    FeeCalculator.inputFee(feeRate, config.inputScriptType)
+  }
 
   private[coordinator] def outputFee(
       feeRate: SatoshisPerVirtualByte = feeRate,
       numPeers: Int = config.minPeers): CurrencyUnit = {
-    val outputSize = getScriptTypeOutputSize(config.outputScriptType)
-
-    val coordinatorOutputSize = getScriptTypeOutputSize(config.changeScriptType)
-    val txOverhead = 10.5
-
-    val peerShare =
-      (coordinatorOutputSize + txOverhead) / numPeers.toDouble
-
-    feeRate * (outputSize + peerShare).ceil.toLong
+    FeeCalculator.outputFee(feeRate = feeRate,
+                            outputScriptType = config.outputScriptType,
+                            coordinatorScriptType = config.changeScriptType,
+                            numPeers = numPeers)
   }
 
-  private[coordinator] def changeOutputFee: CurrencyUnit =
-    feeRate * getScriptTypeOutputSize(config.changeScriptType)
-
-  /** Returns the expected size of an input for the script type in vbytes
-    * @see https://twitter.com/murchandamus/status/1262062602298916865/photo/1
-    */
-  private def getScriptTypeInputSize(scriptType: ScriptType): Int = {
-    scriptType match {
-      case tpe @ (ScriptType.NONSTANDARD | ScriptType.MULTISIG |
-          ScriptType.CLTV | ScriptType.CSV |
-          ScriptType.NONSTANDARD_IF_CONDITIONAL |
-          ScriptType.NOT_IF_CONDITIONAL | ScriptType.MULTISIG_WITH_TIMEOUT |
-          ScriptType.PUBKEY_WITH_TIMEOUT | ScriptType.NULLDATA |
-          ScriptType.WITNESS_UNKNOWN | ScriptType.WITNESS_COMMITMENT |
-          ScriptType.WITNESS_V0_SCRIPTHASH) =>
-        throw new IllegalArgumentException(s"Unknown address type $tpe")
-      case ScriptType.PUBKEY             => 113
-      case ScriptType.PUBKEYHASH         => 148
-      case ScriptType.SCRIPTHASH         => 91
-      case ScriptType.WITNESS_V0_KEYHASH => 68
-      case ScriptType.WITNESS_V1_TAPROOT => 58
-    }
-  }
-
-  /** Returns the expected size of an output for the script type in vbytes
-    * @see https://twitter.com/murchandamus/status/1262062602298916865/photo/1
-    */
-  private def getScriptTypeOutputSize(scriptType: ScriptType): Int = {
-    scriptType match {
-      case tpe @ (ScriptType.NONSTANDARD | ScriptType.MULTISIG |
-          ScriptType.CLTV | ScriptType.CSV |
-          ScriptType.NONSTANDARD_IF_CONDITIONAL |
-          ScriptType.NOT_IF_CONDITIONAL | ScriptType.MULTISIG_WITH_TIMEOUT |
-          ScriptType.PUBKEY_WITH_TIMEOUT | ScriptType.NULLDATA |
-          ScriptType.WITNESS_UNKNOWN | ScriptType.WITNESS_COMMITMENT) =>
-        throw new IllegalArgumentException(s"Unknown address type $tpe")
-      case ScriptType.PUBKEY                => 44
-      case ScriptType.PUBKEYHASH            => 34
-      case ScriptType.SCRIPTHASH            => 32
-      case ScriptType.WITNESS_V0_KEYHASH    => 31
-      case ScriptType.WITNESS_V0_SCRIPTHASH => 43
-      case ScriptType.WITNESS_V1_TAPROOT    => 43
-    }
+  private[coordinator] def changeOutputFee: CurrencyUnit = {
+    FeeCalculator.changeOutputFee(feeRate, config.changeScriptType)
   }
 
   private var beginInputRegistrationCancellable: Option[Cancellable] =
@@ -673,8 +628,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
     TransactionOutput] = {
     if (isRemix) Left(Satoshis.zero)
     else {
-      val numPeers = numRemixes + numNewEntrants
-      val updatedOutputFee = outputFee(roundDb.feeRate, numPeers)
+      val updatedOutputFee = outputFee(roundDb.feeRate, numNewEntrants)
       val totalNewEntrantFee =
         Satoshis(numRemixes) * (roundDb.inputFee + updatedOutputFee)
       val newEntrantFee = totalNewEntrantFee / Satoshis(numNewEntrants)
