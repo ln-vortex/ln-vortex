@@ -10,6 +10,7 @@ import org.bitcoins.testkit.EmbeddedPg
 import org.bitcoins.testkit.async.TestAsyncUtil
 
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
+import scala.util.Random
 
 class DualClientNetworkingTest
     extends DualClientFixture
@@ -33,9 +34,9 @@ class DualClientNetworkingTest
       _ <- clientB.askNonce()
       _ <- coordinator.beginInputRegistration()
       // don't select all coins
-      utxosA <- clientA.listCoins().map(_.tail)
+      utxosA <- clientA.listCoins().map(c => Random.shuffle(c).take(1))
       _ <- clientA.queueCoins(utxosA.map(_.outputReference), nodeIdB, None)
-      utxosB <- clientB.listCoins().map(_.tail)
+      utxosB <- clientB.listCoins().map(c => Random.shuffle(c).take(1))
       _ <- clientB.queueCoins(utxosB.map(_.outputReference), nodeIdA, None)
       _ <- coordinator.beginInputRegistration()
       // wait until outputs are registered

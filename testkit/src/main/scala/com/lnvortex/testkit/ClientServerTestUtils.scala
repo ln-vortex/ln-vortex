@@ -20,6 +20,7 @@ import org.scalatest.Assertions.convertToEqualizer
 
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.Random
 
 trait ClientServerTestUtils {
 
@@ -47,8 +48,8 @@ trait ClientServerTestUtils {
     for {
       nodeId <- peerLnd.nodeId
       _ <- getNonce(peerId, client, coordinator)
-      // don't select all coins
-      utxos <- client.listCoins().map(_.tail)
+      // select random minimal utxo
+      utxos <- client.listCoins().map(c => Random.shuffle(c).take(1))
       _ <- client.queueCoins(utxos.map(_.outputReference), nodeId, None)
       msg <- coordinator.beginInputRegistration()
 
@@ -67,8 +68,8 @@ trait ClientServerTestUtils {
       ec: ExecutionContext): Future[FieldElement] = {
     for {
       _ <- getNonce(peerId, client, coordinator)
-      // don't select all coins
-      utxos <- client.listCoins().map(_.tail)
+      // select random minimal utxo
+      utxos <- client.listCoins().map(c => Random.shuffle(c).take(1))
       addr <- client.vortexWallet.getNewAddress(
         coordinator.mixDetails.outputType)
       _ = client.queueCoins(utxos.map(_.outputReference), addr)
@@ -95,12 +96,12 @@ trait ClientServerTestUtils {
       _ <- getNonce(peerIdA, clientA, coordinator)
       _ <- getNonce(peerIdB, clientB, coordinator)
 
-      // don't select all coins
-      utxos <- clientA.listCoins().map(_.tail)
+      // select random minimal utxo
+      utxos <- clientA.listCoins().map(c => Random.shuffle(c).take(1))
       _ <- clientA.queueCoins(utxos.map(_.outputReference), nodeIdB, None)
 
-      // don't select all coins
-      utxos <- clientB.listCoins().map(_.tail)
+      // select random minimal utxo
+      utxos <- clientB.listCoins().map(c => Random.shuffle(c).take(1))
       _ <- clientB.queueCoins(utxos.map(_.outputReference), nodeIdA, None)
 
       msg <- coordinator.beginInputRegistration()
@@ -380,23 +381,25 @@ trait ClientServerTestUtils {
             coins
               .filter(_.outPoint.txIdBE == txid)
               .filter(_.amount == coordinator.config.mixAmount)
-          case None => coins.tail
+          case None => Random.shuffle(coins).take(1)
         }
       }
       addrA <- clientA.vortexWallet.getNewAddress(
         coordinator.mixDetails.outputType)
-      _ = clientA.queueCoins(utxosA.map(_.outputReference), addrA)
+      coinsA = Random.shuffle(utxosA.map(_.outputReference)).take(1)
+      _ = clientA.queueCoins(coinsA, addrA)
       // select non-remix coins
       utxosB <- clientB.listCoins().map { coins =>
         txidOpt match {
           case Some(txid) =>
             coins.filterNot(_.outPoint.txIdBE == txid)
-          case None => coins.tail
+          case None => Random.shuffle(coins).take(1)
         }
       }
       addrB <- clientB.vortexWallet.getNewAddress(
         coordinator.mixDetails.outputType)
-      _ = clientB.queueCoins(utxosB.map(_.outputReference), addrB)
+      coinsB = Random.shuffle(utxosB.map(_.outputReference)).take(1)
+      _ = clientB.queueCoins(coinsB, addrB)
       msg <- coordinator.beginInputRegistration()
 
       registerInputsA <- clientA.registerCoins(msg.roundId,
@@ -448,7 +451,7 @@ trait ClientServerTestUtils {
       _ = assert(tx.lockTime.toInt == height + 1)
       _ = assert(tx.version == Int32.two)
       // check correct inputs
-      _ = (utxosA ++ utxosB).foreach { utxo =>
+      _ = (coinsA ++ coinsB).foreach { utxo =>
         assert(tx.inputs.exists(_.previousOutput == utxo.outPoint))
       }
       // check correct outputs

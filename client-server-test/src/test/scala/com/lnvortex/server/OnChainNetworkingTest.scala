@@ -7,6 +7,7 @@ import org.bitcoins.testkit.EmbeddedPg
 import org.bitcoins.testkit.async.TestAsyncUtil
 
 import scala.concurrent.duration._
+import scala.util.Random
 
 class OnChainNetworkingTest
     extends ClientServerPairFixture
@@ -26,7 +27,7 @@ class OnChainNetworkingTest
         _ <- client.askNonce()
 
         // don't select all coins
-        utxos <- client.listCoins().map(_.tail)
+        utxos <- client.listCoins().map(_.take(1))
         addr <- client.vortexWallet.getNewAddress(
           coordinator.mixDetails.outputType)
         _ = client.queueCoins(utxos.map(_.outputReference), addr)
@@ -43,7 +44,7 @@ class OnChainNetworkingTest
 
       // don't select all coins
       all <- client.listCoins()
-      utxos = all.tail
+      utxos = Random.shuffle(all).take(1)
       addr <- client.vortexWallet.getNewAddress(
         coordinator.mixDetails.outputType)
       _ = client.queueCoins(utxos.map(_.outputReference), addr)

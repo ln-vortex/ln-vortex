@@ -203,6 +203,10 @@ case class MixDetails(
       maxPeers.bytes ++
       TLV.getStringBytes(status)
   }
+
+  def getTargetAmount(isRemix: Boolean): CurrencyUnit = {
+    if (isRemix) amount else amount + mixFee
+  }
 }
 
 object MixDetails extends VortexMessageFactory[MixDetails] {
@@ -340,6 +344,10 @@ case class RegisterInputs(
       (t: InputReference) => u16Prefix(t.bytes)) ++
       blindedOutput.bytes ++
       changeSpkBytes
+  }
+
+  def isMinimal(target: CurrencyUnit): Boolean = {
+    VortexUtils.isMinimalSelection(inputs.map(_.outputReference), target)
   }
 }
 
