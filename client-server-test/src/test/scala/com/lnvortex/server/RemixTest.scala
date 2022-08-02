@@ -54,8 +54,16 @@ class RemixTest
     } yield {
       assert(roundDbs.size >= 3)
 
-      assert(coinsA.exists(_.anonSet >= 2))
-      assert(coinsB.exists(_.anonSet >= 2))
+      val changeA = coinsA.filter(_.isChange)
+      assert(changeA.size == 1, s"${changeA.size} != 1")
+      assert(changeA.forall(_.anonSet == 1))
+
+      val changeB = coinsB.filter(_.isChange)
+      assert(changeB.size == 2, s"${changeB.size} != 2")
+      assert(changeB.forall(_.anonSet == 1))
+
+      assert(coinsA.count(_.anonSet == 3) == 1)
+      assert(coinsB.count(_.anonSet == 2) == 2)
     }
   }
 }
