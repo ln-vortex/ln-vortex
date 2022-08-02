@@ -18,6 +18,7 @@ import scodec.bits.ByteVector
 
 import java.net.InetSocketAddress
 import scala.concurrent._
+import scala.concurrent.duration.FiniteDuration
 import scala.util.Try
 
 case class CLightningVortexWallet(clightning: CLightningRpcClient)(implicit
@@ -79,14 +80,18 @@ case class CLightningVortexWallet(clightning: CLightningRpcClient)(implicit
 
   override def createInputProof(
       nonce: SchnorrNonce,
-      outputRef: OutputReference): Future[ScriptWitness] = {
+      outputRef: OutputReference,
+      reserveDuration: FiniteDuration): Future[ScriptWitness] = {
     val tx = InputReference.constructInputProofTx(outputRef, nonce)
     val psbt = PSBT
       .fromUnsignedTx(tx)
       .addWitnessUTXOToInput(outputRef.output, 0)
 
+    val blocks = reserveDuration.toMinutes / 10.0
     for {
-      _ <- clightning.reserveInputs(psbt, exclusive = false, reserve = 100)
+      _ <- clightning.reserveInputs(psbt,
+                                    exclusive = false,
+                                    reserve = blocks.toInt)
       signed <- clightning.signPSBT(psbt)
       finalized <- Future.fromTry(signed.finalizeInput(0))
     } yield finalized.inputMaps.head.finalizedScriptWitnessOpt.get.scriptWitness

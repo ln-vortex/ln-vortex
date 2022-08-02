@@ -15,6 +15,7 @@ import org.bitcoins.core.script.ScriptType
 import org.bitcoins.crypto._
 
 import scala.concurrent.Future
+import scala.concurrent.duration.DurationInt
 
 class CLightningVortexWalletTest extends CLightningVortexWalletFixture {
 
@@ -49,7 +50,7 @@ class CLightningVortexWalletTest extends CLightningVortexWalletFixture {
     for {
       utxos <- wallet.listCoins()
       outRefs = utxos.map(_.outputReference)
-      proofFs = outRefs.map(wallet.createInputProof(nonce, _))
+      proofFs = outRefs.map(wallet.createInputProof(nonce, _, 3600.seconds))
       proofs <- Future.sequence(proofFs)
     } yield {
       val inputRefs = outRefs.zip(proofs).map { case (outRef, proof) =>

@@ -15,6 +15,7 @@ import scodec.bits.ByteVector
 
 import java.net.InetSocketAddress
 import scala.concurrent._
+import scala.concurrent.duration.FiniteDuration
 
 abstract class VortexWalletApi extends StartStopAsync[Unit] {
 
@@ -36,7 +37,8 @@ abstract class VortexWalletApi extends StartStopAsync[Unit] {
     */
   def createInputProof(
       nonce: SchnorrNonce,
-      outputRef: OutputReference): Future[ScriptWitness]
+      outputRef: OutputReference,
+      reserveDuration: FiniteDuration): Future[ScriptWitness]
 
   def signPSBT(psbt: PSBT, inputs: Vector[OutputReference]): Future[PSBT]
 

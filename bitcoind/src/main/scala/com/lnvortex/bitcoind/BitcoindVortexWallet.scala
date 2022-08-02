@@ -19,6 +19,7 @@ import scodec.bits.ByteVector
 
 import java.net.InetSocketAddress
 import scala.concurrent.Future
+import scala.concurrent.duration.FiniteDuration
 
 case class BitcoindVortexWallet(
     bitcoind: BitcoindRpcClient,
@@ -88,7 +89,8 @@ case class BitcoindVortexWallet(
 
   override def createInputProof(
       nonce: SchnorrNonce,
-      outputRef: OutputReference): Future[ScriptWitness] = {
+      outputRef: OutputReference,
+      reserveDuration: FiniteDuration): Future[ScriptWitness] = {
     val tx = InputReference.constructInputProofTx(outputRef, nonce)
     val psbt = PSBT.fromUnsignedTx(tx)
 

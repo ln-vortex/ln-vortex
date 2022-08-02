@@ -25,7 +25,7 @@ import org.bitcoins.core.wallet.fee.SatoshisPerVirtualByte
 import org.bitcoins.crypto._
 
 import java.net.InetSocketAddress
-import scala.concurrent.duration.DurationInt
+import scala.concurrent.duration._
 import scala.concurrent.{Future, Promise}
 
 case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
@@ -364,9 +364,14 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
 
         val needsChange = changeAmt >= Policy.dustThreshold
 
+        // Reserve utxos until 10 minutes after the round is scheduled.
+        val timeUtilRound =
+          round.time.toLong + 600 - TimeUtil.currentEpochSecond
+
         for {
           inputProofs <- FutureUtil.sequentially(outputRefs)(
-            vortexWallet.createInputProof(scheduled.nonce, _))
+            vortexWallet
+              .createInputProof(scheduled.nonce, _, timeUtilRound.seconds))
 
           inputRefs = outputRefs.zip(inputProofs).map { case (outRef, proof) =>
             InputReference(outRef, proof)

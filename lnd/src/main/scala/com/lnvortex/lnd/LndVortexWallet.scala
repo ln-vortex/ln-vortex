@@ -23,7 +23,7 @@ import signrpc.{SignDescriptor, SignMethod, SignReq}
 import walletrpc.LabelTransactionRequest
 
 import java.net.InetSocketAddress
-import scala.concurrent.duration.DurationInt
+import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
 case class LndVortexWallet(lndRpcClient: LndRpcClient)(implicit
@@ -71,7 +71,8 @@ case class LndVortexWallet(lndRpcClient: LndRpcClient)(implicit
 
   override def createInputProof(
       nonce: SchnorrNonce,
-      outputRef: OutputReference): Future[ScriptWitness] = {
+      outputRef: OutputReference,
+      reserveDuration: FiniteDuration): Future[ScriptWitness] = {
     val tx = InputReference.constructInputProofTx(outputRef, nonce)
 
     val (signMethod, hashType) = getSignMethod(outputRef.output)
@@ -87,7 +88,8 @@ case class LndVortexWallet(lndRpcClient: LndRpcClient)(implicit
 
     for {
       (_, scriptWit) <- lndRpcClient.computeInputScript(signReq).map(_.head)
-      _ <- lndRpcClient.leaseOutput(outputRef.outPoint, 3600)
+      _ <- lndRpcClient.leaseOutput(outputRef.outPoint,
+                                    reserveDuration.toSeconds)
     } yield scriptWit
   }
 
