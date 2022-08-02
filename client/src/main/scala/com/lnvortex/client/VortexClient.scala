@@ -203,31 +203,33 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
       outPoints: Vector[TransactionOutPoint],
       nodeId: NodeId,
       peerAddrOpt: Option[InetSocketAddress]): Future[Unit] = {
+    require(outPoints.nonEmpty, "Must include inputs")
     listCoins().flatMap { utxos =>
       val coins = utxos
         .filter(u => outPoints.contains(u.outPoint))
-        .map(_.outputReference)
-      queueCoinsAndTryConnect(coins, nodeId, peerAddrOpt)
+
+      if (coins.exists(_.isChange))
+        require(coins.size == 1, "Cannot combine change with other coins")
+
+      val outputRefs = coins.map(_.outputReference)
+      queueCoinsAndTryConnect(outputRefs, nodeId, peerAddrOpt)
     }
   }
 
   def getCoinsAndQueue(
       outPoints: Vector[TransactionOutPoint],
       address: BitcoinAddress): Future[Unit] = {
+    require(outPoints.nonEmpty, "Must include inputs")
     listCoins().map { utxos =>
       val coins = utxos
         .filter(u => outPoints.contains(u.outPoint))
-        .map(_.outputReference)
-      queueCoins(coins, address)
-    }
-  }
 
-  def queueCoins(
-      outputRefs: Vector[OutputReference],
-      nodeUri: NodeUri): Future[Unit] = {
-    queueCoinsAndTryConnect(outputRefs,
-                            nodeUri.nodeId,
-                            Some(nodeUri.socketAddress))
+      if (coins.exists(_.isChange))
+        require(coins.size == 1, "Cannot combine change with other coins")
+
+      val outputRefs = coins.map(_.outputReference)
+      queueCoins(outputRefs, address)
+    }
   }
 
   def queueCoins(
