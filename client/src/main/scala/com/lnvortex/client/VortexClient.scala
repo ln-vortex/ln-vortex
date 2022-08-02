@@ -249,6 +249,11 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
           s"At invalid state $state, cannot queue coins")
       case receivedNonce: ReceivedNonce =>
         val round = receivedNonce.round
+
+        val isRemix =
+          outputRefs.size == 1 && outputRefs.head.output.value == round.amount
+        val roundFee = if (isRemix) Satoshis.zero else round.mixFee
+
         logger.info(
           s"Queueing ${outputRefs.size} coins to open a channel to $nodeId")
         // todo check if peer supports taproot channel if needed
@@ -269,9 +274,11 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
         ) {
           throw new InvalidInputException(
             s"Cannot have inputs from duplicate addresses")
-        } else if (outputRefs.map(_.output.value).sum < round.amount) {
+        } else if (
+          outputRefs.map(_.output.value).sum < round.amount + roundFee
+        ) {
           throw new InvalidInputException(
-            s"Must select more inputs to find round, needed ${round.amount}")
+            s"Must select more inputs to find round, needed ${round.amount + roundFee}")
         } else {
           checkMinChanSize(amount = round.amount,
                            nodeId = nodeId,
@@ -297,6 +304,9 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
           s"At invalid state $state, cannot queue coins")
       case receivedNonce: ReceivedNonce =>
         val round = receivedNonce.round
+        val isRemix =
+          outputRefs.size == 1 && outputRefs.head.output.value == round.amount
+        val roundFee = if (isRemix) Satoshis.zero else round.mixFee
         logger.info(
           s"Queueing ${outputRefs.size} coins for collaborative transaction")
         if (
@@ -313,9 +323,11 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
         ) {
           throw new InvalidInputException(
             s"Cannot have inputs from duplicate addresses")
-        } else if (outputRefs.map(_.output.value).sum < round.amount) {
+        } else if (
+          outputRefs.map(_.output.value).sum < round.amount + roundFee
+        ) {
           throw new InvalidInputException(
-            s"Must select more inputs to find round, needed ${round.amount + round.mixFee}")
+            s"Must select more inputs to find round, needed ${round.amount + roundFee}")
         } else {
           roundDetails = receivedNonce.nextStage(inputs = outputRefs,
                                                  addressOpt = Some(address),
