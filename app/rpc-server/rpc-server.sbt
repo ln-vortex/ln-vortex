@@ -9,4 +9,6 @@ assembly / assemblyMergeStrategy := {
   case _                                   => MergeStrategy.first
 }
 
+run / fork := true
+
 enablePlugins(DebianPlugin, JavaAppPackaging, NativeImagePlugin)
