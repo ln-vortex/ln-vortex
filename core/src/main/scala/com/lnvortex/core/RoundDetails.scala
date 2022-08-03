@@ -20,12 +20,12 @@ case object NoDetails extends RoundDetails {
   override val order: Int = 0
   override val status: ClientStatus = ClientStatus.NoDetails
 
-  def nextStage(round: MixDetails): KnownRound = {
+  def nextStage(round: RoundParameters): KnownRound = {
     KnownRound(round)
   }
 }
 
-case class KnownRound(round: MixDetails) extends RoundDetails {
+case class KnownRound(round: RoundParameters) extends RoundDetails {
   override val order: Int = 1
   override val status: ClientStatus = ClientStatus.KnownRound
 
@@ -33,7 +33,7 @@ case class KnownRound(round: MixDetails) extends RoundDetails {
     ReceivedNonce(round, nonce)
 }
 
-case class ReceivedNonce(round: MixDetails, nonce: SchnorrNonce)
+case class ReceivedNonce(round: RoundParameters, nonce: SchnorrNonce)
     extends RoundDetails {
   override val order: Int = 2
   override val status: ClientStatus = ClientStatus.ReceivedNonce
@@ -47,7 +47,7 @@ case class ReceivedNonce(round: MixDetails, nonce: SchnorrNonce)
 }
 
 case class InputsScheduled(
-    round: MixDetails,
+    round: RoundParameters,
     nonce: SchnorrNonce,
     inputs: Vector[OutputReference],
     addressOpt: Option[BitcoinAddress],
@@ -72,7 +72,7 @@ case class InputsScheduled(
 
 sealed trait InitializedRound extends RoundDetails {
 
-  def round: MixDetails
+  def round: RoundParameters
   def inputFee: CurrencyUnit
   def outputFee: CurrencyUnit
   def changeOutputFee: CurrencyUnit
@@ -97,7 +97,9 @@ sealed trait InitializedRound extends RoundDetails {
     }
   }
 
-  def restartRound(round: MixDetails, nonce: SchnorrNonce): InputsScheduled =
+  def restartRound(
+      round: RoundParameters,
+      nonce: SchnorrNonce): InputsScheduled =
     InputsScheduled(
       round = round,
       nonce = nonce,
@@ -109,7 +111,7 @@ sealed trait InitializedRound extends RoundDetails {
 }
 
 case class InputsRegistered(
-    round: MixDetails,
+    round: RoundParameters,
     inputFee: CurrencyUnit,
     outputFee: CurrencyUnit,
     changeOutputFee: CurrencyUnit,
@@ -129,7 +131,7 @@ case class InputsRegistered(
 }
 
 case class MixOutputRegistered(
-    round: MixDetails,
+    round: RoundParameters,
     inputFee: CurrencyUnit,
     outputFee: CurrencyUnit,
     changeOutputFee: CurrencyUnit,
@@ -150,7 +152,7 @@ case class MixOutputRegistered(
 }
 
 case class PSBTSigned(
-    round: MixDetails,
+    round: RoundParameters,
     inputFee: CurrencyUnit,
     outputFee: CurrencyUnit,
     changeOutputFee: CurrencyUnit,
@@ -184,7 +186,7 @@ case class PSBTSigned(
 
 object RoundDetails {
 
-  def getMixDetailsOpt(details: RoundDetails): Option[MixDetails] = {
+  def getRoundParamsOpt(details: RoundDetails): Option[RoundParameters] = {
     details match {
       case NoDetails                  => None
       case known: KnownRound          => Some(known.round)

@@ -113,8 +113,8 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
     lastRoundTime + config.roundInterval.toSeconds
   }
 
-  def mixDetails: MixDetails =
-    MixDetails(
+  def roundParams: RoundParameters =
+    RoundParameters(
       version = version,
       roundId = currentRoundId,
       amount = config.roundAmount,
@@ -214,7 +214,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       if (announce) {
         logger.info("Sending new round details to peers")
         allConnections.foreach { peer =>
-          peer ! mixDetails
+          peer ! roundParams
         }
       }
 
@@ -512,7 +512,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
     val f = for {
       (roundDb, aliceDbOpt, otherInputDbs, isRemix) <- dbF
       validInputs <- validInputsF
-      isMinimal = registerInputs.isMinimal(mixDetails.getTargetAmount(isRemix))
+      isMinimal = registerInputs.isMinimal(roundParams.getTargetAmount(isRemix))
       isMinimalErr =
         if (isMinimal) None
         else
@@ -920,7 +920,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
               val connectionHandler = oldMap(id)
               getNonce(id, oldMap(id), AskNonce(newRound.roundId)).map { db =>
                 val nonceMsg = NonceMessage(db.nonce)
-                connectionHandler ! RestartRoundMessage(mixDetails, nonceMsg)
+                connectionHandler ! RestartRoundMessage(roundParams, nonceMsg)
               }
             }
           }

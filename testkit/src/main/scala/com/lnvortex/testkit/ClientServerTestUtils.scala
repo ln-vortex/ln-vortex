@@ -3,7 +3,7 @@ package com.lnvortex.testkit
 import akka.testkit.TestActorRef
 import com.lnvortex.client._
 import com.lnvortex.core.AskNonce
-import com.lnvortex.core.RoundDetails.getMixDetailsOpt
+import com.lnvortex.core.RoundDetails.getRoundParamsOpt
 import com.lnvortex.lnd.LndVortexWallet
 import com.lnvortex.server.coordinator.VortexCoordinator
 import com.lnvortex.server.models.AliceDb
@@ -71,7 +71,7 @@ trait ClientServerTestUtils {
       // select random minimal utxo
       utxos <- client.listCoins().map(c => Random.shuffle(c).take(1))
       addr <- client.vortexWallet.getNewAddress(
-        coordinator.mixDetails.outputType)
+        coordinator.roundParams.outputType)
       _ = client.queueCoins(utxos.map(_.outputReference), addr)
       msg <- coordinator.beginInputRegistration()
 
@@ -385,14 +385,14 @@ trait ClientServerTestUtils {
       coordinator: VortexCoordinator)(implicit
       ec: ExecutionContext): Future[Transaction] = {
     // verify same roundId
-    require(coordinator.getCurrentRoundId == getMixDetailsOpt(
+    require(coordinator.getCurrentRoundId == getRoundParamsOpt(
               clientA.getCurrentRoundDetails).get.roundId,
             "Incorrect round id")
-    require(coordinator.getCurrentRoundId == getMixDetailsOpt(
+    require(coordinator.getCurrentRoundId == getRoundParamsOpt(
               clientB.getCurrentRoundDetails).get.roundId,
             "Incorrect round id")
 
-    val roundAmount = coordinator.mixDetails.amount
+    val roundAmount = coordinator.roundParams.amount
 
     for {
       _ <- getNonce(peerIdA, clientA, coordinator)
@@ -408,7 +408,7 @@ trait ClientServerTestUtils {
         }
       }
       addrA <- clientA.vortexWallet.getNewAddress(
-        coordinator.mixDetails.outputType)
+        coordinator.roundParams.outputType)
       coinsA = Random.shuffle(utxosA.map(_.outputReference)).take(1)
       _ = clientA.queueCoins(coinsA, addrA)
       // select non-remix coins
@@ -420,7 +420,7 @@ trait ClientServerTestUtils {
         }
       }
       addrB <- clientB.vortexWallet.getNewAddress(
-        coordinator.mixDetails.outputType)
+        coordinator.roundParams.outputType)
       coinsB = Random.shuffle(utxosB.map(_.outputReference)).take(1)
       _ = clientB.queueCoins(coinsB, addrB)
       msg <- coordinator.beginInputRegistration()
@@ -491,7 +491,7 @@ trait ClientServerTestUtils {
           assert(tx.outputs.count(_.value != roundAmount) == 2)
           assert(
             tx.outputs.count(
-              _.value == coordinator.mixDetails.coordinatorFee) == 1)
+              _.value == coordinator.roundParams.coordinatorFee) == 1)
           // 2 mix outputs + 1 change + coordinator fee
           assert(tx.outputs.size == 4)
         case None =>
@@ -499,7 +499,7 @@ trait ClientServerTestUtils {
           assert(tx.outputs.count(_.value != roundAmount) == 3)
           assert(
             tx.outputs.count(
-              _.value == coordinator.mixDetails.coordinatorFee * Satoshis(
+              _.value == coordinator.roundParams.coordinatorFee * Satoshis(
                 2)) == 1)
           // 2 mix outputs + 2 change + coordinator fee
           assert(tx.outputs.size == 5)

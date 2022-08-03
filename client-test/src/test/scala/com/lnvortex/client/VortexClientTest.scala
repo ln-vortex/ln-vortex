@@ -18,7 +18,7 @@ import org.bitcoins.testkitcore.gen.NumberGenerator
 class VortexClientTest extends VortexClientFixture {
   behavior of "VortexClient"
 
-  val dummyMix: MixDetails = MixDetails(
+  val roundParams: RoundParameters = RoundParameters(
     version = UInt16.zero,
     roundId = DoubleSha256Digest.empty,
     amount = Satoshis(200000),
@@ -35,14 +35,14 @@ class VortexClientTest extends VortexClientFixture {
   val nonce: SchnorrNonce = ECPublicKey.freshPublicKey.schnorrNonce
 
   val dummyTweaks: BlindingTweaks =
-    BlindingTweaks.freshBlindingTweaks(dummyMix.publicKey, nonce)
+    BlindingTweaks.freshBlindingTweaks(roundParams.publicKey, nonce)
 
-  it must "fail to process an unknown version AskMixDetails" in {
+  it must "fail to process an unknown version AskRoundParameters" in {
     vortexClient =>
       forAll(NumberGenerator.uInt16.suchThat(!knownVersions.contains(_))) {
         version =>
           assertThrows[RuntimeException](
-            vortexClient.setRound(dummyMix.copy(version = version)))
+            vortexClient.setRound(roundParams.copy(version = version)))
       }
   }
 
@@ -69,7 +69,7 @@ class VortexClientTest extends VortexClientFixture {
       utxos <- vortexClient.listCoins()
       refs = utxos.map(_.outputReference)
 
-      testState = InputsScheduled(round = dummyMix,
+      testState = InputsScheduled(round = roundParams,
                                   nonce = nonce,
                                   inputs = refs,
                                   addressOpt = None,
@@ -79,7 +79,8 @@ class VortexClientTest extends VortexClientFixture {
 
       _ = vortexClient.handlerP.success(TestActorRef("test"))
       _ <- vortexClient.cancelRegistration()
-    } yield assert(vortexClient.getCurrentRoundDetails == KnownRound(dummyMix))
+    } yield assert(
+      vortexClient.getCurrentRoundDetails == KnownRound(roundParams))
   }
 
   it must "fail to sign a psbt with no fee info" in { vortexClient =>
@@ -89,8 +90,8 @@ class VortexClientTest extends VortexClientFixture {
       nodeId <- lnd.lndRpcClient.nodeId
       utxos <- vortexClient.listCoins()
       refs = utxos.map(_.outputReference)
-      addrA <- lnd.getNewAddress(dummyMix.changeType)
-      addrB <- lnd.getNewAddress(dummyMix.outputType)
+      addrA <- lnd.getNewAddress(roundParams.changeType)
+      addrB <- lnd.getNewAddress(roundParams.outputType)
       change = TransactionOutput(Satoshis(599800000), addrA.scriptPubKey)
       mix = TransactionOutput(Satoshis(200000), addrB.scriptPubKey)
 
@@ -104,7 +105,7 @@ class VortexClientTest extends VortexClientFixture {
         mixOutput = mix,
         tweaks = dummyTweaks
       )
-      testState = MixOutputRegistered(dummyMix,
+      testState = MixOutputRegistered(roundParams,
                                       Satoshis.zero,
                                       Satoshis.zero,
                                       Satoshis.zero,
@@ -130,8 +131,8 @@ class VortexClientTest extends VortexClientFixture {
       utxos <- lnd.listCoins()
       refs = utxos.map(_.outputReference)
 
-      addrA <- lnd.getNewAddress(dummyMix.changeType)
-      addrB <- lnd.getNewAddress(dummyMix.outputType)
+      addrA <- lnd.getNewAddress(roundParams.changeType)
+      addrB <- lnd.getNewAddress(roundParams.outputType)
       change = TransactionOutput(Satoshis(599800000), addrA.scriptPubKey)
       mix = TransactionOutput(Satoshis(200000), addrB.scriptPubKey)
 
@@ -145,7 +146,7 @@ class VortexClientTest extends VortexClientFixture {
         mixOutput = mix,
         tweaks = dummyTweaks
       )
-      testState = MixOutputRegistered(dummyMix,
+      testState = MixOutputRegistered(roundParams,
                                       Satoshis.zero,
                                       Satoshis.zero,
                                       Satoshis.zero,
@@ -172,8 +173,8 @@ class VortexClientTest extends VortexClientFixture {
         nodeId <- lnd.lndRpcClient.nodeId
         utxos <- vortexClient.listCoins()
         refs = utxos.map(_.outputReference)
-        addrA <- lnd.getNewAddress(dummyMix.changeType)
-        addrB <- lnd.getNewAddress(dummyMix.outputType)
+        addrA <- lnd.getNewAddress(roundParams.changeType)
+        addrB <- lnd.getNewAddress(roundParams.outputType)
         change = TransactionOutput(Satoshis(599800000), addrA.scriptPubKey)
         mix = TransactionOutput(Satoshis(200000), addrB.scriptPubKey)
 
@@ -187,7 +188,7 @@ class VortexClientTest extends VortexClientFixture {
           mixOutput = mix,
           tweaks = dummyTweaks
         )
-        testState = MixOutputRegistered(dummyMix,
+        testState = MixOutputRegistered(roundParams,
                                         Satoshis.zero,
                                         Satoshis.zero,
                                         Satoshis.zero,
@@ -214,8 +215,8 @@ class VortexClientTest extends VortexClientFixture {
         nodeId <- lnd.lndRpcClient.nodeId
         utxos <- vortexClient.listCoins()
         refs = utxos.map(_.outputReference)
-        addrA <- lnd.getNewAddress(dummyMix.changeType)
-        addrB <- lnd.getNewAddress(dummyMix.outputType)
+        addrA <- lnd.getNewAddress(roundParams.changeType)
+        addrB <- lnd.getNewAddress(roundParams.outputType)
         change = TransactionOutput(Satoshis(599700000), addrA.scriptPubKey)
         mix = TransactionOutput(Satoshis(200000), addrB.scriptPubKey)
 
@@ -229,7 +230,7 @@ class VortexClientTest extends VortexClientFixture {
           mixOutput = mix,
           tweaks = dummyTweaks
         )
-        testState = MixOutputRegistered(dummyMix,
+        testState = MixOutputRegistered(roundParams,
                                         Satoshis.zero,
                                         Satoshis.zero,
                                         Satoshis.zero,
@@ -256,8 +257,8 @@ class VortexClientTest extends VortexClientFixture {
       utxos <- vortexClient.listCoins()
       _ = require(utxos.nonEmpty)
       refs = utxos.map(_.outputReference)
-      addrA <- lnd.getNewAddress(dummyMix.changeType)
-      addrB <- lnd.getNewAddress(dummyMix.outputType)
+      addrA <- lnd.getNewAddress(roundParams.changeType)
+      addrB <- lnd.getNewAddress(roundParams.outputType)
       change = TransactionOutput(Satoshis(599800000), addrA.scriptPubKey)
       mix = TransactionOutput(Satoshis(200000), addrB.scriptPubKey)
 
@@ -271,7 +272,7 @@ class VortexClientTest extends VortexClientFixture {
         mixOutput = mix,
         tweaks = dummyTweaks
       )
-      testState = MixOutputRegistered(dummyMix,
+      testState = MixOutputRegistered(roundParams,
                                       Satoshis.zero,
                                       Satoshis.zero,
                                       Satoshis.zero,
@@ -299,8 +300,8 @@ class VortexClientTest extends VortexClientFixture {
         utxos <- vortexClient.listCoins()
         _ = require(utxos.nonEmpty)
         refs = utxos.map(_.outputReference)
-        addrA <- lnd.getNewAddress(dummyMix.changeType)
-        addrB <- lnd.getNewAddress(dummyMix.outputType)
+        addrA <- lnd.getNewAddress(roundParams.changeType)
+        addrB <- lnd.getNewAddress(roundParams.outputType)
         change = TransactionOutput(Satoshis(599800000), addrA.scriptPubKey)
         mix = TransactionOutput(Satoshis(200000), addrB.scriptPubKey)
 
@@ -314,7 +315,7 @@ class VortexClientTest extends VortexClientFixture {
           mixOutput = mix,
           tweaks = dummyTweaks
         )
-        testState = MixOutputRegistered(dummyMix,
+        testState = MixOutputRegistered(roundParams,
                                         Satoshis.zero,
                                         Satoshis.zero,
                                         Satoshis.zero,

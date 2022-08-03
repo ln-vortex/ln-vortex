@@ -155,7 +155,8 @@ object VortexPicklers {
   implicit val scriptTypeWrites: Writes[ScriptType] = scriptType =>
     JsString(scriptType.toString)
 
-  implicit val mixDetailsWrites: OWrites[MixDetails] = Json.writes[MixDetails]
+  implicit val roundParametersWrites: OWrites[RoundParameters] =
+    Json.writes[RoundParameters]
 
   implicit val RoundDetailsWrites: OWrites[RoundDetails] =
     (details: RoundDetails) => {

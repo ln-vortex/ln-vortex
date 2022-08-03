@@ -1,7 +1,7 @@
 package com.lnvortex.client
 
 import akka.actor.{ActorRef, ActorSystem}
-import com.lnvortex.core.RoundDetails.{getMixDetailsOpt, getNonceOpt}
+import com.lnvortex.core.RoundDetails.{getNonceOpt, getRoundParamsOpt}
 import com.lnvortex.client.VortexClientException._
 import com.lnvortex.client.config.VortexAppConfig
 import com.lnvortex.client.db.UTXODAO
@@ -46,7 +46,7 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
 
   def getCurrentRoundDetails: RoundDetails = roundDetails
 
-  private[lnvortex] def setRound(adv: MixDetails): Unit = {
+  private[lnvortex] def setRound(adv: RoundParameters): Unit = {
     if (VortexClient.knownVersions.contains(adv.version)) {
       roundDetails match {
         case NoDetails | _: ReceivedNonce | _: KnownRound |
@@ -57,7 +57,7 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
       }
     } else {
       throw new RuntimeException(
-        s"Received unknown mix version ${adv.version.toInt}, consider updating software")
+        s"Received unknown version ${adv.version.toInt}, consider updating software")
     }
   }
 
@@ -86,7 +86,7 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
     for {
       _ <- P2PClient.connect(peer, this, Some(handlerP))
       handler <- handlerP.future
-    } yield handler ! AskMixDetails(vortexWallet.network)
+    } yield handler ! AskRoundParameters(vortexWallet.network)
   }
 
   def listCoins(): Future[Vector[UnspentCoin]] = {
@@ -147,11 +147,11 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
     getNonceOpt(roundDetails) match {
       case Some(nonce) =>
         handlerP.future.map { handler =>
-          // .get is safe, can't have nonce without mix details
-          val mixDetails = getMixDetailsOpt(roundDetails).get
-          handler ! CancelRegistrationMessage(nonce, mixDetails.roundId)
+          // .get is safe, can't have nonce without round params
+          val roundParams = getRoundParamsOpt(roundDetails).get
+          handler ! CancelRegistrationMessage(nonce, roundParams.roundId)
 
-          roundDetails = KnownRound(mixDetails)
+          roundDetails = KnownRound(roundParams)
         }
       case None =>
         Future.failed(new IllegalStateException("No registration to cancel"))
@@ -637,7 +637,7 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
 
         cancelF.map { _ =>
           roundDetails =
-            state.restartRound(msg.mixDetails, msg.nonceMessage.schnorrNonce)
+            state.restartRound(msg.roundParams, msg.nonceMessage.schnorrNonce)
         }
     }
   }

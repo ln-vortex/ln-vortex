@@ -45,15 +45,15 @@ class ServerDataHandler(
   private def handleVortexMessage(
       message: ClientVortexMessage): Future[Unit] = {
     message match {
-      case AskMixDetails(network) =>
+      case AskRoundParameters(network) =>
         val currentNetwork = coordinator.config.network
         if (currentNetwork == network) {
           coordinator.allConnections += connectionHandler
-          connectionHandler ! coordinator.mixDetails
+          connectionHandler ! coordinator.roundParams
           Future.unit
         } else {
           logger.warn(
-            s"Received AskMixDetails for different network $network, current network $currentNetwork")
+            s"Received AskRoundParameters for different network $network, current network $currentNetwork")
           Future.unit
         }
       case askNonce: AskNonce =>

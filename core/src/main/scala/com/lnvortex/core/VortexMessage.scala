@@ -39,8 +39,8 @@ object VortexMessage extends Factory[VortexMessage] with Logging {
     Vector(
       PingTLV,
       PongTLV,
-      AskMixDetails,
-      MixDetails,
+      AskRoundParameters,
+      RoundParameters,
       AskNonce,
       NonceMessage,
       AskInputs,
@@ -153,29 +153,30 @@ object PongTLV extends VortexMessageFactory[PongTLV] {
   override val typeName: String = "PongTLV"
 }
 
-case class AskMixDetails(network: BitcoinNetwork) extends ClientVortexMessage {
-  override val tpe: BigSizeUInt = AskMixDetails.tpe
+case class AskRoundParameters(network: BitcoinNetwork)
+    extends ClientVortexMessage {
+  override val tpe: BigSizeUInt = AskRoundParameters.tpe
 
   override val value: ByteVector = {
     network.chainParams.genesisBlock.blockHeader.hashBE.bytes
   }
 }
 
-object AskMixDetails extends VortexMessageFactory[AskMixDetails] {
+object AskRoundParameters extends VortexMessageFactory[AskRoundParameters] {
   override val tpe: BigSizeUInt = BigSizeUInt(42001)
 
-  override val typeName: String = "AskMixDetails"
+  override val typeName: String = "AskRoundParameters"
 
-  override def fromTLVValue(value: ByteVector): AskMixDetails = {
+  override def fromTLVValue(value: ByteVector): AskRoundParameters = {
     val network = Networks.fromChainHash(DoubleSha256DigestBE(value)) match {
       case network: BitcoinNetwork => network
     }
 
-    AskMixDetails(network)
+    AskRoundParameters(network)
   }
 }
 
-case class MixDetails(
+case class RoundParameters(
     version: UInt16,
     roundId: DoubleSha256Digest,
     amount: CurrencyUnit,
@@ -188,7 +189,7 @@ case class MixDetails(
     maxPeers: UInt16,
     status: NormalizedString)
     extends ServerVortexMessage {
-  override val tpe: BigSizeUInt = MixDetails.tpe
+  override val tpe: BigSizeUInt = RoundParameters.tpe
 
   override val value: ByteVector = {
     version.bytes ++
@@ -209,12 +210,12 @@ case class MixDetails(
   }
 }
 
-object MixDetails extends VortexMessageFactory[MixDetails] {
+object RoundParameters extends VortexMessageFactory[RoundParameters] {
   override val tpe: BigSizeUInt = BigSizeUInt(42003)
 
-  override val typeName: String = "MixDetails"
+  override val typeName: String = "RoundParameters"
 
-  override def fromTLVValue(value: ByteVector): MixDetails = {
+  override def fromTLVValue(value: ByteVector): RoundParameters = {
     val iter = com.lnvortex.core.ValueIterator(value)
 
     val version = iter.takeU16()
@@ -229,7 +230,7 @@ object MixDetails extends VortexMessageFactory[MixDetails] {
     val maxPeers = iter.takeU16()
     val status = iter.takeString()
 
-    MixDetails(
+    RoundParameters(
       version = version,
       roundId = roundId,
       amount = amount,
@@ -499,12 +500,12 @@ object SignedTxMessage extends VortexMessageFactory[SignedTxMessage] {
 }
 
 case class RestartRoundMessage(
-    mixDetails: MixDetails,
+    roundParams: RoundParameters,
     nonceMessage: NonceMessage)
     extends ServerVortexMessage {
   override val tpe: BigSizeUInt = RestartRoundMessage.tpe
 
-  override lazy val value: ByteVector = mixDetails.bytes ++ nonceMessage.bytes
+  override lazy val value: ByteVector = roundParams.bytes ++ nonceMessage.bytes
 }
 
 object RestartRoundMessage extends VortexMessageFactory[RestartRoundMessage] {
@@ -515,10 +516,10 @@ object RestartRoundMessage extends VortexMessageFactory[RestartRoundMessage] {
   override def fromTLVValue(value: ByteVector): RestartRoundMessage = {
     val iter = ValueIterator(value)
 
-    val mixDetails = iter.take(MixDetails)
+    val roundParams = iter.take(RoundParameters)
     val nonceMessage = iter.take(NonceMessage)
 
-    RestartRoundMessage(mixDetails, nonceMessage)
+    RestartRoundMessage(roundParams, nonceMessage)
   }
 }
 

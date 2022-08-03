@@ -70,7 +70,7 @@ trait ClientServerPairFixture
 
           _ <- LndRpcTestUtil.connectLNNodes(lnd, peerLnd)
 
-          // wait for it to receive mix details
+          // wait for it to receive round params
           _ <- TestAsyncUtil.awaitCondition(() =>
             client.getCurrentRoundDetails.order > 0)
 

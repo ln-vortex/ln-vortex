@@ -22,11 +22,11 @@ object Generators {
     }
   }
 
-  def askMixDetails: Gen[AskMixDetails] = {
+  def askRoundParameters: Gen[AskRoundParameters] = {
     for {
       network <- ChainParamsGenerator.bitcoinNetworkParams
     } yield {
-      AskMixDetails(network)
+      AskRoundParameters(network)
     }
   }
 
@@ -36,7 +36,7 @@ object Generators {
               ScriptType.WITNESS_V1_TAPROOT)
   }
 
-  def mixDetails: Gen[MixDetails] = {
+  def roundParameters: Gen[RoundParameters] = {
     for {
       version <- NumberGenerator.uInt16
       roundId <- CryptoGenerators.doubleSha256Digest
@@ -50,7 +50,7 @@ object Generators {
       maxPeers <- NumberGenerator.uInt16
       status <- StringGenerators.genUTF8String
     } yield {
-      MixDetails(
+      RoundParameters(
         version = version,
         roundId = roundId,
         amount = amount,
@@ -142,9 +142,9 @@ object Generators {
 
   def restartRoundMessage: Gen[RestartRoundMessage] = {
     for {
-      mixDetails <- mixDetails
+      roundParams <- roundParameters
       nonceMsg <- nonceMsg
-    } yield RestartRoundMessage(mixDetails, nonceMsg)
+    } yield RestartRoundMessage(roundParams, nonceMsg)
   }
 
   def cancelRegistrationMessage: Gen[CancelRegistrationMessage] = {

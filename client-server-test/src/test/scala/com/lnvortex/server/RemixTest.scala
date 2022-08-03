@@ -35,8 +35,8 @@ class RemixTest
                                  coordinator)
 
       _ <- coordinator.newRound()
-      _ = clientA.setRound(coordinator.mixDetails)
-      _ = clientB.setRound(coordinator.mixDetails)
+      _ = clientA.setRound(coordinator.roundParams)
+      _ = clientB.setRound(coordinator.roundParams)
 
       _ <- completeOnChainRound(Some(tx.txIdBE),
                                 peerId,

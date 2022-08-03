@@ -13,7 +13,7 @@ class RoundDetailsTest extends BitcoinSUnitTest {
 
   val roundAmount: Satoshis = Satoshis(200000)
 
-  val dummyMix: MixDetails = MixDetails(
+  val roundParams: RoundParameters = RoundParameters(
     version = UInt16.zero,
     roundId = DoubleSha256Digest.empty,
     amount = roundAmount,
@@ -31,8 +31,8 @@ class RoundDetailsTest extends BitcoinSUnitTest {
       inputAmounts: Vector[Satoshis],
       hasChange: Boolean): InitDetails = {
     val tweaks = BlindingTweaks.freshBlindingTweaks(
-      dummyMix.publicKey,
-      dummyMix.publicKey.publicKey.schnorrNonce)
+      roundParams.publicKey,
+      roundParams.publicKey.publicKey.schnorrNonce)
 
     val changeOpt =
       if (hasChange) Some(EmptyScriptPubKey)
@@ -57,7 +57,7 @@ class RoundDetailsTest extends BitcoinSUnitTest {
 
   it must "calculate expected change amount" in {
     val details = InputsRegistered(
-      round = dummyMix,
+      round = roundParams,
       inputFee = Satoshis(149),
       outputFee = Satoshis(43),
       changeOutputFee = Satoshis(43),
@@ -74,7 +74,7 @@ class RoundDetailsTest extends BitcoinSUnitTest {
 
   it must "calculate expected change amount with no change" in {
     val details = InputsRegistered(
-      round = dummyMix,
+      round = roundParams,
       inputFee = Satoshis(149),
       outputFee = Satoshis(43),
       changeOutputFee = Satoshis(43),

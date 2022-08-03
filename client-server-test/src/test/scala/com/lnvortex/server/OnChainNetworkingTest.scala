@@ -29,7 +29,7 @@ class OnChainNetworkingTest
         // don't select all coins
         utxos <- client.listCoins().map(_.take(1))
         addr <- client.vortexWallet.getNewAddress(
-          coordinator.mixDetails.outputType)
+          coordinator.roundParams.outputType)
         _ = client.queueCoins(utxos.map(_.outputReference), addr)
 
         _ <- client.cancelRegistration()
@@ -46,7 +46,7 @@ class OnChainNetworkingTest
       all <- client.listCoins()
       utxos = Random.shuffle(all).take(1)
       addr <- client.vortexWallet.getNewAddress(
-        coordinator.mixDetails.outputType)
+        coordinator.roundParams.outputType)
       _ = client.queueCoins(utxos.map(_.outputReference), addr)
 
       _ <- coordinator.beginInputRegistration()

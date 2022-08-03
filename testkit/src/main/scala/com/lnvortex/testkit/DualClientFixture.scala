@@ -73,7 +73,7 @@ trait DualClientFixture
 
           _ <- LndRpcTestUtil.connectLNNodes(lndA, lndB)
 
-          // wait for clients to receive mix details
+          // wait for clients to receive round params
           _ <- TestAsyncUtil.awaitCondition(() =>
             clientA.getCurrentRoundDetails.order > 0)
           _ <- TestAsyncUtil.awaitCondition(() =>

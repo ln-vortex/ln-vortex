@@ -52,7 +52,7 @@ class ClientDataHandler(
   private def handleVortexMessage(
       message: ServerVortexMessage): Future[Unit] = {
     message match {
-      case adv: MixDetails =>
+      case adv: RoundParameters =>
         logger.info(s"Received round details ${adv.roundId.hex}")
         vortexClient.setRound(adv)
         Future.unit
