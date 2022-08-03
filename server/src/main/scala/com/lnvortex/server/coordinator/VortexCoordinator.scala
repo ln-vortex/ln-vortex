@@ -110,7 +110,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
   private var lastRoundTime: Long = TimeUtil.currentEpochSecond
 
   private def roundStartTime: Long = {
-    lastRoundTime + config.mixInterval.toSeconds
+    lastRoundTime + config.roundInterval.toSeconds
   }
 
   def mixDetails: MixDetails =
@@ -181,7 +181,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
     } yield {
       // switch to input registration at correct time
       beginInputRegistrationCancellable = Some(
-        system.scheduler.scheduleOnce(config.mixInterval) {
+        system.scheduler.scheduleOnce(config.roundInterval) {
           beginInputRegistration()
             .recoverWith(_ => reconcileRound(isNewRound = true))
           ()
