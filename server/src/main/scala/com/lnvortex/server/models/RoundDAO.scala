@@ -62,7 +62,7 @@ case class RoundDAO()(implicit
 
     def feeRate: Rep[SatoshisPerVirtualByte] = column("fee_rate")
 
-    def mixFee: Rep[CurrencyUnit] = column("mix_fee")
+    def coordinatorFee: Rep[CurrencyUnit] = column("coordinator_fee")
 
     def inputFee: Rep[CurrencyUnit] = column("input_fee")
 
@@ -85,7 +85,7 @@ case class RoundDAO()(implicit
        status,
        roundTime,
        feeRate,
-       mixFee,
+       coordinatorFee,
        inputFee,
        outputFee,
        changeOutputFee,

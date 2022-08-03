@@ -54,7 +54,7 @@ Round:
 - version: Number
 - roundId: String - id for the round
 - amount: Number - denomination for the round
-- mixFee: Number - fee in satoshis for the round
+- coordinatorFee: Number - fee in satoshis for the round
 - publicKey: String - coordinator's public key
 - time: Number - when the round will execute, in epoch seconds
 

@@ -1018,8 +1018,8 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
       }
       assert(hasChangeOutputs)
 
-      val mixFee = coordinator.config.mixFee * peerIds.size
-      val mixOutput = TransactionOutput(mixFee, addr.scriptPubKey)
+      val coordinatorFee = coordinator.config.coordinatorFee * peerIds.size
+      val mixOutput = TransactionOutput(coordinatorFee, addr.scriptPubKey)
       assert(tx.outputs.contains(mixOutput))
     }
   }

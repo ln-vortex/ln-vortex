@@ -41,7 +41,7 @@ object Generators {
       version <- NumberGenerator.uInt16
       roundId <- CryptoGenerators.doubleSha256Digest
       amount <- CurrencyUnitGenerator.positiveSatoshis
-      mixFee <- CurrencyUnitGenerator.positiveSatoshis
+      coordinatorFee <- CurrencyUnitGenerator.positiveSatoshis
       pubkey <- CryptoGenerators.schnorrPublicKey
       time <- NumberGenerator.uInt64
       inputType <- validScriptType
@@ -54,7 +54,7 @@ object Generators {
         version = version,
         roundId = roundId,
         amount = amount,
-        mixFee = mixFee,
+        coordinatorFee = coordinatorFee,
         publicKey = pubkey,
         time = time,
         inputType = inputType,

@@ -120,8 +120,8 @@ case class VortexCoordinatorAppConfig(
     Satoshis(long)
   }
 
-  lazy val mixFee: Satoshis = {
-    val long = config.getLong(s"$moduleName.mixFee")
+  lazy val coordinatorFee: Satoshis = {
+    val long = config.getLong(s"$moduleName.coordinatorFee")
     Satoshis(long)
   }
 

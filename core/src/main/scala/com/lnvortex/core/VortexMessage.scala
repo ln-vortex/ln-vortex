@@ -179,7 +179,7 @@ case class MixDetails(
     version: UInt16,
     roundId: DoubleSha256Digest,
     amount: CurrencyUnit,
-    mixFee: CurrencyUnit,
+    coordinatorFee: CurrencyUnit,
     publicKey: SchnorrPublicKey,
     time: UInt64,
     inputType: ScriptType,
@@ -194,7 +194,7 @@ case class MixDetails(
     version.bytes ++
       roundId.bytes ++
       amount.satoshis.toUInt64.bytes ++
-      mixFee.satoshis.toUInt64.bytes ++
+      coordinatorFee.satoshis.toUInt64.bytes ++
       publicKey.bytes ++
       time.bytes ++
       getScriptTypeBytes(inputType) ++
@@ -205,7 +205,7 @@ case class MixDetails(
   }
 
   def getTargetAmount(isRemix: Boolean): CurrencyUnit = {
-    if (isRemix) amount else amount + mixFee
+    if (isRemix) amount else amount + coordinatorFee
   }
 }
 
@@ -220,7 +220,7 @@ object MixDetails extends VortexMessageFactory[MixDetails] {
     val version = iter.takeU16()
     val roundId = DoubleSha256Digest(iter.take(32))
     val amount = iter.takeSats()
-    val mixFee = iter.takeSats()
+    val coordinatorFee = iter.takeSats()
     val publicKey = SchnorrPublicKey(iter.take(32))
     val time = iter.takeU64()
     val inputType = iter.takeScriptType()
@@ -233,7 +233,7 @@ object MixDetails extends VortexMessageFactory[MixDetails] {
       version = version,
       roundId = roundId,
       amount = amount,
-      mixFee = mixFee,
+      coordinatorFee = coordinatorFee,
       publicKey = publicKey,
       time = time,
       inputType = inputType,

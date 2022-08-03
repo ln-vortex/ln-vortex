@@ -88,7 +88,7 @@ sealed trait InitializedRound extends RoundDetails {
       val newEntrantFee = totalNewEntrantFee / Satoshis(numNewEntrants)
 
       val excessAfterChange =
-        initDetails.inputAmt - round.amount - round.mixFee - (Satoshis(
+        initDetails.inputAmt - round.amount - round.coordinatorFee - (Satoshis(
           initDetails.inputs.size) * inputFee) - outputFee - changeOutputFee - newEntrantFee
 
       if (excessAfterChange >= Policy.dustThreshold)

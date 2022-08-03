@@ -118,7 +118,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       version = version,
       roundId = currentRoundId,
       amount = config.mixAmount,
-      mixFee = config.mixFee,
+      coordinatorFee = config.coordinatorFee,
       publicKey = publicKey,
       time = UInt64(roundStartTime),
       maxPeers = UInt16(config.maxPeers),
@@ -171,7 +171,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
         roundId = currentRoundId,
         roundTime = Instant.ofEpochSecond(inputRegStartTime),
         feeRate = feeRate,
-        mixFee = config.mixFee,
+        coordinatorFee = config.coordinatorFee,
         inputFee = inputFee,
         outputFee = outputFee(),
         changeFee = changeOutputFee,
@@ -658,7 +658,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       val totalNewEntrantFee =
         Satoshis(numRemixes) * (roundDb.inputFee + updatedOutputFee)
       val newEntrantFee = totalNewEntrantFee / Satoshis(numNewEntrants)
-      val excess = inputAmount - roundDb.amount - roundDb.mixFee - (Satoshis(
+      val excess = inputAmount - roundDb.amount - roundDb.coordinatorFee - (Satoshis(
         numInputs) * roundDb.inputFee) - updatedOutputFee - newEntrantFee
 
       changeSpkOpt match {
@@ -734,10 +734,10 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
 
           val usedExcess = if (excess < Satoshis.zero) Satoshis.zero else excess
           // add outputs
-          val mixFee = usedExcess + (Satoshis(numNewEntrants) * config.mixFee)
-          val mixFeeOutput = TransactionOutput(mixFee, mixAddr.scriptPubKey)
+          val coordinatorFee = usedExcess + (Satoshis(numNewEntrants) * config.coordinatorFee)
+          val coordinatorFeeOutput = TransactionOutput(coordinatorFee, mixAddr.scriptPubKey)
           val mixOutputs = outputDbs.map(_.output)
-          val outputsToAdd = mixOutputs ++ changeOutputs :+ mixFeeOutput
+          val outputsToAdd = mixOutputs ++ changeOutputs :+ coordinatorFeeOutput
 
           txBuilder ++= outputsToAdd
 

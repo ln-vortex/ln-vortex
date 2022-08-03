@@ -490,7 +490,7 @@ trait ClientServerTestUtils {
           assert(tx.outputs.count(_.value == roundAmount) == 2)
           assert(tx.outputs.count(_.value != roundAmount) == 2)
           assert(
-            tx.outputs.count(_.value == coordinator.mixDetails.mixFee) == 1)
+            tx.outputs.count(_.value == coordinator.mixDetails.coordinatorFee) == 1)
           // 2 mix outputs + 1 change + coordinator fee
           assert(tx.outputs.size == 4)
         case None =>
@@ -498,7 +498,7 @@ trait ClientServerTestUtils {
           assert(tx.outputs.count(_.value != roundAmount) == 3)
           assert(
             tx.outputs.count(
-              _.value == coordinator.mixDetails.mixFee * Satoshis(2)) == 1)
+              _.value == coordinator.mixDetails.coordinatorFee * Satoshis(2)) == 1)
           // 2 mix outputs + 2 change + coordinator fee
           assert(tx.outputs.size == 5)
       }

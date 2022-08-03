@@ -22,7 +22,7 @@ class VortexClientTest extends VortexClientFixture {
     version = UInt16.zero,
     roundId = DoubleSha256Digest.empty,
     amount = Satoshis(200000),
-    mixFee = Satoshis.zero,
+    coordinatorFee = Satoshis.zero,
     publicKey = ECPublicKey.freshPublicKey.schnorrPublicKey,
     time = UInt64.zero,
     inputType = ScriptType.WITNESS_V0_KEYHASH,
