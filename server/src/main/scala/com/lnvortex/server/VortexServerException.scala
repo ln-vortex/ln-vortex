@@ -28,10 +28,10 @@ object VortexServerException {
   class InvalidOutputSignatureException(private val reason: String)
       extends VortexServerException(reason)
 
-  class InvalidMixOutputScriptPubKeyException(private val reason: String)
+  class InvalidTargetOutputScriptPubKeyException(private val reason: String)
       extends VortexServerException(reason)
 
-  class InvalidMixOutputAmountException(private val reason: String)
+  class InvalidTargetOutputAmountException(private val reason: String)
       extends VortexServerException(reason)
 
   class InvalidPSBTSignaturesException(private val reason: String)

@@ -11,13 +11,13 @@ import org.bitcoins.testkitcore.util.BitcoinSUnitTest
 
 class RoundDetailsTest extends BitcoinSUnitTest {
 
-  val mixAmount: Satoshis = Satoshis(200000)
+  val roundAmount: Satoshis = Satoshis(200000)
 
-  val dummyMix: MixDetails = MixDetails(
+  val roundParams: RoundParameters = RoundParameters(
     version = UInt16.zero,
     roundId = DoubleSha256Digest.empty,
-    amount = mixAmount,
-    mixFee = Satoshis.zero,
+    amount = roundAmount,
+    coordinatorFee = Satoshis.zero,
     publicKey = ECPublicKey.freshPublicKey.schnorrPublicKey,
     time = UInt64.zero,
     inputType = ScriptType.WITNESS_V0_KEYHASH,
@@ -31,8 +31,8 @@ class RoundDetailsTest extends BitcoinSUnitTest {
       inputAmounts: Vector[Satoshis],
       hasChange: Boolean): InitDetails = {
     val tweaks = BlindingTweaks.freshBlindingTweaks(
-      dummyMix.publicKey,
-      dummyMix.publicKey.publicKey.schnorrNonce)
+      roundParams.publicKey,
+      roundParams.publicKey.publicKey.schnorrNonce)
 
     val changeOpt =
       if (hasChange) Some(EmptyScriptPubKey)
@@ -50,20 +50,20 @@ class RoundDetailsTest extends BitcoinSUnitTest {
       peerAddrOpt = None,
       changeSpkOpt = changeOpt,
       chanId = Sha256Digest.empty.bytes,
-      mixOutput = EmptyTransactionOutput,
+      targetOutput = EmptyTransactionOutput,
       tweaks = tweaks
     )
   }
 
   it must "calculate expected change amount" in {
     val details = InputsRegistered(
-      round = dummyMix,
+      round = roundParams,
       inputFee = Satoshis(149),
       outputFee = Satoshis(43),
       changeOutputFee = Satoshis(43),
       nonce = ECPublicKey.freshPublicKey.schnorrNonce,
       initDetails = testInitDetails(inputAmounts =
-                                      Vector(Satoshis(100000), mixAmount),
+                                      Vector(Satoshis(100000), roundAmount),
                                     hasChange = true)
     )
 
@@ -74,13 +74,13 @@ class RoundDetailsTest extends BitcoinSUnitTest {
 
   it must "calculate expected change amount with no change" in {
     val details = InputsRegistered(
-      round = dummyMix,
+      round = roundParams,
       inputFee = Satoshis(149),
       outputFee = Satoshis(43),
       changeOutputFee = Satoshis(43),
       nonce = ECPublicKey.freshPublicKey.schnorrNonce,
       initDetails = testInitDetails(inputAmounts =
-                                      Vector(Satoshis(100000), mixAmount),
+                                      Vector(Satoshis(100000), roundAmount),
                                     hasChange = false)
     )
 

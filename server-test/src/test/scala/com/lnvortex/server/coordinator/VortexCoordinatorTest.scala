@@ -610,9 +610,9 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
                                    signerNonce = aliceDb.nonce)
 
       p2wsh = P2WSHWitnessSPKV0(EmptyScriptPubKey)
-      mixOutput = TransactionOutput(coordinator.config.mixAmount, p2wsh)
-      challenge = RegisterMixOutput.calculateChallenge(
-        mixOutput,
+      targetOutput = TransactionOutput(coordinator.config.roundAmount, p2wsh)
+      challenge = RegisterOutput.calculateChallenge(
+        targetOutput,
         coordinator.getCurrentRoundId)
       blind = BlindSchnorrUtil.generateChallenge(coordinator.publicKey,
                                                  aliceDb.nonce,
@@ -629,7 +629,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
                                               tweaks,
                                               challenge)
       _ <- coordinator.beginOutputRegistration()
-      _ <- coordinator.verifyAndRegisterBob(RegisterMixOutput(sig, mixOutput))
+      _ <- coordinator.verifyAndRegisterBob(RegisterOutput(sig, targetOutput))
     } yield succeed
   }
 
@@ -659,9 +659,9 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
                                    signerNonce = aliceDb.nonce)
 
       p2wsh = P2WSHWitnessSPKV0(EmptyScriptPubKey)
-      mixOutput = TransactionOutput(coordinator.config.mixAmount, p2wsh)
-      challenge = RegisterMixOutput.calculateChallenge(
-        mixOutput,
+      targetOutput = TransactionOutput(coordinator.config.roundAmount, p2wsh)
+      challenge = RegisterOutput.calculateChallenge(
+        targetOutput,
         coordinator.getCurrentRoundId)
       blind = BlindSchnorrUtil.generateChallenge(coordinator.publicKey,
                                                  aliceDb.nonce,
@@ -674,11 +674,11 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
       _ <- coordinator.registerAlice(Sha256Digest.empty, registerInputs)
       _ <- coordinator.beginOutputRegistration()
       p2wsh = P2WSHWitnessSPKV0(EmptyScriptPubKey)
-      mixOutput = TransactionOutput(coordinator.config.mixAmount, p2wsh)
+      targetOutput = TransactionOutput(coordinator.config.roundAmount, p2wsh)
       // random sig
       sig = ECPrivateKey.freshPrivateKey.schnorrSign(Sha256Digest.empty.bytes)
       res <- recoverToSucceededIf[InvalidOutputSignatureException](
-        coordinator.verifyAndRegisterBob(RegisterMixOutput(sig, mixOutput)))
+        coordinator.verifyAndRegisterBob(RegisterOutput(sig, targetOutput)))
     } yield res
   }
 
@@ -709,10 +709,10 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
                                      signerNonce = aliceDb.nonce)
 
         // change change addr spk
-        mixOutput = TransactionOutput(coordinator.config.mixAmount,
-                                      addr.scriptPubKey)
-        challenge = RegisterMixOutput.calculateChallenge(
-          mixOutput,
+        targetOutput = TransactionOutput(coordinator.config.roundAmount,
+                                         addr.scriptPubKey)
+        challenge = RegisterOutput.calculateChallenge(
+          targetOutput,
           coordinator.getCurrentRoundId)
         blind = BlindSchnorrUtil.generateChallenge(coordinator.publicKey,
                                                    aliceDb.nonce,
@@ -730,8 +730,8 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
                                                 tweaks,
                                                 challenge)
         _ <- coordinator.beginOutputRegistration()
-        res <- recoverToSucceededIf[InvalidMixOutputScriptPubKeyException](
-          coordinator.verifyAndRegisterBob(RegisterMixOutput(sig, mixOutput)))
+        res <- recoverToSucceededIf[InvalidTargetOutputScriptPubKeyException](
+          coordinator.verifyAndRegisterBob(RegisterOutput(sig, targetOutput)))
       } yield res
   }
 
@@ -762,10 +762,10 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
                                      signerNonce = aliceDb.nonce)
 
         // use input's spk
-        mixOutput = TransactionOutput(coordinator.config.mixAmount,
-                                      outputRef.output.scriptPubKey)
-        challenge = RegisterMixOutput.calculateChallenge(
-          mixOutput,
+        targetOutput = TransactionOutput(coordinator.config.roundAmount,
+                                         outputRef.output.scriptPubKey)
+        challenge = RegisterOutput.calculateChallenge(
+          targetOutput,
           coordinator.getCurrentRoundId)
         blind = BlindSchnorrUtil.generateChallenge(coordinator.publicKey,
                                                    aliceDb.nonce,
@@ -783,8 +783,8 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
                                                 tweaks,
                                                 challenge)
         _ <- coordinator.beginOutputRegistration()
-        res <- recoverToSucceededIf[InvalidMixOutputScriptPubKeyException](
-          coordinator.verifyAndRegisterBob(RegisterMixOutput(sig, mixOutput)))
+        res <- recoverToSucceededIf[InvalidTargetOutputScriptPubKeyException](
+          coordinator.verifyAndRegisterBob(RegisterOutput(sig, targetOutput)))
       } yield res
   }
 
@@ -814,10 +814,10 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
                                    signerNonce = aliceDb.nonce)
 
       // wrong spk
-      mixOutput = TransactionOutput(coordinator.config.mixAmount,
-                                    addr.scriptPubKey)
-      challenge = RegisterMixOutput.calculateChallenge(
-        mixOutput,
+      targetOutput = TransactionOutput(coordinator.config.roundAmount,
+                                       addr.scriptPubKey)
+      challenge = RegisterOutput.calculateChallenge(
+        targetOutput,
         coordinator.getCurrentRoundId)
       blind = BlindSchnorrUtil.generateChallenge(coordinator.publicKey,
                                                  aliceDb.nonce,
@@ -834,8 +834,8 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
                                               tweaks,
                                               challenge)
       _ <- coordinator.beginOutputRegistration()
-      res <- recoverToSucceededIf[InvalidMixOutputScriptPubKeyException](
-        coordinator.verifyAndRegisterBob(RegisterMixOutput(sig, mixOutput)))
+      res <- recoverToSucceededIf[InvalidTargetOutputScriptPubKeyException](
+        coordinator.verifyAndRegisterBob(RegisterOutput(sig, targetOutput)))
     } yield res
   }
 
@@ -865,9 +865,9 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
                                    signerNonce = aliceDb.nonce)
 
       p2wsh = P2WSHWitnessSPKV0(EmptyScriptPubKey)
-      mixOutput = TransactionOutput(Bitcoins.one, p2wsh)
-      challenge = RegisterMixOutput.calculateChallenge(
-        mixOutput,
+      targetOutput = TransactionOutput(Bitcoins.one, p2wsh)
+      challenge = RegisterOutput.calculateChallenge(
+        targetOutput,
         coordinator.getCurrentRoundId)
       blind = BlindSchnorrUtil.generateChallenge(coordinator.publicKey,
                                                  aliceDb.nonce,
@@ -884,8 +884,8 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
                                               tweaks,
                                               challenge)
       _ <- coordinator.beginOutputRegistration()
-      res <- recoverToSucceededIf[InvalidMixOutputAmountException](
-        coordinator.verifyAndRegisterBob(RegisterMixOutput(sig, mixOutput)))
+      res <- recoverToSucceededIf[InvalidTargetOutputAmountException](
+        coordinator.verifyAndRegisterBob(RegisterOutput(sig, targetOutput)))
     } yield res
   }
 
@@ -916,11 +916,10 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
                                      signerNonce = aliceDb.nonce)
 
         p2wsh = P2WSHWitnessSPKV0(EmptyScriptPubKey)
-        mixOutput = TransactionOutput(coordinator.config.mixAmount, p2wsh)
+        targetOutput = TransactionOutput(coordinator.config.roundAmount, p2wsh)
         // wrong roundId
-        challenge = RegisterMixOutput.calculateChallenge(
-          mixOutput,
-          DoubleSha256Digest.empty)
+        challenge = RegisterOutput.calculateChallenge(targetOutput,
+                                                      DoubleSha256Digest.empty)
         blind = BlindSchnorrUtil.generateChallenge(coordinator.publicKey,
                                                    aliceDb.nonce,
                                                    tweaks,
@@ -938,7 +937,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
                                                 challenge)
         _ <- coordinator.beginOutputRegistration()
         res <- recoverToSucceededIf[InvalidOutputSignatureException](
-          coordinator.verifyAndRegisterBob(RegisterMixOutput(sig, mixOutput)))
+          coordinator.verifyAndRegisterBob(RegisterOutput(sig, targetOutput)))
       } yield res
   }
 
@@ -986,7 +985,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
       outputDbs = peerIds.map { _ =>
         val raw = P2PKHScriptPubKey(ECPublicKey.freshPublicKey)
         val spk = P2WSHWitnessSPKV0(raw)
-        val output = TransactionOutput(coordinator.config.mixAmount, spk)
+        val output = TransactionOutput(coordinator.config.roundAmount, spk)
         val sig = ECPrivateKey.freshPrivateKey.schnorrSign(
           CryptoUtil.sha256(raw.bytes).bytes)
 
@@ -1018,9 +1017,9 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
       }
       assert(hasChangeOutputs)
 
-      val mixFee = coordinator.config.mixFee * peerIds.size
-      val mixOutput = TransactionOutput(mixFee, addr.scriptPubKey)
-      assert(tx.outputs.contains(mixOutput))
+      val coordinatorFee = coordinator.config.coordinatorFee * peerIds.size
+      val targetOutput = TransactionOutput(coordinatorFee, addr.scriptPubKey)
+      assert(tx.outputs.contains(targetOutput))
     }
   }
 
@@ -1064,7 +1063,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
       outputDb = {
         val raw = P2PKHScriptPubKey(ECPublicKey.freshPublicKey)
         val spk = P2WSHWitnessSPKV0(raw)
-        val output = TransactionOutput(coordinator.config.mixAmount, spk)
+        val output = TransactionOutput(coordinator.config.roundAmount, spk)
         val sig = ECPrivateKey.freshPrivateKey.schnorrSign(
           CryptoUtil.sha256(raw.bytes).bytes)
 
@@ -1121,7 +1120,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
       outputDb = {
         val raw = P2PKHScriptPubKey(ECPublicKey.freshPublicKey)
         val spk = P2WSHWitnessSPKV0(raw)
-        val output = TransactionOutput(coordinator.config.mixAmount, spk)
+        val output = TransactionOutput(coordinator.config.roundAmount, spk)
         val sig = ECPrivateKey.freshPrivateKey.schnorrSign(
           CryptoUtil.sha256(raw.bytes).bytes)
 
@@ -1184,7 +1183,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
       outputDb = {
         val raw = P2PKHScriptPubKey(ECPublicKey.freshPublicKey)
         val spk = P2WSHWitnessSPKV0(raw)
-        val output = TransactionOutput(coordinator.config.mixAmount, spk)
+        val output = TransactionOutput(coordinator.config.roundAmount, spk)
         val sig = ECPrivateKey.freshPrivateKey.schnorrSign(
           CryptoUtil.sha256(raw.bytes).bytes)
 
@@ -1240,7 +1239,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
       outputDb = {
         val raw = P2PKHScriptPubKey(ECPublicKey.freshPublicKey)
         val spk = P2WSHWitnessSPKV0(raw)
-        val output = TransactionOutput(coordinator.config.mixAmount, spk)
+        val output = TransactionOutput(coordinator.config.roundAmount, spk)
         val sig = ECPrivateKey.freshPrivateKey.schnorrSign(
           CryptoUtil.sha256(raw.bytes).bytes)
 

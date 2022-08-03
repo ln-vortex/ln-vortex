@@ -10,7 +10,7 @@ object VortexClientException {
   class InvalidInputException(private val reason: String)
       extends VortexClientException(reason)
 
-  class InvalidMixedOutputException(private val reason: String)
+  class InvalidTargetOutputException(private val reason: String)
       extends VortexClientException(reason)
 
   class InvalidChangeOutputException(private val reason: String)

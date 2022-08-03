@@ -155,7 +155,8 @@ object VortexPicklers {
   implicit val scriptTypeWrites: Writes[ScriptType] = scriptType =>
     JsString(scriptType.toString)
 
-  implicit val mixDetailsWrites: OWrites[MixDetails] = Json.writes[MixDetails]
+  implicit val roundParametersWrites: OWrites[RoundParameters] =
+    Json.writes[RoundParameters]
 
   implicit val RoundDetailsWrites: OWrites[RoundDetails] =
     (details: RoundDetails) => {
@@ -165,9 +166,8 @@ object VortexPicklers {
         case rn: ReceivedNonce    => Json.writes[ReceivedNonce].writes(rn)
         case is: InputsScheduled  => Json.writes[InputsScheduled].writes(is)
         case ir: InputsRegistered => Json.writes[InputsRegistered].writes(ir)
-        case or: MixOutputRegistered =>
-          Json.writes[MixOutputRegistered].writes(or)
-        case ps: PSBTSigned => Json.writes[PSBTSigned].writes(ps)
+        case or: OutputRegistered => Json.writes[OutputRegistered].writes(or)
+        case ps: PSBTSigned       => Json.writes[PSBTSigned].writes(ps)
       }
 
       val extra = JsObject(

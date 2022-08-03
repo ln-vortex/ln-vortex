@@ -42,9 +42,9 @@ trait LnVortexTestUtils { self: EmbeddedPg =>
          |coordinator {
          |  listen = "0.0.0.0:$listenPort"
          |  maxPeers = 2
-         |  mixFee = 10000
-         |  mixInterval = 60m
-         |  mixAmount = 1000000
+         |  coordinatorFee = 10000
+         |  roundInterval = 60m
+         |  roundAmount = 1000000
          |  inputRegistrationTime = 20s
          |  outputRegistrationTime = 20s
          |  signingTime = 20s

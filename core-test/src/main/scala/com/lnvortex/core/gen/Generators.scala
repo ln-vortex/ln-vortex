@@ -22,11 +22,11 @@ object Generators {
     }
   }
 
-  def askMixDetails: Gen[AskMixDetails] = {
+  def askRoundParameters: Gen[AskRoundParameters] = {
     for {
       network <- ChainParamsGenerator.bitcoinNetworkParams
     } yield {
-      AskMixDetails(network)
+      AskRoundParameters(network)
     }
   }
 
@@ -36,12 +36,12 @@ object Generators {
               ScriptType.WITNESS_V1_TAPROOT)
   }
 
-  def mixDetails: Gen[MixDetails] = {
+  def roundParameters: Gen[RoundParameters] = {
     for {
       version <- NumberGenerator.uInt16
       roundId <- CryptoGenerators.doubleSha256Digest
       amount <- CurrencyUnitGenerator.positiveSatoshis
-      mixFee <- CurrencyUnitGenerator.positiveSatoshis
+      coordinatorFee <- CurrencyUnitGenerator.positiveSatoshis
       pubkey <- CryptoGenerators.schnorrPublicKey
       time <- NumberGenerator.uInt64
       inputType <- validScriptType
@@ -50,11 +50,11 @@ object Generators {
       maxPeers <- NumberGenerator.uInt16
       status <- StringGenerators.genUTF8String
     } yield {
-      MixDetails(
+      RoundParameters(
         version = version,
         roundId = roundId,
         amount = amount,
-        mixFee = mixFee,
+        coordinatorFee = coordinatorFee,
         publicKey = pubkey,
         time = time,
         inputType = inputType,
@@ -115,11 +115,11 @@ object Generators {
     } yield BlindedSig(blindOutputSig)
   }
 
-  def registerMixOutput: Gen[RegisterMixOutput] = {
+  def registerOutput: Gen[RegisterOutput] = {
     for {
       sig <- CryptoGenerators.schnorrDigitalSignature
       output <- TransactionGenerators.output
-    } yield RegisterMixOutput(sig, output)
+    } yield RegisterOutput(sig, output)
   }
 
   def unsignedPsbtMessage: Gen[UnsignedPsbtMessage] = {
@@ -142,9 +142,9 @@ object Generators {
 
   def restartRoundMessage: Gen[RestartRoundMessage] = {
     for {
-      mixDetails <- mixDetails
+      roundParams <- roundParameters
       nonceMsg <- nonceMsg
-    } yield RestartRoundMessage(mixDetails, nonceMsg)
+    } yield RestartRoundMessage(roundParams, nonceMsg)
   }
 
   def cancelRegistrationMessage: Gen[CancelRegistrationMessage] = {

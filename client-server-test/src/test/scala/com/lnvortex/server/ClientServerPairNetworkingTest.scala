@@ -1,6 +1,6 @@
 package com.lnvortex.server
 
-import com.lnvortex.core.RoundDetails.getMixDetailsOpt
+import com.lnvortex.core.RoundDetails.getRoundParamsOpt
 import com.lnvortex.testkit.{ClientServerPairFixture, LnVortexTestUtils}
 import org.bitcoins.core.script.ScriptType
 import org.bitcoins.core.script.ScriptType._
@@ -38,13 +38,13 @@ class ClientServerPairNetworkingTest
   }
 
   it must "announce a new round" in { case (client, coordinator, _) =>
-    val roundId = getMixDetailsOpt(client.getCurrentRoundDetails).get.roundId
+    val roundId = getRoundParamsOpt(client.getCurrentRoundDetails).get.roundId
     assert(roundId == coordinator.getCurrentRoundId)
     for {
       db <- coordinator.newRound()
       _ <- TestAsyncUtil.awaitCondition(
         () =>
-          getMixDetailsOpt(
+          getRoundParamsOpt(
             client.getCurrentRoundDetails).get.roundId == db.roundId,
         interval,
         maxTries = 500

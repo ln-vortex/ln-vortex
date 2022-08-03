@@ -20,7 +20,7 @@ case class InitDetails(
     peerAddrOpt: Option[InetSocketAddress],
     changeSpkOpt: Option[ScriptPubKey],
     chanId: ByteVector,
-    mixOutput: TransactionOutput,
+    targetOutput: TransactionOutput,
     tweaks: BlindingTweaks) {
   val inputAmt: CurrencyUnit = inputs.map(_.output.value).sum
 }

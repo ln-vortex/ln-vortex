@@ -22,16 +22,16 @@ class VortexMessageSerializationTest extends BitcoinSUnitTest {
     assert(VortexMessage(msg.bytes) == msg)
   }
 
-  "AskMixDetails" must "have serialization symmetry" in {
-    forAll(Generators.askMixDetails) { msg =>
-      assert(AskMixDetails(msg.bytes) == msg)
+  "AskRoundParameters" must "have serialization symmetry" in {
+    forAll(Generators.askRoundParameters) { msg =>
+      assert(AskRoundParameters(msg.bytes) == msg)
       assert(VortexMessage(msg.bytes) == msg)
     }
   }
 
-  "MixDetails" must "have serialization symmetry" in {
-    forAll(Generators.mixDetails) { msg =>
-      assert(MixDetails(msg.bytes) == msg)
+  "RoundParameters" must "have serialization symmetry" in {
+    forAll(Generators.roundParameters) { msg =>
+      assert(RoundParameters(msg.bytes) == msg)
       assert(VortexMessage(msg.bytes) == msg)
     }
   }
@@ -77,9 +77,9 @@ class VortexMessageSerializationTest extends BitcoinSUnitTest {
     }
   }
 
-  "RegisterMixOutput" must "have serialization symmetry" in {
-    forAll(Generators.registerMixOutput) { msg =>
-      assert(RegisterMixOutput(msg.bytes) == msg)
+  "RegisterOutput" must "have serialization symmetry" in {
+    forAll(Generators.registerOutput) { msg =>
+      assert(RegisterOutput(msg.bytes) == msg)
       assert(VortexMessage(msg.bytes) == msg)
     }
   }

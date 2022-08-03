@@ -7,20 +7,22 @@ CREATE TABLE banned_utxos
 
 CREATE TABLE rounds
 (
-    round_id    TEXT PRIMARY KEY NOT NULL,
-    status      TEXT             NOT NULL,
-    round_time  TIMESTAMP        NOT NULL,
-    fee_rate    TEXT             NOT NULL,
-    mix_fee     INTEGER          NOT NULL,
-    input_fee   INTEGER          NOT NULL,
-    output_fee  INTEGER          NOT NULL,
-    change_fee  INTEGER          NOT NULL,
-    amount      INTEGER          NOT NULL,
-    psbt        TEXT,
-    transaction TEXT,
-    txid        TEXT,
-    profit      INTEGER
+    round_id        TEXT PRIMARY KEY NOT NULL,
+    status          TEXT             NOT NULL,
+    round_time      TIMESTAMP        NOT NULL,
+    fee_rate        TEXT             NOT NULL,
+    coordinator_fee INTEGER          NOT NULL,
+    input_fee       INTEGER          NOT NULL,
+    output_fee      INTEGER          NOT NULL,
+    change_fee      INTEGER          NOT NULL,
+    amount          INTEGER          NOT NULL,
+    psbt            TEXT,
+    transaction     TEXT,
+    txid            TEXT,
+    profit          INTEGER
 );
+
+CREATE INDEX round_txid_index on rounds (txid);
 
 CREATE TABLE alices
 (

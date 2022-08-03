@@ -5,7 +5,7 @@ import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server._
 import com.lnvortex.client.VortexClient
 import com.lnvortex.config.VortexPicklers._
-import com.lnvortex.core.RoundDetails.getMixDetailsOpt
+import com.lnvortex.core.RoundDetails.getRoundParamsOpt
 import com.lnvortex.core.api.VortexWalletApi
 import play.api.libs.json._
 
@@ -84,7 +84,7 @@ case class LnVortexRoutes(client: VortexClient[VortexWalletApi])(implicit
                   client.getCoinsAndQueue(outpoints, nodeId, peerAddrOpt)
                 case (None, None) =>
                   for {
-                    addr <- client.vortexWallet.getNewAddress(getMixDetailsOpt(
+                    addr <- client.vortexWallet.getNewAddress(getRoundParamsOpt(
                       client.getCurrentRoundDetails).get.outputType)
                     _ <- client.getCoinsAndQueue(outpoints, addr)
                   } yield ()

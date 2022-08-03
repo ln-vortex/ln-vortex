@@ -20,12 +20,12 @@ case object NoDetails extends RoundDetails {
   override val order: Int = 0
   override val status: ClientStatus = ClientStatus.NoDetails
 
-  def nextStage(round: MixDetails): KnownRound = {
+  def nextStage(round: RoundParameters): KnownRound = {
     KnownRound(round)
   }
 }
 
-case class KnownRound(round: MixDetails) extends RoundDetails {
+case class KnownRound(round: RoundParameters) extends RoundDetails {
   override val order: Int = 1
   override val status: ClientStatus = ClientStatus.KnownRound
 
@@ -33,7 +33,7 @@ case class KnownRound(round: MixDetails) extends RoundDetails {
     ReceivedNonce(round, nonce)
 }
 
-case class ReceivedNonce(round: MixDetails, nonce: SchnorrNonce)
+case class ReceivedNonce(round: RoundParameters, nonce: SchnorrNonce)
     extends RoundDetails {
   override val order: Int = 2
   override val status: ClientStatus = ClientStatus.ReceivedNonce
@@ -47,7 +47,7 @@ case class ReceivedNonce(round: MixDetails, nonce: SchnorrNonce)
 }
 
 case class InputsScheduled(
-    round: MixDetails,
+    round: RoundParameters,
     nonce: SchnorrNonce,
     inputs: Vector[OutputReference],
     addressOpt: Option[BitcoinAddress],
@@ -72,7 +72,7 @@ case class InputsScheduled(
 
 sealed trait InitializedRound extends RoundDetails {
 
-  def round: MixDetails
+  def round: RoundParameters
   def inputFee: CurrencyUnit
   def outputFee: CurrencyUnit
   def changeOutputFee: CurrencyUnit
@@ -88,7 +88,7 @@ sealed trait InitializedRound extends RoundDetails {
       val newEntrantFee = totalNewEntrantFee / Satoshis(numNewEntrants)
 
       val excessAfterChange =
-        initDetails.inputAmt - round.amount - round.mixFee - (Satoshis(
+        initDetails.inputAmt - round.amount - round.coordinatorFee - (Satoshis(
           initDetails.inputs.size) * inputFee) - outputFee - changeOutputFee - newEntrantFee
 
       if (excessAfterChange >= Policy.dustThreshold)
@@ -97,7 +97,9 @@ sealed trait InitializedRound extends RoundDetails {
     }
   }
 
-  def restartRound(round: MixDetails, nonce: SchnorrNonce): InputsScheduled =
+  def restartRound(
+      round: RoundParameters,
+      nonce: SchnorrNonce): InputsScheduled =
     InputsScheduled(
       round = round,
       nonce = nonce,
@@ -109,7 +111,7 @@ sealed trait InitializedRound extends RoundDetails {
 }
 
 case class InputsRegistered(
-    round: MixDetails,
+    round: RoundParameters,
     inputFee: CurrencyUnit,
     outputFee: CurrencyUnit,
     changeOutputFee: CurrencyUnit,
@@ -119,17 +121,17 @@ case class InputsRegistered(
   override val order: Int = 4
   override val status: ClientStatus = ClientStatus.InputsRegistered
 
-  def nextStage: MixOutputRegistered =
-    MixOutputRegistered(round,
-                        inputFee,
-                        outputFee,
-                        changeOutputFee,
-                        nonce,
-                        initDetails)
+  def nextStage: OutputRegistered =
+    OutputRegistered(round,
+                     inputFee,
+                     outputFee,
+                     changeOutputFee,
+                     nonce,
+                     initDetails)
 }
 
-case class MixOutputRegistered(
-    round: MixDetails,
+case class OutputRegistered(
+    round: RoundParameters,
     inputFee: CurrencyUnit,
     outputFee: CurrencyUnit,
     changeOutputFee: CurrencyUnit,
@@ -137,7 +139,7 @@ case class MixOutputRegistered(
     initDetails: InitDetails)
     extends InitializedRound {
   override val order: Int = 5
-  override val status: ClientStatus = ClientStatus.MixOutputRegistered
+  override val status: ClientStatus = ClientStatus.OutputRegistered
 
   def nextStage(psbt: PSBT): PSBTSigned =
     PSBTSigned(round,
@@ -150,7 +152,7 @@ case class MixOutputRegistered(
 }
 
 case class PSBTSigned(
-    round: MixDetails,
+    round: RoundParameters,
     inputFee: CurrencyUnit,
     outputFee: CurrencyUnit,
     changeOutputFee: CurrencyUnit,
@@ -165,7 +167,7 @@ case class PSBTSigned(
     val txId = psbt.transaction.txId
     val vout = UInt32(
       psbt.transaction.outputs.indexWhere(
-        _.scriptPubKey == initDetails.mixOutput.scriptPubKey))
+        _.scriptPubKey == initDetails.targetOutput.scriptPubKey))
 
     TransactionOutPoint(txId, vout)
   }
@@ -184,7 +186,7 @@ case class PSBTSigned(
 
 object RoundDetails {
 
-  def getMixDetailsOpt(details: RoundDetails): Option[MixDetails] = {
+  def getRoundParamsOpt(details: RoundDetails): Option[RoundParameters] = {
     details match {
       case NoDetails                  => None
       case known: KnownRound          => Some(known.round)
@@ -235,17 +237,17 @@ object ClientStatus extends StringFactory[ClientStatus] {
 
   /** After the [[AskInputs]] message has been received and the client sends its
     * inputs to the coordinator its inputs will be registered.
-    * This is the first state when the mixing begins.
+    * This is the first state when the round begins.
     */
   case object InputsRegistered extends ClientStatus
 
-  /** Intermediate step during the mix.
+  /** Intermediate step during the round.
     * The client has registered its output with unblinded signature
     * under its alternate Bob identity
     */
-  case object MixOutputRegistered extends ClientStatus
+  case object OutputRegistered extends ClientStatus
 
-  /** Final stage during the mix.
+  /** Final stage during the round.
     * The client has received the PSBT and signed it.
     * It will send it back to the coordinator to
     * complete the transaction and broadcast
@@ -257,7 +259,7 @@ object ClientStatus extends StringFactory[ClientStatus] {
                                          ReceivedNonce,
                                          InputsScheduled,
                                          InputsRegistered,
-                                         MixOutputRegistered,
+                                         OutputRegistered,
                                          PSBTSigned)
 
   override def fromStringOpt(string: String): Option[ClientStatus] = {

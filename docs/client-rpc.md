@@ -47,14 +47,14 @@ None
 
 #### Response
 
-- status: String - [NoDetails, KnownRound, ReceivedNonce, InputsScheduled, InputsRegistered, MixOutputRegistered, PSBTSigned]
+- status: String - [NoDetails, KnownRound, ReceivedNonce, InputsScheduled, InputsRegistered, TargetOutputRegistered, PSBTSigned]
 - round: Round - Available for all statuses besides `NoDetails`
 
 Round:
 - version: Number
 - roundId: String - id for the round
 - amount: Number - denomination for the round
-- mixFee: Number - fee in satoshis for the round
+- coordinatorFee: Number - fee in satoshis for the round
 - publicKey: String - coordinator's public key
 - time: Number - when the round will execute, in epoch seconds
 

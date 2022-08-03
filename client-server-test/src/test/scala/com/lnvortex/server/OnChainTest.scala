@@ -34,7 +34,7 @@ class OnChainTest
         case KnownRound(round) =>
           assert(round.roundId == roundDb.roundId)
           assert(round.amount == roundDb.amount)
-          assert(round.mixFee == roundDb.mixFee)
+          assert(round.coordinatorFee == roundDb.coordinatorFee)
           assert(round.publicKey == coordinator.publicKey)
           assert(round.time == UInt64(roundDb.roundTime.getEpochSecond))
       }
@@ -71,7 +71,7 @@ class OnChainTest
       outputDbs <- coordinator.outputsDAO.findAll()
     } yield {
       val expectedOutput =
-        getInitDetailsOpt(client.getCurrentRoundDetails).get.mixOutput
+        getInitDetailsOpt(client.getCurrentRoundDetails).get.targetOutput
 
       assert(outputDbs.size == 1)
       assert(outputDbs.head.output == expectedOutput)

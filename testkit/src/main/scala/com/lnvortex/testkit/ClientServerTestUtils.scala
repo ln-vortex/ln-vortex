@@ -3,7 +3,7 @@ package com.lnvortex.testkit
 import akka.testkit.TestActorRef
 import com.lnvortex.client._
 import com.lnvortex.core.AskNonce
-import com.lnvortex.core.RoundDetails.getMixDetailsOpt
+import com.lnvortex.core.RoundDetails.getRoundParamsOpt
 import com.lnvortex.lnd.LndVortexWallet
 import com.lnvortex.server.coordinator.VortexCoordinator
 import com.lnvortex.server.models.AliceDb
@@ -71,7 +71,7 @@ trait ClientServerTestUtils {
       // select random minimal utxo
       utxos <- client.listCoins().map(c => Random.shuffle(c).take(1))
       addr <- client.vortexWallet.getNewAddress(
-        coordinator.mixDetails.outputType)
+        coordinator.roundParams.outputType)
       _ = client.queueCoins(utxos.map(_.outputReference), addr)
       msg <- coordinator.beginInputRegistration()
 
@@ -128,11 +128,11 @@ trait ClientServerTestUtils {
     for {
       blindSig <- registerInputs(peerId, client, coordinator, peerLnd)
 
-      registerMixOutput = client.processBlindOutputSig(blindSig)
+      register = client.processBlindOutputSig(blindSig)
 
       _ <- coordinator.beginOutputRegistration()
 
-      _ <- coordinator.verifyAndRegisterBob(registerMixOutput)
+      _ <- coordinator.verifyAndRegisterBob(register)
     } yield ()
   }
 
@@ -144,11 +144,11 @@ trait ClientServerTestUtils {
     for {
       blindSig <- registerInputs(peerId, client, coordinator)
 
-      registerMixOutput = client.processBlindOutputSig(blindSig)
+      register = client.processBlindOutputSig(blindSig)
 
       _ <- coordinator.beginOutputRegistration()
 
-      _ <- coordinator.verifyAndRegisterBob(registerMixOutput)
+      _ <- coordinator.verifyAndRegisterBob(register)
     } yield ()
   }
 
@@ -166,13 +166,13 @@ trait ClientServerTestUtils {
                                                clientB,
                                                coordinator)
 
-      registerMixOutputA = clientA.processBlindOutputSig(blindSigA)
-      registerMixOutputB = clientB.processBlindOutputSig(blindSigB)
+      registerA = clientA.processBlindOutputSig(blindSigA)
+      registerB = clientB.processBlindOutputSig(blindSigB)
 
       _ <- coordinator.beginOutputRegistration()
 
-      _ <- coordinator.verifyAndRegisterBob(registerMixOutputA)
-      _ <- coordinator.verifyAndRegisterBob(registerMixOutputB)
+      _ <- coordinator.verifyAndRegisterBob(registerA)
+      _ <- coordinator.verifyAndRegisterBob(registerB)
     } yield ()
   }
 
@@ -240,7 +240,7 @@ trait ClientServerTestUtils {
     } yield (signedA, signedB)
   }
 
-  def completeMixRound(
+  def completeChannelRound(
       peerId: Sha256Digest,
       client: VortexClient[LndVortexWallet],
       coordinator: VortexCoordinator,
@@ -309,7 +309,7 @@ trait ClientServerTestUtils {
     }
   }
 
-  def completeMixRound(
+  def completeChannelRound(
       peerIdA: Sha256Digest,
       peerIdB: Sha256Digest,
       clientA: VortexClient[LndVortexWallet],
@@ -385,14 +385,14 @@ trait ClientServerTestUtils {
       coordinator: VortexCoordinator)(implicit
       ec: ExecutionContext): Future[Transaction] = {
     // verify same roundId
-    require(coordinator.getCurrentRoundId == getMixDetailsOpt(
+    require(coordinator.getCurrentRoundId == getRoundParamsOpt(
               clientA.getCurrentRoundDetails).get.roundId,
             "Incorrect round id")
-    require(coordinator.getCurrentRoundId == getMixDetailsOpt(
+    require(coordinator.getCurrentRoundId == getRoundParamsOpt(
               clientB.getCurrentRoundDetails).get.roundId,
             "Incorrect round id")
 
-    val roundAmount = coordinator.mixDetails.amount
+    val roundAmount = coordinator.roundParams.amount
 
     for {
       _ <- getNonce(peerIdA, clientA, coordinator)
@@ -403,12 +403,12 @@ trait ClientServerTestUtils {
           case Some(txid) =>
             coins
               .filter(_.outPoint.txIdBE == txid)
-              .filter(_.amount == coordinator.config.mixAmount)
+              .filter(_.amount == coordinator.config.roundAmount)
           case None => Random.shuffle(coins).take(1)
         }
       }
       addrA <- clientA.vortexWallet.getNewAddress(
-        coordinator.mixDetails.outputType)
+        coordinator.roundParams.outputType)
       coinsA = Random.shuffle(utxosA.map(_.outputReference)).take(1)
       _ = clientA.queueCoins(coinsA, addrA)
       // select non-remix coins
@@ -420,7 +420,7 @@ trait ClientServerTestUtils {
         }
       }
       addrB <- clientB.vortexWallet.getNewAddress(
-        coordinator.mixDetails.outputType)
+        coordinator.roundParams.outputType)
       coinsB = Random.shuffle(utxosB.map(_.outputReference)).take(1)
       _ = clientB.queueCoins(coinsB, addrB)
       msg <- coordinator.beginInputRegistration()
@@ -436,13 +436,13 @@ trait ClientServerTestUtils {
       blindSigA <- coordinator.registerAlice(peerIdA, registerInputsA)
       blindSigB <- coordinator.registerAlice(peerIdB, registerInputsB)
 
-      registerMixOutputA = clientA.processBlindOutputSig(blindSigA)
-      registerMixOutputB = clientB.processBlindOutputSig(blindSigB)
+      registerA = clientA.processBlindOutputSig(blindSigA)
+      registerB = clientB.processBlindOutputSig(blindSigB)
 
       _ <- coordinator.beginOutputRegistration()
 
-      _ <- coordinator.verifyAndRegisterBob(registerMixOutputA)
-      _ <- coordinator.verifyAndRegisterBob(registerMixOutputB)
+      _ <- coordinator.verifyAndRegisterBob(registerA)
+      _ <- coordinator.verifyAndRegisterBob(registerB)
 
       // registering inputs and outputs will make it construct the unsigned psbt
       _ <- TestAsyncUtil.awaitConditionF(
@@ -490,16 +490,18 @@ trait ClientServerTestUtils {
           assert(tx.outputs.count(_.value == roundAmount) == 2)
           assert(tx.outputs.count(_.value != roundAmount) == 2)
           assert(
-            tx.outputs.count(_.value == coordinator.mixDetails.mixFee) == 1)
-          // 2 mix outputs + 1 change + coordinator fee
+            tx.outputs.count(
+              _.value == coordinator.roundParams.coordinatorFee) == 1)
+          // 2 target outputs + 1 change + coordinator fee
           assert(tx.outputs.size == 4)
         case None =>
           assert(tx.outputs.count(_.value == roundAmount) == 2)
           assert(tx.outputs.count(_.value != roundAmount) == 3)
           assert(
             tx.outputs.count(
-              _.value == coordinator.mixDetails.mixFee * Satoshis(2)) == 1)
-          // 2 mix outputs + 2 change + coordinator fee
+              _.value == coordinator.roundParams.coordinatorFee * Satoshis(
+                2)) == 1)
+          // 2 target outputs + 2 change + coordinator fee
           assert(tx.outputs.size == 5)
       }
 
@@ -528,7 +530,7 @@ trait ClientServerTestUtils {
           val prev = coinsA.filter(_.outPoint.txIdBE == txid)
           assert(prev.size == 1 && prev.head.amount != roundAmount)
 
-          // mix output
+          // target output
           assert(
             coinsA
               .find(_.outPoint.txIdBE == tx.txIdBE)
@@ -536,7 +538,7 @@ trait ClientServerTestUtils {
         case None =>
           val roundOutputs = coinsA.filter(_.outPoint.txIdBE == tx.txIdBE)
           assert(roundOutputs.size == 2) // output + change
-          // mix output
+          // target output
           assert(roundOutputs.exists(_.amount == roundAmount))
           // change output
           assert(roundOutputs.exists(_.amount != roundAmount))
@@ -545,7 +547,7 @@ trait ClientServerTestUtils {
       coinsB <- clientB.listCoins()
       roundOutputs = coinsB.filter(_.outPoint.txIdBE == tx.txIdBE)
       _ = assert(roundOutputs.size == 2) // output + change
-      // mix output
+      // target output
       _ = assert(roundOutputs.exists(_.amount == roundAmount))
       // change output
       _ = assert(roundOutputs.exists(_.amount != roundAmount))

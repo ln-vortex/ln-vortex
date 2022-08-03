@@ -45,15 +45,15 @@ class ServerDataHandler(
   private def handleVortexMessage(
       message: ClientVortexMessage): Future[Unit] = {
     message match {
-      case AskMixDetails(network) =>
+      case AskRoundParameters(network) =>
         val currentNetwork = coordinator.config.network
         if (currentNetwork == network) {
           coordinator.allConnections += connectionHandler
-          connectionHandler ! coordinator.mixDetails
+          connectionHandler ! coordinator.roundParams
           Future.unit
         } else {
           logger.warn(
-            s"Received AskMixDetails for different network $network, current network $currentNetwork")
+            s"Received AskRoundParameters for different network $network, current network $currentNetwork")
           Future.unit
         }
       case askNonce: AskNonce =>
@@ -64,7 +64,7 @@ class ServerDataHandler(
         for {
           _ <- coordinator.registerAlice(id, inputs)
         } yield ()
-      case bob: RegisterMixOutput =>
+      case bob: RegisterOutput =>
         coordinator.verifyAndRegisterBob(bob).map(_ => ())
       case SignedPsbtMessage(psbt) =>
         coordinator.registerPSBTSignatures(id, psbt).map { signedTx =>
