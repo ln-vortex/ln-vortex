@@ -92,10 +92,10 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
   def listCoins(): Future[Vector[UnspentCoin]] = {
     for {
       coins <- vortexWallet.listCoins()
-      utxoDbs <- utxoDAO.findByOutPoints(coins.map(_.outPoint))
+      utxoDbs <- utxoDAO.createOutPointMap(coins.map(_.outPoint))
     } yield {
       coins.map { coin =>
-        val utxoOpt = utxoDbs.find(_.outPoint == coin.outPoint)
+        val utxoOpt = utxoDbs.get(coin.outPoint).flatten
         utxoOpt match {
           case Some(utxo) =>
             coin.copy(anonSet = utxo.anonSet, isChange = utxo.isChange)

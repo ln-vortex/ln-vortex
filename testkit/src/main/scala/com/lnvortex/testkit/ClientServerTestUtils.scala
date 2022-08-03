@@ -251,6 +251,8 @@ trait ClientServerTestUtils {
 
       tx <- coordinator.registerPSBTSignatures(peerId, psbt)
 
+      _ <- client.completeRound(tx)
+
       inputUtxos = all.filter(t =>
         tx.inputs.map(_.previousOutput).contains(t.outPoint))
       inputAmt = inputUtxos.map(_.amount).sum
@@ -280,6 +282,8 @@ trait ClientServerTestUtils {
 
       tx <- coordinator.registerPSBTSignatures(peerId, psbt)
 
+      _ <- client.completeRound(tx)
+
       inputUtxos = all.filter(t =>
         tx.inputs.map(_.previousOutput).contains(t.outPoint))
       inputAmt = inputUtxos.map(_.amount).sum
@@ -297,7 +301,12 @@ trait ClientServerTestUtils {
       _ <- TestAsyncUtil.awaitConditionF(() => client.listCoins().map(_ != all),
                                          interval = 100.milliseconds,
                                          maxTries = 500)
-    } yield ()
+      newCoins <- client.listCoins()
+    } yield {
+      val change = newCoins.filter(_.isChange)
+      assert(change.size == 1)
+      assert(change.forall(_.anonSet == 1))
+    }
   }
 
   def completeMixRound(
@@ -326,6 +335,9 @@ trait ClientServerTestUtils {
 
       _ = require(tx == tx2)
 
+      _ <- clientA.completeRound(tx)
+      _ <- clientB.completeRound(tx)
+
       inputUtxos = (utxosA ++ utxosB).filter(t =>
         tx.inputs.map(_.previousOutput).contains(t.outPoint))
       inputAmt = inputUtxos.map(_.amount).sum
@@ -347,10 +359,21 @@ trait ClientServerTestUtils {
 
       // wait until clientB sees new channel
       _ <- TestAsyncUtil.awaitConditionF(
-        () => clientA.vortexWallet.lndRpcClient.listChannels().map(_.nonEmpty),
+        () => clientB.vortexWallet.lndRpcClient.listChannels().map(_.nonEmpty),
         interval = 100.milliseconds,
         maxTries = 500)
-    } yield ()
+
+      newCoinsA <- clientA.listCoins()
+      newCoinsB <- clientB.listCoins()
+    } yield {
+      val changeA = newCoinsA.filter(_.isChange)
+      assert(changeA.size == 1, s"${changeA.size} != 1")
+      assert(changeA.forall(_.anonSet == 1))
+
+      val changeB = newCoinsB.filter(_.isChange)
+      assert(changeB.size == 1, s"${changeB.size} != 1")
+      assert(changeB.forall(_.anonSet == 1))
+    }
   }
 
   def completeOnChainRound(
