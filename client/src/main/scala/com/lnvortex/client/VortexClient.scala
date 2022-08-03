@@ -194,7 +194,8 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
 
       f.recover { case ex: Throwable =>
         logger.error(s"Error from Lightning node: ${ex.getMessage}", ex)
-        throw new RuntimeException(s"$amount is under peer's minimum channel size")
+        throw new RuntimeException(
+          s"$amount is under peer's minimum channel size")
       }
     }
   }
@@ -658,7 +659,8 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
         for {
           _ <- vortexWallet.broadcastTransaction(signedTx)
           _ <- vortexWallet
-            .labelTransaction(signedTx.txId, s"LnVortex Mix Anonimity set: $anonSet")
+            .labelTransaction(signedTx.txId,
+                              s"LnVortex Anonymity set: $anonSet")
             .recover(_ => ())
           _ <- utxoDAO.setAnonSets(state.initDetails.inputs.map(_.outPoint),
                                    state.channelOutpoint,
