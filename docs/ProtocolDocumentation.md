@@ -53,7 +53,7 @@ combines the signatures and propagates the CoinJoin on the network, and sends it
 ### Dealing with change
 
 The goal of this CoinJoin is to open a lightning channel without having to reveal which utxos are yours. Because of
-this, it is important to preserve privacy after the mix, specifically with the change output(s).
+this, it is important to preserve privacy after the round, specifically with the change output(s).
 
 Since the users are not mixing to themselves and instead directly into a lightning channel, we must consider the
 implications of how easily inputs and change can be linked. For example, if two users are mixing to open a 1 BTC channel
