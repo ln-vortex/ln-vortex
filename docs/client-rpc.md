@@ -47,7 +47,7 @@ None
 
 #### Response
 
-- status: String - [NoDetails, KnownRound, ReceivedNonce, InputsScheduled, InputsRegistered, MixOutputRegistered, PSBTSigned]
+- status: String - [NoDetails, KnownRound, ReceivedNonce, InputsScheduled, InputsRegistered, TargetOutputRegistered, PSBTSigned]
 - round: Round - Available for all statuses besides `NoDetails`
 
 Round:

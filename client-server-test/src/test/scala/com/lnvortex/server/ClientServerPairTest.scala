@@ -70,7 +70,7 @@ class ClientServerPairTest
         outputDbs <- coordinator.outputsDAO.findAll()
       } yield {
         val expectedOutput =
-          getInitDetailsOpt(client.getCurrentRoundDetails).get.mixOutput
+          getInitDetailsOpt(client.getCurrentRoundDetails).get.targetOutput
 
         assert(outputDbs.size == 1)
         assert(outputDbs.head.output == expectedOutput)
@@ -85,7 +85,7 @@ class ClientServerPairTest
 
   it must "open a channel" in { case (client, coordinator, peerLnd) =>
     for {
-      _ <- completeMixRound(peerId, client, coordinator, peerLnd)
+      _ <- completeChannelRound(peerId, client, coordinator, peerLnd)
 
       roundDbs <- coordinator.roundDAO.findAll()
     } yield assert(roundDbs.size == 2)

@@ -62,9 +62,9 @@ class DualClientTest
         outputDbs <- coordinator.outputsDAO.findAll()
       } yield {
         val expectedOutputA =
-          getInitDetailsOpt(clientA.getCurrentRoundDetails).get.mixOutput
+          getInitDetailsOpt(clientA.getCurrentRoundDetails).get.targetOutput
         val expectedOutputB =
-          getInitDetailsOpt(clientB.getCurrentRoundDetails).get.mixOutput
+          getInitDetailsOpt(clientB.getCurrentRoundDetails).get.targetOutput
 
         assert(outputDbs.size == 2)
         assert(outputDbs.exists(_.output == expectedOutputA))
@@ -87,7 +87,7 @@ class DualClientTest
 
   it must "open channels" in { case (clientA, clientB, coordinator) =>
     for {
-      _ <- completeMixRound(peerIdA, peerIdB, clientA, clientB, coordinator)
+      _ <- completeChannelRound(peerIdA, peerIdB, clientA, clientB, coordinator)
 
       roundDbs <- coordinator.roundDAO.findAll()
     } yield assert(roundDbs.size == 2)

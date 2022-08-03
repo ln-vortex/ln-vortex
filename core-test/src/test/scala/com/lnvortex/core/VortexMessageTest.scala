@@ -24,7 +24,7 @@ class VortexMessageTest extends BitcoinSUnitTest {
   it must "correctly verify a Bob message" in {
     forAll(ScriptGenerators.p2wshSPKV0.map(_._1)) { spk =>
       val output = TransactionOutput(amount, spk)
-      val hash = RegisterMixOutput.calculateChallenge(output, roundId)
+      val hash = RegisterOutput.calculateChallenge(output, roundId)
 
       val challenge =
         BlindSchnorrUtil.generateChallenge(pubKey, nonce, tweaks, hash)
@@ -34,7 +34,7 @@ class VortexMessageTest extends BitcoinSUnitTest {
       val sig =
         BlindSchnorrUtil.unblindSignature(blindSig, pubKey, nonce, tweaks, hash)
 
-      val bobMsg = RegisterMixOutput(sig, output)
+      val bobMsg = RegisterOutput(sig, output)
 
       val verify = bobMsg.verifySig(pubKey, roundId)
 
@@ -45,7 +45,7 @@ class VortexMessageTest extends BitcoinSUnitTest {
   it must "fail to verify a Bob message with different tweaks sig" in {
     forAll(ScriptGenerators.p2wshSPKV0.map(_._1)) { spk =>
       val output = TransactionOutput(amount, spk)
-      val hash = RegisterMixOutput.calculateChallenge(output, roundId)
+      val hash = RegisterOutput.calculateChallenge(output, roundId)
 
       val challenge =
         BlindSchnorrUtil.generateChallenge(pubKey, nonce, tweaks, hash)
@@ -66,7 +66,7 @@ class VortexMessageTest extends BitcoinSUnitTest {
   it must "fail to verify a Bob message with wrong keys" in {
     forAll(ScriptGenerators.p2wshSPKV0.map(_._1)) { spk =>
       val output = TransactionOutput(amount, spk)
-      val hash = RegisterMixOutput.calculateChallenge(output, roundId)
+      val hash = RegisterOutput.calculateChallenge(output, roundId)
 
       val challenge =
         BlindSchnorrUtil.generateChallenge(pubKey, nonce, tweaks, hash)
@@ -76,7 +76,7 @@ class VortexMessageTest extends BitcoinSUnitTest {
       val sig =
         BlindSchnorrUtil.unblindSignature(blindSig, pubKey, nonce, tweaks, hash)
 
-      val bobMsg = RegisterMixOutput(sig, output)
+      val bobMsg = RegisterOutput(sig, output)
 
       val verify = bobMsg.verifySig(kVal.schnorrPublicKey, roundId)
 

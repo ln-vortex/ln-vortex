@@ -71,7 +71,7 @@ class OnChainTest
       outputDbs <- coordinator.outputsDAO.findAll()
     } yield {
       val expectedOutput =
-        getInitDetailsOpt(client.getCurrentRoundDetails).get.mixOutput
+        getInitDetailsOpt(client.getCurrentRoundDetails).get.targetOutput
 
       assert(outputDbs.size == 1)
       assert(outputDbs.head.output == expectedOutput)

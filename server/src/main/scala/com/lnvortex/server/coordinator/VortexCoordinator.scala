@@ -480,9 +480,9 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       val inputRef = registerInputs.inputs.head
       roundDAO.hasTxIdAction(inputRef.outPoint.txIdBE).map { isPrevRound =>
         // make sure it wasn't a change output
-        val isMixUtxo = inputRef.output.value == config.roundAmount
+        val wasTargetUtxo = inputRef.output.value == config.roundAmount
         val noChange = registerInputs.changeSpkOpt.isEmpty
-        isPrevRound && isMixUtxo && noChange
+        isPrevRound && wasTargetUtxo && noChange
       }
     } else DBIO.successful(false)
 
@@ -588,7 +588,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
   }
 
   private[lnvortex] def verifyAndRegisterBob(
-      bob: RegisterMixOutput): Future[Unit] = {
+      bob: RegisterOutput): Future[Unit] = {
     logger.info("A bob is registering an output")
 
     val validSpk = bob.output.scriptPubKey.scriptType == config.outputScriptType
@@ -599,7 +599,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       Future.failed(new InvalidOutputSignatureException(
         s"Bob attempted to register an output with an invalid sig ${bob.sig.hex}"))
     } else if (!validSpk) {
-      Future.failed(new InvalidMixOutputScriptPubKeyException(
+      Future.failed(new InvalidTargetOutputScriptPubKeyException(
         s"Bob attempted to register an output with an invalid script pub key ${bob.output.scriptPubKey.scriptType}"))
     } else {
       val db = RegisteredOutputDb(bob.output, bob.sig, currentRoundId)
@@ -610,7 +610,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
             throw new IllegalStateException(
               s"Round is in invalid state ${round.status}")
           if (round.amount != bob.output.value)
-            throw new InvalidMixOutputAmountException(
+            throw new InvalidTargetOutputAmountException(
               s"Output given is incorrect amount, got ${bob.output.value} expected ${round.amount}")
         }
 
@@ -623,7 +623,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
         _ <-
           if (spks.contains(bob.output.scriptPubKey)) {
             DBIO.failed(
-              new InvalidMixOutputScriptPubKeyException(
+              new InvalidTargetOutputScriptPubKeyException(
                 s"$bobAddr already registered as an input"))
           } else DBIO.successful(())
 
@@ -678,7 +678,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
   }
 
   private[coordinator] def constructUnsignedPSBT(
-      mixAddr: BitcoinAddress): Future[PSBT] = {
+      feeAddr: BitcoinAddress): Future[PSBT] = {
     bitcoind.getBlockCount.flatMap { height =>
       val dbsAction = for {
         aliceDbs <- aliceDAO.findRegisteredForRoundAction(currentRoundId)
@@ -738,9 +738,10 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
           val coordinatorFee =
             usedExcess + (Satoshis(numNewEntrants) * config.coordinatorFee)
           val coordinatorFeeOutput =
-            TransactionOutput(coordinatorFee, mixAddr.scriptPubKey)
-          val mixOutputs = outputDbs.map(_.output)
-          val outputsToAdd = mixOutputs ++ changeOutputs :+ coordinatorFeeOutput
+            TransactionOutput(coordinatorFee, feeAddr.scriptPubKey)
+          val targetOutputs = outputDbs.map(_.output)
+          val outputsToAdd =
+            targetOutputs ++ changeOutputs :+ coordinatorFeeOutput
 
           txBuilder ++= outputsToAdd
 

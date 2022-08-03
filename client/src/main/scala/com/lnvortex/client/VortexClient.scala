@@ -247,7 +247,7 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
     require(outputRefs.nonEmpty, "Must include inputs")
     roundDetails match {
       case state @ (NoDetails | _: KnownRound | _: InputsScheduled |
-          _: InputsRegistered | _: MixOutputRegistered | _: PSBTSigned) =>
+          _: InputsRegistered | _: OutputRegistered | _: PSBTSigned) =>
         throw new IllegalStateException(
           s"At invalid state $state, cannot queue coins")
       case receivedNonce: ReceivedNonce =>
@@ -270,7 +270,7 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
           throw new InvalidInputException(
             s"Must select more inputs to find round, needed ${round.amount}")
         } else if (round.outputType != ScriptType.WITNESS_V0_SCRIPTHASH) {
-          throw new InvalidMixedOutputException(
+          throw new InvalidTargetOutputException(
             "This version of LND only supports SegwitV0 channels")
         } else if (
           outputRefs.distinctBy(_.output.scriptPubKey).size != outputRefs.size
@@ -303,7 +303,7 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
     require(outputRefs.nonEmpty, "Must include inputs")
     roundDetails match {
       case state @ (NoDetails | _: KnownRound | _: InputsScheduled |
-          _: InputsRegistered | _: MixOutputRegistered | _: PSBTSigned) =>
+          _: InputsRegistered | _: OutputRegistered | _: PSBTSigned) =>
         throw new IllegalStateException(
           s"At invalid state $state, cannot queue coins")
       case receivedNonce: ReceivedNonce =>
@@ -322,7 +322,7 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
           throw new InvalidInputException(
             s"Error. Must use ${round.inputType} inputs")
         } else if (address.scriptPubKey.scriptType != round.outputType) {
-          throw new InvalidMixedOutputException(
+          throw new InvalidTargetOutputException(
             s"Error. Must use ${round.outputType} address")
         } else if (
           outputRefs.distinctBy(_.output.scriptPubKey).size != outputRefs.size
@@ -413,7 +413,7 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
                   if (
                     details.address.scriptPubKey.scriptType != round.outputType
                   ) {
-                    throw new InvalidMixedOutputException(
+                    throw new InvalidTargetOutputException(
                       s"The channel is invalid, need a ${round.outputType} output")
                   } else details
                 }
@@ -423,7 +423,7 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
                   if (addr.scriptPubKey.scriptType == round.outputType) {
                     Future.successful(addr)
                   } else {
-                    Future.failed(new InvalidMixedOutputException(
+                    Future.failed(new InvalidTargetOutputException(
                       s"Need a ${round.outputType} address, got ${addr.scriptPubKey.scriptType}"))
                   }
                 case None => vortexWallet.getNewAddress(round.outputType)
@@ -435,9 +435,9 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
               }
           }
         } yield {
-          val mixOutput = channelDetails.output
+          val targetOutput = channelDetails.output
           val hashedOutput =
-            RegisterMixOutput.calculateChallenge(mixOutput, round.roundId)
+            RegisterOutput.calculateChallenge(targetOutput, round.roundId)
 
           val tweaks = freshBlindingTweaks(signerPubKey = round.publicKey,
                                            signerNonce = scheduled.nonce)
@@ -454,7 +454,7 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
             peerAddrOpt = scheduled.peerAddrOpt,
             changeSpkOpt = changeAddrOpt.map(_.scriptPubKey),
             chanId = channelDetails.id,
-            mixOutput = mixOutput,
+            targetOutput = targetOutput,
             tweaks = tweaks
           )
 
@@ -468,21 +468,21 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
     }
   }
 
-  def processBlindOutputSig(blindOutputSig: FieldElement): RegisterMixOutput = {
+  def processBlindOutputSig(blindOutputSig: FieldElement): RegisterOutput = {
     logger.info("Got blind signature from coordinator, processing...")
     roundDetails match {
       case state @ (NoDetails | _: KnownRound | _: ReceivedNonce |
-          _: InputsScheduled | _: MixOutputRegistered | _: PSBTSigned) =>
+          _: InputsScheduled | _: OutputRegistered | _: PSBTSigned) =>
         throw new IllegalStateException(
           s"At invalid state $state, cannot processBlindOutputSig")
       case details: InputsRegistered =>
-        val mixOutput = details.initDetails.mixOutput
+        val targetOutput = details.initDetails.targetOutput
         val publicKey = details.round.publicKey
         val nonce = details.nonce
         val tweaks = details.initDetails.tweaks
 
         val challenge =
-          RegisterMixOutput.calculateChallenge(mixOutput, details.round.roundId)
+          RegisterOutput.calculateChallenge(targetOutput, details.round.roundId)
         val sig = BlindSchnorrUtil.unblindSignature(blindSig = blindOutputSig,
                                                     signerPubKey = publicKey,
                                                     signerNonce = nonce,
@@ -490,12 +490,12 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
                                                     message = challenge)
         roundDetails = details.nextStage
 
-        RegisterMixOutput(sig, mixOutput)
+        RegisterOutput(sig, targetOutput)
     }
   }
 
   private[client] def sendOutputMessageAsBob(
-      msg: RegisterMixOutput): Future[Unit] = {
+      msg: RegisterOutput): Future[Unit] = {
     val bobHandlerP = Promise[ActorRef]()
 
     logger.info("Sending channel output as Bob")
@@ -515,7 +515,7 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
         Future.failed(
           new IllegalStateException(
             s"At invalid state $state, cannot validateAndSignPsbt"))
-      case state: MixOutputRegistered =>
+      case state: OutputRegistered =>
         vortexWallet.getBlockHeight().flatMap { height =>
           val inputs: Vector[OutputReference] = state.initDetails.inputs
           lazy val myOutpoints = inputs.map(_.outPoint)
@@ -557,8 +557,8 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
                 false
             }
 
-          lazy val hasMixOutput =
-            tx.outputs.contains(state.initDetails.mixOutput)
+          lazy val targetOutput =
+            tx.outputs.contains(state.initDetails.targetOutput)
 
           lazy val noDust = tx.outputs.forall(_.value >= Policy.dustThreshold)
 
@@ -582,9 +582,9 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
             Future.failed(
               new BadLocktimeException(
                 "Transaction locktime is too far in the future"))
-          } else if (!hasMixOutput) {
-            Future.failed(new InvalidMixedOutputException(
-              s"Missing expected mixed output ${state.initDetails.mixOutput}"))
+          } else if (!targetOutput) {
+            Future.failed(new InvalidTargetOutputException(
+              s"Missing expected target output ${state.initDetails.targetOutput}"))
           } else if (!hasCorrectChange) {
             Future.failed(
               new InvalidChangeOutputException(
@@ -623,7 +623,7 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
   def restartRound(msg: RestartRoundMessage): Future[Unit] = {
     roundDetails match {
       case state @ (NoDetails | _: KnownRound | _: ReceivedNonce |
-          _: InputsScheduled | _: InputsRegistered | _: MixOutputRegistered) =>
+          _: InputsScheduled | _: InputsRegistered | _: OutputRegistered) =>
         throw new IllegalStateException(
           s"At invalid state $state, cannot restartRound")
       case state: PSBTSigned =>
@@ -645,7 +645,7 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
   def completeRound(signedTx: Transaction): Future[Unit] = {
     roundDetails match {
       case state @ (NoDetails | _: KnownRound | _: ReceivedNonce |
-          _: InputsScheduled | _: InputsRegistered | _: MixOutputRegistered) =>
+          _: InputsScheduled | _: InputsRegistered | _: OutputRegistered) =>
         Future.failed(
           new IllegalStateException(
             s"At invalid state $state, cannot completeRound"))

@@ -64,7 +64,7 @@ class ServerDataHandler(
         for {
           _ <- coordinator.registerAlice(id, inputs)
         } yield ()
-      case bob: RegisterMixOutput =>
+      case bob: RegisterOutput =>
         coordinator.verifyAndRegisterBob(bob).map(_ => ())
       case SignedPsbtMessage(psbt) =>
         coordinator.registerPSBTSignatures(id, psbt).map { signedTx =>

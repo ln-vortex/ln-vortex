@@ -77,9 +77,9 @@ class VortexMessageSerializationTest extends BitcoinSUnitTest {
     }
   }
 
-  "RegisterMixOutput" must "have serialization symmetry" in {
-    forAll(Generators.registerMixOutput) { msg =>
-      assert(RegisterMixOutput(msg.bytes) == msg)
+  "RegisterOutput" must "have serialization symmetry" in {
+    forAll(Generators.registerOutput) { msg =>
+      assert(RegisterOutput(msg.bytes) == msg)
       assert(VortexMessage(msg.bytes) == msg)
     }
   }

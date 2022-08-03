@@ -93,7 +93,7 @@ class VortexClientTest extends VortexClientFixture {
       addrA <- lnd.getNewAddress(roundParams.changeType)
       addrB <- lnd.getNewAddress(roundParams.outputType)
       change = TransactionOutput(Satoshis(599800000), addrA.scriptPubKey)
-      mix = TransactionOutput(Satoshis(200000), addrB.scriptPubKey)
+      targetOutput = TransactionOutput(Satoshis(200000), addrB.scriptPubKey)
 
       testDetails = InitDetails(
         inputs = refs,
@@ -102,67 +102,68 @@ class VortexClientTest extends VortexClientFixture {
         peerAddrOpt = None,
         changeSpkOpt = Some(change.scriptPubKey),
         chanId = Sha256Digest.empty.bytes,
-        mixOutput = mix,
+        targetOutput = targetOutput,
         tweaks = dummyTweaks
       )
-      testState = MixOutputRegistered(roundParams,
-                                      Satoshis.zero,
-                                      Satoshis.zero,
-                                      Satoshis.zero,
-                                      nonce,
-                                      testDetails)
+      testState = OutputRegistered(roundParams,
+                                   Satoshis.zero,
+                                   Satoshis.zero,
+                                   Satoshis.zero,
+                                   nonce,
+                                   testDetails)
       _ = vortexClient.setRoundDetails(testState)
 
       inputs = refs
         .map(_.outPoint)
         .map(TransactionInput(_, EmptyScriptSignature, UInt32.max))
-      outputs = Vector(change, mix)
+      outputs = Vector(change, targetOutput)
       tx = BaseTransaction(Int32.two, inputs, outputs, UInt32.zero)
       res <- recoverToSucceededIf[TooLowOfFeeException](
         vortexClient.validateAndSignPsbt(PSBT.fromUnsignedTx(tx)))
     } yield res
   }
 
-  it must "fail to sign a psbt with a missing mix output" in { vortexClient =>
-    val lnd = vortexClient.vortexWallet
+  it must "fail to sign a psbt with a missing target output" in {
+    vortexClient =>
+      val lnd = vortexClient.vortexWallet
 
-    for {
-      nodeId <- lnd.lndRpcClient.nodeId
-      utxos <- lnd.listCoins()
-      refs = utxos.map(_.outputReference)
+      for {
+        nodeId <- lnd.lndRpcClient.nodeId
+        utxos <- lnd.listCoins()
+        refs = utxos.map(_.outputReference)
 
-      addrA <- lnd.getNewAddress(roundParams.changeType)
-      addrB <- lnd.getNewAddress(roundParams.outputType)
-      change = TransactionOutput(Satoshis(599800000), addrA.scriptPubKey)
-      mix = TransactionOutput(Satoshis(200000), addrB.scriptPubKey)
+        addrA <- lnd.getNewAddress(roundParams.changeType)
+        addrB <- lnd.getNewAddress(roundParams.outputType)
+        change = TransactionOutput(Satoshis(599800000), addrA.scriptPubKey)
+        target = TransactionOutput(Satoshis(200000), addrB.scriptPubKey)
 
-      testDetails = InitDetails(
-        inputs = refs,
-        addressOpt = None,
-        nodeIdOpt = Some(nodeId),
-        peerAddrOpt = None,
-        changeSpkOpt = Some(change.scriptPubKey),
-        chanId = Sha256Digest.empty.bytes,
-        mixOutput = mix,
-        tweaks = dummyTweaks
-      )
-      testState = MixOutputRegistered(roundParams,
-                                      Satoshis.zero,
-                                      Satoshis.zero,
-                                      Satoshis.zero,
-                                      nonce,
-                                      testDetails)
-      _ = vortexClient.setRoundDetails(testState)
+        testDetails = InitDetails(
+          inputs = refs,
+          addressOpt = None,
+          nodeIdOpt = Some(nodeId),
+          peerAddrOpt = None,
+          changeSpkOpt = Some(change.scriptPubKey),
+          chanId = Sha256Digest.empty.bytes,
+          targetOutput = target,
+          tweaks = dummyTweaks
+        )
+        testState = OutputRegistered(roundParams,
+                                     Satoshis.zero,
+                                     Satoshis.zero,
+                                     Satoshis.zero,
+                                     nonce,
+                                     testDetails)
+        _ = vortexClient.setRoundDetails(testState)
 
-      inputs = refs
-        .map(_.outPoint)
-        .map(TransactionInput(_, EmptyScriptSignature, UInt32.max))
-      outputs = Vector(change)
-      tx = BaseTransaction(Int32.two, inputs, outputs, UInt32.zero)
-      psbt = PSBT.fromUnsignedTx(tx)
-      res <- recoverToSucceededIf[InvalidMixedOutputException](
-        vortexClient.validateAndSignPsbt(psbt))
-    } yield res
+        inputs = refs
+          .map(_.outPoint)
+          .map(TransactionInput(_, EmptyScriptSignature, UInt32.max))
+        outputs = Vector(change)
+        tx = BaseTransaction(Int32.two, inputs, outputs, UInt32.zero)
+        psbt = PSBT.fromUnsignedTx(tx)
+        res <- recoverToSucceededIf[InvalidTargetOutputException](
+          vortexClient.validateAndSignPsbt(psbt))
+      } yield res
   }
 
   it must "fail to sign a psbt with a missing change output" in {
@@ -176,7 +177,7 @@ class VortexClientTest extends VortexClientFixture {
         addrA <- lnd.getNewAddress(roundParams.changeType)
         addrB <- lnd.getNewAddress(roundParams.outputType)
         change = TransactionOutput(Satoshis(599800000), addrA.scriptPubKey)
-        mix = TransactionOutput(Satoshis(200000), addrB.scriptPubKey)
+        targetOutput = TransactionOutput(Satoshis(200000), addrB.scriptPubKey)
 
         testDetails = InitDetails(
           inputs = refs,
@@ -185,21 +186,21 @@ class VortexClientTest extends VortexClientFixture {
           peerAddrOpt = None,
           changeSpkOpt = Some(change.scriptPubKey),
           chanId = Sha256Digest.empty.bytes,
-          mixOutput = mix,
+          targetOutput = targetOutput,
           tweaks = dummyTweaks
         )
-        testState = MixOutputRegistered(roundParams,
-                                        Satoshis.zero,
-                                        Satoshis.zero,
-                                        Satoshis.zero,
-                                        nonce,
-                                        testDetails)
+        testState = OutputRegistered(roundParams,
+                                     Satoshis.zero,
+                                     Satoshis.zero,
+                                     Satoshis.zero,
+                                     nonce,
+                                     testDetails)
         _ = vortexClient.setRoundDetails(testState)
 
         inputs = refs
           .map(_.outPoint)
           .map(TransactionInput(_, EmptyScriptSignature, UInt32.max))
-        outputs = Vector(mix)
+        outputs = Vector(targetOutput)
         tx = BaseTransaction(Int32.two, inputs, outputs, UInt32.zero)
         psbt = PSBT.fromUnsignedTx(tx)
         res <- recoverToSucceededIf[InvalidChangeOutputException](
@@ -218,7 +219,7 @@ class VortexClientTest extends VortexClientFixture {
         addrA <- lnd.getNewAddress(roundParams.changeType)
         addrB <- lnd.getNewAddress(roundParams.outputType)
         change = TransactionOutput(Satoshis(599700000), addrA.scriptPubKey)
-        mix = TransactionOutput(Satoshis(200000), addrB.scriptPubKey)
+        targetOutput = TransactionOutput(Satoshis(200000), addrB.scriptPubKey)
 
         testDetails = InitDetails(
           inputs = refs,
@@ -227,21 +228,21 @@ class VortexClientTest extends VortexClientFixture {
           peerAddrOpt = None,
           changeSpkOpt = Some(change.scriptPubKey),
           chanId = Sha256Digest.empty.bytes,
-          mixOutput = mix,
+          targetOutput = targetOutput,
           tweaks = dummyTweaks
         )
-        testState = MixOutputRegistered(roundParams,
-                                        Satoshis.zero,
-                                        Satoshis.zero,
-                                        Satoshis.zero,
-                                        nonce,
-                                        testDetails)
+        testState = OutputRegistered(roundParams,
+                                     Satoshis.zero,
+                                     Satoshis.zero,
+                                     Satoshis.zero,
+                                     nonce,
+                                     testDetails)
         _ = vortexClient.setRoundDetails(testState)
 
         inputs = refs
           .map(_.outPoint)
           .map(TransactionInput(_, EmptyScriptSignature, UInt32.max))
-        outputs = Vector(change, mix)
+        outputs = Vector(change, targetOutput)
         tx = BaseTransaction(Int32.two, inputs, outputs, UInt32.zero)
         psbt = PSBT.fromUnsignedTx(tx)
         res <- recoverToSucceededIf[InvalidChangeOutputException](
@@ -260,7 +261,7 @@ class VortexClientTest extends VortexClientFixture {
       addrA <- lnd.getNewAddress(roundParams.changeType)
       addrB <- lnd.getNewAddress(roundParams.outputType)
       change = TransactionOutput(Satoshis(599800000), addrA.scriptPubKey)
-      mix = TransactionOutput(Satoshis(200000), addrB.scriptPubKey)
+      targetOutput = TransactionOutput(Satoshis(200000), addrB.scriptPubKey)
 
       testDetails = InitDetails(
         inputs = refs,
@@ -269,21 +270,21 @@ class VortexClientTest extends VortexClientFixture {
         peerAddrOpt = None,
         changeSpkOpt = Some(change.scriptPubKey),
         chanId = Sha256Digest.empty.bytes,
-        mixOutput = mix,
+        targetOutput = targetOutput,
         tweaks = dummyTweaks
       )
-      testState = MixOutputRegistered(roundParams,
-                                      Satoshis.zero,
-                                      Satoshis.zero,
-                                      Satoshis.zero,
-                                      nonce,
-                                      testDetails)
+      testState = OutputRegistered(roundParams,
+                                   Satoshis.zero,
+                                   Satoshis.zero,
+                                   Satoshis.zero,
+                                   nonce,
+                                   testDetails)
       _ = vortexClient.setRoundDetails(testState)
 
       inputs = refs
         .map(_.outPoint)
         .map(TransactionInput(_, EmptyScriptSignature, UInt32.max))
-      outputs = Vector(change, mix)
+      outputs = Vector(change, targetOutput)
       tx = BaseTransaction(Int32.two, inputs.tail, outputs, UInt32.zero)
       psbt = PSBT.fromUnsignedTx(tx)
       res <- recoverToSucceededIf[MissingInputsException](
@@ -303,7 +304,7 @@ class VortexClientTest extends VortexClientFixture {
         addrA <- lnd.getNewAddress(roundParams.changeType)
         addrB <- lnd.getNewAddress(roundParams.outputType)
         change = TransactionOutput(Satoshis(599800000), addrA.scriptPubKey)
-        mix = TransactionOutput(Satoshis(200000), addrB.scriptPubKey)
+        targetOutput = TransactionOutput(Satoshis(200000), addrB.scriptPubKey)
 
         testDetails = InitDetails(
           inputs = refs,
@@ -312,21 +313,21 @@ class VortexClientTest extends VortexClientFixture {
           peerAddrOpt = None,
           changeSpkOpt = Some(change.scriptPubKey),
           chanId = Sha256Digest.empty.bytes,
-          mixOutput = mix,
+          targetOutput = targetOutput,
           tweaks = dummyTweaks
         )
-        testState = MixOutputRegistered(roundParams,
-                                        Satoshis.zero,
-                                        Satoshis.zero,
-                                        Satoshis.zero,
-                                        nonce,
-                                        testDetails)
+        testState = OutputRegistered(roundParams,
+                                     Satoshis.zero,
+                                     Satoshis.zero,
+                                     Satoshis.zero,
+                                     nonce,
+                                     testDetails)
         _ = vortexClient.setRoundDetails(testState)
 
         inputs = refs
           .map(_.outPoint)
           .map(TransactionInput(_, EmptyScriptSignature, UInt32.max))
-        outputs = Vector(change, mix)
+        outputs = Vector(change, targetOutput)
         tx = BaseTransaction(Int32.two, inputs, outputs, UInt32.max)
         psbt = PSBT.fromUnsignedTx(tx)
         res <- recoverToSucceededIf[BadLocktimeException](

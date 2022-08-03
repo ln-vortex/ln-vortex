@@ -121,16 +121,16 @@ case class InputsRegistered(
   override val order: Int = 4
   override val status: ClientStatus = ClientStatus.InputsRegistered
 
-  def nextStage: MixOutputRegistered =
-    MixOutputRegistered(round,
-                        inputFee,
-                        outputFee,
-                        changeOutputFee,
-                        nonce,
-                        initDetails)
+  def nextStage: OutputRegistered =
+    OutputRegistered(round,
+                     inputFee,
+                     outputFee,
+                     changeOutputFee,
+                     nonce,
+                     initDetails)
 }
 
-case class MixOutputRegistered(
+case class OutputRegistered(
     round: RoundParameters,
     inputFee: CurrencyUnit,
     outputFee: CurrencyUnit,
@@ -139,7 +139,7 @@ case class MixOutputRegistered(
     initDetails: InitDetails)
     extends InitializedRound {
   override val order: Int = 5
-  override val status: ClientStatus = ClientStatus.MixOutputRegistered
+  override val status: ClientStatus = ClientStatus.OutputRegistered
 
   def nextStage(psbt: PSBT): PSBTSigned =
     PSBTSigned(round,
@@ -167,7 +167,7 @@ case class PSBTSigned(
     val txId = psbt.transaction.txId
     val vout = UInt32(
       psbt.transaction.outputs.indexWhere(
-        _.scriptPubKey == initDetails.mixOutput.scriptPubKey))
+        _.scriptPubKey == initDetails.targetOutput.scriptPubKey))
 
     TransactionOutPoint(txId, vout)
   }
@@ -237,17 +237,17 @@ object ClientStatus extends StringFactory[ClientStatus] {
 
   /** After the [[AskInputs]] message has been received and the client sends its
     * inputs to the coordinator its inputs will be registered.
-    * This is the first state when the mixing begins.
+    * This is the first state when the round begins.
     */
   case object InputsRegistered extends ClientStatus
 
-  /** Intermediate step during the mix.
+  /** Intermediate step during the round.
     * The client has registered its output with unblinded signature
     * under its alternate Bob identity
     */
-  case object MixOutputRegistered extends ClientStatus
+  case object OutputRegistered extends ClientStatus
 
-  /** Final stage during the mix.
+  /** Final stage during the round.
     * The client has received the PSBT and signed it.
     * It will send it back to the coordinator to
     * complete the transaction and broadcast
@@ -259,7 +259,7 @@ object ClientStatus extends StringFactory[ClientStatus] {
                                          ReceivedNonce,
                                          InputsScheduled,
                                          InputsRegistered,
-                                         MixOutputRegistered,
+                                         OutputRegistered,
                                          PSBTSigned)
 
   override def fromStringOpt(string: String): Option[ClientStatus] = {

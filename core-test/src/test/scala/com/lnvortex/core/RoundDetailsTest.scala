@@ -50,7 +50,7 @@ class RoundDetailsTest extends BitcoinSUnitTest {
       peerAddrOpt = None,
       changeSpkOpt = changeOpt,
       chanId = Sha256Digest.empty.bytes,
-      mixOutput = EmptyTransactionOutput,
+      targetOutput = EmptyTransactionOutput,
       tweaks = tweaks
     )
   }

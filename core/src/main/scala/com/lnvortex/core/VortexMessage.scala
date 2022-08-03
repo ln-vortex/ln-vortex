@@ -46,7 +46,7 @@ object VortexMessage extends Factory[VortexMessage] with Logging {
       AskInputs,
       RegisterInputs,
       BlindedSig,
-      RegisterMixOutput,
+      RegisterOutput,
       UnsignedPsbtMessage,
       SignedPsbtMessage,
       SignedTxMessage,
@@ -376,7 +376,7 @@ object RegisterInputs extends VortexMessageFactory[RegisterInputs] {
   }
 }
 
-/** Response from mixer to Alice's first message
+/** Response from coordinator to Alice's first message
   * @param blindOutputSig Response from BlindingTweaks.generateBlindSig
   */
 case class BlindedSig(blindOutputSig: FieldElement)
@@ -400,35 +400,35 @@ object BlindedSig extends VortexMessageFactory[BlindedSig] {
 /** @param sig Response from BlindingTweaks.unblindSignature
   * @param output Output they are registering
   */
-case class RegisterMixOutput(
+case class RegisterOutput(
     sig: SchnorrDigitalSignature,
     output: TransactionOutput)
     extends ClientVortexMessage {
-  override val tpe: BigSizeUInt = RegisterMixOutput.tpe
+  override val tpe: BigSizeUInt = RegisterOutput.tpe
 
   override val value: ByteVector = sig.bytes ++ u16Prefix(output.bytes)
 
   def verifySig(
       publicKey: SchnorrPublicKey,
       roundId: DoubleSha256Digest): Boolean = {
-    val challenge = RegisterMixOutput.calculateChallenge(output, roundId)
+    val challenge = RegisterOutput.calculateChallenge(output, roundId)
     publicKey.verify(challenge, sig)
   }
 }
 
-object RegisterMixOutput extends VortexMessageFactory[RegisterMixOutput] {
+object RegisterOutput extends VortexMessageFactory[RegisterOutput] {
   override val tpe: BigSizeUInt = BigSizeUInt(42015)
 
-  override val typeName: String = "RegisterMixOutput"
+  override val typeName: String = "RegisterOutput"
 
-  override def fromTLVValue(value: ByteVector): RegisterMixOutput = {
+  override def fromTLVValue(value: ByteVector): RegisterOutput = {
     val iter = ValueIterator(value)
 
     val sig = iter.take(SchnorrDigitalSignature, 64)
     val output = iter.takeU16Prefixed[TransactionOutput](len =>
       TransactionOutput(iter.take(len)))
 
-    RegisterMixOutput(sig, output)
+    RegisterOutput(sig, output)
   }
 
   def calculateChallenge(
