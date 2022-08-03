@@ -379,7 +379,8 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
         val selectedAmt = outputRefs.map(_.output.value).sum
         val inputFees = Satoshis(outputRefs.size) * inputFee
         val onChainFees = inputFees + outputFee + changeOutputFee
-        val changeAmt = selectedAmt - round.amount - round.coordinatorFee - onChainFees
+        val changeAmt =
+          selectedAmt - round.amount - round.coordinatorFee - onChainFees
 
         val needsChange = changeAmt >= Policy.dustThreshold
 

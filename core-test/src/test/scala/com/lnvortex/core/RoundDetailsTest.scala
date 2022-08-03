@@ -11,12 +11,12 @@ import org.bitcoins.testkitcore.util.BitcoinSUnitTest
 
 class RoundDetailsTest extends BitcoinSUnitTest {
 
-  val mixAmount: Satoshis = Satoshis(200000)
+  val roundAmount: Satoshis = Satoshis(200000)
 
   val dummyMix: MixDetails = MixDetails(
     version = UInt16.zero,
     roundId = DoubleSha256Digest.empty,
-    amount = mixAmount,
+    amount = roundAmount,
     coordinatorFee = Satoshis.zero,
     publicKey = ECPublicKey.freshPublicKey.schnorrPublicKey,
     time = UInt64.zero,
@@ -63,7 +63,7 @@ class RoundDetailsTest extends BitcoinSUnitTest {
       changeOutputFee = Satoshis(43),
       nonce = ECPublicKey.freshPublicKey.schnorrNonce,
       initDetails = testInitDetails(inputAmounts =
-                                      Vector(Satoshis(100000), mixAmount),
+                                      Vector(Satoshis(100000), roundAmount),
                                     hasChange = true)
     )
 
@@ -80,7 +80,7 @@ class RoundDetailsTest extends BitcoinSUnitTest {
       changeOutputFee = Satoshis(43),
       nonce = ECPublicKey.freshPublicKey.schnorrNonce,
       initDetails = testInitDetails(inputAmounts =
-                                      Vector(Satoshis(100000), mixAmount),
+                                      Vector(Satoshis(100000), roundAmount),
                                     hasChange = false)
     )
 

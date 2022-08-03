@@ -115,8 +115,8 @@ case class VortexCoordinatorAppConfig(
 
   lazy val minPeers: Int = minRemixPeers + minNewPeers
 
-  lazy val mixAmount: Satoshis = {
-    val long = config.getLong(s"$moduleName.mixAmount")
+  lazy val roundAmount: Satoshis = {
+    val long = config.getLong(s"$moduleName.roundAmount")
     Satoshis(long)
   }
 

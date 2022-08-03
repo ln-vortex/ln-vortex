@@ -403,7 +403,7 @@ trait ClientServerTestUtils {
           case Some(txid) =>
             coins
               .filter(_.outPoint.txIdBE == txid)
-              .filter(_.amount == coordinator.config.mixAmount)
+              .filter(_.amount == coordinator.config.roundAmount)
           case None => Random.shuffle(coins).take(1)
         }
       }
@@ -490,7 +490,8 @@ trait ClientServerTestUtils {
           assert(tx.outputs.count(_.value == roundAmount) == 2)
           assert(tx.outputs.count(_.value != roundAmount) == 2)
           assert(
-            tx.outputs.count(_.value == coordinator.mixDetails.coordinatorFee) == 1)
+            tx.outputs.count(
+              _.value == coordinator.mixDetails.coordinatorFee) == 1)
           // 2 mix outputs + 1 change + coordinator fee
           assert(tx.outputs.size == 4)
         case None =>
@@ -498,7 +499,8 @@ trait ClientServerTestUtils {
           assert(tx.outputs.count(_.value != roundAmount) == 3)
           assert(
             tx.outputs.count(
-              _.value == coordinator.mixDetails.coordinatorFee * Satoshis(2)) == 1)
+              _.value == coordinator.mixDetails.coordinatorFee * Satoshis(
+                2)) == 1)
           // 2 mix outputs + 2 change + coordinator fee
           assert(tx.outputs.size == 5)
       }

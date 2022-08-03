@@ -117,7 +117,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
     MixDetails(
       version = version,
       roundId = currentRoundId,
-      amount = config.mixAmount,
+      amount = config.roundAmount,
       coordinatorFee = config.coordinatorFee,
       publicKey = publicKey,
       time = UInt64(roundStartTime),
@@ -175,7 +175,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
         inputFee = inputFee,
         outputFee = outputFee(),
         changeFee = changeOutputFee,
-        amount = config.mixAmount
+        amount = config.roundAmount
       )
       created <- roundDAO.create(roundDb)
     } yield {
@@ -480,7 +480,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       val inputRef = registerInputs.inputs.head
       roundDAO.hasTxIdAction(inputRef.outPoint.txIdBE).map { isPrevRound =>
         // make sure it wasn't a change output
-        val isMixUtxo = inputRef.output.value == config.mixAmount
+        val isMixUtxo = inputRef.output.value == config.roundAmount
         val noChange = registerInputs.changeSpkOpt.isEmpty
         isPrevRound && isMixUtxo && noChange
       }
@@ -658,8 +658,9 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       val totalNewEntrantFee =
         Satoshis(numRemixes) * (roundDb.inputFee + updatedOutputFee)
       val newEntrantFee = totalNewEntrantFee / Satoshis(numNewEntrants)
-      val excess = inputAmount - roundDb.amount - roundDb.coordinatorFee - (Satoshis(
-        numInputs) * roundDb.inputFee) - updatedOutputFee - newEntrantFee
+      val excess =
+        inputAmount - roundDb.amount - roundDb.coordinatorFee - (Satoshis(
+          numInputs) * roundDb.inputFee) - updatedOutputFee - newEntrantFee
 
       changeSpkOpt match {
         case Some(changeSpk) =>
@@ -734,8 +735,10 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
 
           val usedExcess = if (excess < Satoshis.zero) Satoshis.zero else excess
           // add outputs
-          val coordinatorFee = usedExcess + (Satoshis(numNewEntrants) * config.coordinatorFee)
-          val coordinatorFeeOutput = TransactionOutput(coordinatorFee, mixAddr.scriptPubKey)
+          val coordinatorFee =
+            usedExcess + (Satoshis(numNewEntrants) * config.coordinatorFee)
+          val coordinatorFeeOutput =
+            TransactionOutput(coordinatorFee, mixAddr.scriptPubKey)
           val mixOutputs = outputDbs.map(_.output)
           val outputsToAdd = mixOutputs ++ changeOutputs :+ coordinatorFeeOutput
 
