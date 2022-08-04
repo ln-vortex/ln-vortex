@@ -408,7 +408,7 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
                 .initChannelOpen(nodeId = nodeId,
                                  peerAddrOpt = scheduled.peerAddrOpt,
                                  fundingAmount = scheduled.round.amount,
-                                 privateChannel = false)
+                                 privateChannel = true)
                 .map { details =>
                   if (
                     details.address.scriptPubKey.scriptType != round.outputType
