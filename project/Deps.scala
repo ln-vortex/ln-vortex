@@ -2,30 +2,10 @@ import sbt._
 
 object Deps {
 
-  lazy val arch: String = System.getProperty("os.arch")
-
-  lazy val osName: String = System.getProperty("os.name") match {
-    case n if n.startsWith("Linux") => "linux"
-    case n if n.startsWith("Mac") =>
-      if (arch == "aarch64") {
-        //needed to accommodate the different chip
-        //arch for M1. see: https://github.com/bitcoin-s/bitcoin-s/pull/3041
-        s"mac-$arch"
-      } else {
-        "mac"
-      }
-    case n if n.startsWith("Windows") => "win"
-    case x =>
-      throw new Exception(s"Unknown platform $x!")
-  }
-
   object V {
     val akkaV = "10.2.9"
     val akkaStreamV = "2.6.19"
     val akkaActorV: String = akkaStreamV
-
-    val scalaFxV = "16.0.0-R25"
-    val javaFxV = "17-ea+8"
 
     val bitcoinsV = "1.9.2-125-f286b42c-SNAPSHOT"
 
@@ -70,15 +50,6 @@ object Deps {
 
     val grizzledSlf4j =
       "org.clapper" %% "grizzled-slf4j" % V.grizzledSlf4jV withSources () withJavadoc ()
-
-    val slf4jApi =
-      "org.slf4j" % "slf4j-api" % V.slf4j % "provided" withSources () withJavadoc ()
-
-    val slf4jSimple =
-      "org.slf4j" % "slf4j-simple" % V.slf4j % "provided" withSources () withJavadoc ()
-
-    val logback =
-      "ch.qos.logback" % "logback-classic" % V.logback withSources () withJavadoc ()
 
     val bitcoinsCore =
       "org.bitcoin-s" %% "bitcoin-s-core" % V.bitcoinsV withSources () withJavadoc ()
