@@ -13,7 +13,7 @@ version := "1.0"
 
 scalaVersion := "2.13.8"
 
-resolvers += Resolver.sonatypeRepo("snapshots")
+resolvers ++= Resolver.sonatypeOssRepos("snapshots")
 
 enablePlugins(ReproducibleBuildsPlugin,
               JavaAppPackaging,
@@ -24,7 +24,7 @@ Compile / doc := (target.value / "none")
 scalacOptions ++= Seq("release", "11")
 
 // general package information (can be scoped to Windows)
-maintainer := "Ben Carman <benthecarman@live.com>"
+maintainer := "benthecarman <benthecarman@live.com>"
 // Will say "Welcome to the <packageSummary> Setup Wizard"
 packageSummary := "LN Vortex"
 // Will be used for drop down menu in setup wizard
@@ -205,8 +205,7 @@ lazy val client = project
 lazy val clientTest = project
   .in(file("client-test"))
   .settings(CommonSettings.testSettings: _*)
-  .settings(name := "client-test",
-            libraryDependencies ++= Deps.clientServerTest)
+  .settings(name := "client-test")
   .settings(parallelExecution := false)
   .dependsOn(client, testkit)
 
@@ -219,23 +218,21 @@ lazy val server = project
 lazy val serverTest = project
   .in(file("server-test"))
   .settings(CommonSettings.testSettings: _*)
-  .settings(name := "server-test",
-            libraryDependencies ++= Deps.clientServerTest)
+  .settings(name := "server-test")
   .settings(parallelExecution := false)
   .dependsOn(server, testkit)
 
 lazy val clientServerTest = project
   .in(file("client-server-test"))
   .settings(CommonSettings.testSettings: _*)
-  .settings(name := "client-server-test",
-            libraryDependencies ++= Deps.clientServerTest)
+  .settings(name := "client-server-test")
   .settings(parallelExecution := false)
   .dependsOn(client, server, testkit)
 
 lazy val testkit = project
   .in(file("testkit"))
   .settings(CommonSettings.testSettings: _*)
-  .settings(name := "testkit", libraryDependencies ++= Deps.clientServerTest)
+  .settings(name := "testkit", libraryDependencies ++= Deps.testkit)
   .dependsOn(core, client, server, coreTest, lnd, clightning)
 
 TaskKeys.downloadLnd := {

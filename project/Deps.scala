@@ -114,12 +114,6 @@ object Deps {
       "org.bitcoin-s" %% "bitcoin-s-db-commons" % V.bitcoinsV withSources () withJavadoc ()
   }
 
-  val logging: List[ModuleID] =
-    List(Compile.logback,
-         Compile.slf4jSimple,
-         Compile.slf4jApi,
-         Compile.grizzledSlf4j)
-
   val config: List[ModuleID] = List(Compile.bitcoinsAppCommons)
 
   val cli: List[ModuleID] = List(
@@ -136,22 +130,26 @@ object Deps {
     List(
       Compile.akkaHttp,
       Compile.akkaSlf4j,
-      Compile.micoPickle
-    ) ++ logging
+      Compile.micoPickle,
+      Compile.grizzledSlf4j
+    )
 
   val core: List[ModuleID] = List(
-    Compile.bitcoinsCore
-  ) ++ logging
+    Compile.bitcoinsCore,
+    Compile.grizzledSlf4j
+  )
 
-  val lndBackend: List[ModuleID] = List(Compile.bitcoinsLnd) ++ logging
+  val lndBackend: List[ModuleID] =
+    List(Compile.bitcoinsLnd, Compile.grizzledSlf4j)
 
   val bitcoindBackend: List[ModuleID] =
-    List(Compile.bitcoinsBitcoindRpc) ++ logging
+    List(Compile.bitcoinsBitcoindRpc, Compile.grizzledSlf4j)
 
   val cLightningBackend: List[ModuleID] =
     List(Compile.bitcoinsCLightning,
          Compile.akkaActor,
-         Compile.bitcoinsCore) ++ logging
+         Compile.bitcoinsCore,
+         Compile.grizzledSlf4j)
 
   val client: List[ModuleID] = List(
     Compile.bitcoinsTor,
@@ -159,25 +157,26 @@ object Deps {
     Compile.akkaActor,
     Compile.akkaHttp,
     Compile.akkaStream,
-    Compile.akkaSlf4j
-  ) ++ logging
-
-  val backend: List[ModuleID] = List(
-    Compile.bitcoinsTor,
-    Compile.bitcoinsDbCommons,
-    Compile.akkaActor,
-    Compile.akkaHttp,
-    Compile.akkaStream,
-    Compile.akkaSlf4j
-  ) ++ logging
+    Compile.akkaSlf4j,
+    Compile.grizzledSlf4j
+  )
 
   val server: List[ModuleID] =
-    List(Compile.bitcoinsKeyManager,
-         Compile.bitcoinsFeeProvider,
-         Compile.bitcoinsBitcoindRpc) ++ backend
+    List(
+      Compile.bitcoinsKeyManager,
+      Compile.bitcoinsFeeProvider,
+      Compile.bitcoinsBitcoindRpc,
+      Compile.bitcoinsTor,
+      Compile.bitcoinsDbCommons,
+      Compile.akkaActor,
+      Compile.akkaHttp,
+      Compile.akkaStream,
+      Compile.akkaSlf4j,
+      Compile.grizzledSlf4j
+    )
 
   val coreTest: List[ModuleID] = List(Compile.bitcoinsTestkitCore) ++ core
 
-  val clientServerTest: List[ModuleID] =
-    List(Compile.bitcoinsTestkit, Compile.bitcoinsBitcoindRpc) ++ backend
+  val testkit: List[ModuleID] =
+    List(Compile.bitcoinsTestkit, Compile.bitcoinsBitcoindRpc)
 }
