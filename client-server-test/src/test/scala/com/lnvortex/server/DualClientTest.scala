@@ -7,6 +7,7 @@ import org.bitcoins.core.script.ScriptType
 import org.bitcoins.core.script.ScriptType._
 import org.bitcoins.crypto.Sha256Digest
 import org.bitcoins.testkit.EmbeddedPg
+import org.bitcoins.testkit.util.FileUtil
 import scodec.bits.ByteVector
 
 class DualClientTest
@@ -18,8 +19,8 @@ class DualClientTest
   override val inputScriptType: ScriptType = WITNESS_V0_KEYHASH
   override val changeScriptType: ScriptType = WITNESS_V0_KEYHASH
 
-  override val testActor: TestActorRef[Nothing] = TestActorRef(
-    "DualClientTest-test")
+  override def getTestActor: TestActorRef[Nothing] = TestActorRef(
+    s"ln-vortex-test-${FileUtil.randomDirName}")
   val peerIdA: Sha256Digest = Sha256Digest(ByteVector.low(32))
   val peerIdB: Sha256Digest = Sha256Digest(ByteVector.high(32))
 
