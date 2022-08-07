@@ -39,31 +39,44 @@ class FeeCalculatorTest extends BitcoinSUnitTest {
       FeeCalculator.outputFee(feeRate = feeRate,
                               outputScriptType = WITNESS_V1_TAPROOT,
                               coordinatorScriptType = WITNESS_V1_TAPROOT,
-                              numPeers = 1)
+                              numPeersOpt = Some(1))
     assert(inputFee == Satoshis(97))
+
+    val inputFeeNoPeers =
+      FeeCalculator.outputFee(feeRate = feeRate,
+                              outputScriptType = WITNESS_V1_TAPROOT,
+                              coordinatorScriptType = WITNESS_V1_TAPROOT,
+                              numPeersOpt = None)
+    assert(inputFeeNoPeers == Satoshis(43))
 
     val inputFee2 =
       FeeCalculator.outputFee(feeRate = feeRate,
                               outputScriptType = WITNESS_V0_SCRIPTHASH,
                               coordinatorScriptType = WITNESS_V0_KEYHASH,
-                              numPeers = 5)
+                              numPeersOpt = Some(5))
     assert(inputFee2 == Satoshis(52))
 
     assertThrows[IllegalArgumentException](
       FeeCalculator
-        .outputFee(feeRate, NONSTANDARD_IF_CONDITIONAL, WITNESS_V1_TAPROOT, 1))
+        .outputFee(feeRate,
+                   NONSTANDARD_IF_CONDITIONAL,
+                   WITNESS_V1_TAPROOT,
+                   Some(1)))
 
     assertThrows[IllegalArgumentException](
       FeeCalculator
-        .outputFee(feeRate, WITNESS_V1_TAPROOT, NONSTANDARD_IF_CONDITIONAL, 1))
+        .outputFee(feeRate,
+                   WITNESS_V1_TAPROOT,
+                   NONSTANDARD_IF_CONDITIONAL,
+                   Some(1)))
 
     assertThrows[IllegalArgumentException](
       FeeCalculator
-        .outputFee(feeRate, WITNESS_V1_TAPROOT, WITNESS_V1_TAPROOT, 0))
+        .outputFee(feeRate, WITNESS_V1_TAPROOT, WITNESS_V1_TAPROOT, Some(0)))
 
     assertThrows[IllegalArgumentException](
       FeeCalculator
-        .outputFee(feeRate, WITNESS_V1_TAPROOT, WITNESS_V1_TAPROOT, -1))
+        .outputFee(feeRate, WITNESS_V1_TAPROOT, WITNESS_V1_TAPROOT, Some(-1)))
   }
 
 }

@@ -15,15 +15,18 @@ trait FeeCalculator {
       feeRate: SatoshisPerVirtualByte,
       outputScriptType: ScriptType,
       coordinatorScriptType: ScriptType,
-      numPeers: Int): CurrencyUnit = {
-    require(numPeers > 0, "Number of peers must be greater than 0")
+      numPeersOpt: Option[Int]): CurrencyUnit = {
+    require(numPeersOpt.forall(_ > 0), "Number of peers must be greater than 0")
     val outputSize = getScriptTypeOutputSize(outputScriptType)
 
     val coordinatorOutputSize = getScriptTypeOutputSize(coordinatorScriptType)
     val txOverhead = 10.5
 
-    val peerShare =
-      (coordinatorOutputSize + txOverhead) / numPeers.toDouble
+    val peerShare = numPeersOpt match {
+      case Some(numPeers) =>
+        (coordinatorOutputSize + txOverhead) / numPeers.toDouble
+      case None => 0.0
+    }
 
     feeRate * (outputSize + peerShare).ceil.toLong
   }

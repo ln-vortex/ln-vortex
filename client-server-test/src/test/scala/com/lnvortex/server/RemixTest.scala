@@ -7,6 +7,7 @@ import org.bitcoins.core.script.ScriptType._
 import org.bitcoins.crypto.{CryptoUtil, ECPrivateKey, Sha256Digest}
 import org.bitcoins.testkit.EmbeddedPg
 import org.bitcoins.testkit.async.TestAsyncUtil
+import org.bitcoins.testkit.util.FileUtil
 
 import scala.concurrent.duration.DurationInt
 
@@ -14,13 +15,13 @@ class RemixTest
     extends DualClientFixture
     with ClientServerTestUtils
     with EmbeddedPg {
-  override lazy val pgEnabled: Boolean = true
   override val isNetworkingTest = false
   override val outputScriptType: ScriptType = WITNESS_V1_TAPROOT
   override val changeScriptType: ScriptType = WITNESS_V1_TAPROOT
   override val inputScriptType: ScriptType = WITNESS_V1_TAPROOT
 
-  val testActor: TestActorRef[Nothing] = TestActorRef("Remix-test")
+  override def getTestActor: TestActorRef[Nothing] = TestActorRef(
+    s"ln-vortex-test-${FileUtil.randomDirName}")
 
   def peerId: Sha256Digest =
     CryptoUtil.sha256(ECPrivateKey.freshPrivateKey.bytes)
