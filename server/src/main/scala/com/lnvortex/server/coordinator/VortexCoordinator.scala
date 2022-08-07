@@ -88,11 +88,11 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
 
   private[coordinator] def outputFee(
       feeRate: SatoshisPerVirtualByte = feeRate,
-      numPeers: Int = config.minPeers): CurrencyUnit = {
+      numPeersOpt: Option[Int] = Some(config.minPeers)): CurrencyUnit = {
     FeeCalculator.outputFee(feeRate = feeRate,
                             outputScriptType = config.outputScriptType,
                             coordinatorScriptType = config.changeScriptType,
-                            numPeers = numPeers)
+                            numPeersOpt = numPeersOpt)
   }
 
   private[coordinator] def changeOutputFee: CurrencyUnit = {
@@ -654,9 +654,10 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
     TransactionOutput] = {
     if (isRemix) Left(Satoshis.zero)
     else {
-      val updatedOutputFee = outputFee(roundDb.feeRate, numNewEntrants)
+      val updatedOutputFee = outputFee(roundDb.feeRate, Some(numNewEntrants))
       val totalNewEntrantFee =
-        Satoshis(numRemixes) * (roundDb.inputFee + updatedOutputFee)
+        Satoshis(numRemixes) * (roundDb.inputFee + outputFee(roundDb.feeRate,
+                                                             None))
       val newEntrantFee = totalNewEntrantFee / Satoshis(numNewEntrants)
       val excess =
         inputAmount - roundDb.amount - roundDb.coordinatorFee - (Satoshis(

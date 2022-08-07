@@ -15,7 +15,6 @@ class RemixTest
     extends DualClientFixture
     with ClientServerTestUtils
     with EmbeddedPg {
-  override lazy val pgEnabled: Boolean = true
   override val isNetworkingTest = false
   override val outputScriptType: ScriptType = WITNESS_V1_TAPROOT
   override val changeScriptType: ScriptType = WITNESS_V1_TAPROOT

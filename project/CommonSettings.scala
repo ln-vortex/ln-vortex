@@ -60,7 +60,7 @@ object CommonSettings {
         PB.protocExecutable.value
     ),
     assembly / test := {},
-    resolvers += Resolver.sonatypeRepo("snapshots"),
+    resolvers ++= Resolver.sonatypeOssRepos("snapshots"),
     resolvers +=
       "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
   )
