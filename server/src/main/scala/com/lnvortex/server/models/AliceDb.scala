@@ -2,6 +2,7 @@ package com.lnvortex.server.models
 
 import org.bitcoins.core.hd._
 import org.bitcoins.core.protocol.script.ScriptPubKey
+import org.bitcoins.core.psbt.PSBT
 import org.bitcoins.crypto._
 
 case class AliceDb(
@@ -18,8 +19,10 @@ case class AliceDb(
     blindedOutputOpt: Option[FieldElement],
     changeSpkOpt: Option[ScriptPubKey],
     blindOutputSigOpt: Option[FieldElement],
-    signed: Boolean
+    signedPSBT: Option[PSBT]
 ) {
+
+  val signed: Boolean = signedPSBT.isDefined
 
   val noncePath: BIP32Path = {
     val coin = HDCoin(purpose, this.coin)
@@ -44,19 +47,19 @@ case class AliceDb(
          blindOutputSigOpt = Some(blindOutputSig))
   }
 
-  def markSigned(): AliceDb = {
+  def markSigned(psbt: PSBT): AliceDb = {
     require(blindedOutputOpt.isDefined)
     require(numInputs > 0)
     require(blindOutputSigOpt.isDefined)
 
-    copy(signed = true)
+    copy(signedPSBT = Some(psbt))
   }
 
   def unregister(): AliceDb = {
     copy(blindedOutputOpt = None,
          changeSpkOpt = None,
          blindOutputSigOpt = None,
-         signed = false,
+         signedPSBT = None,
          numInputs = -1)
   }
 }
@@ -87,7 +90,7 @@ object AliceDbs {
       blindedOutputOpt = None,
       changeSpkOpt = None,
       blindOutputSigOpt = None,
-      signed = false
+      signedPSBT = None
     )
   }
 }

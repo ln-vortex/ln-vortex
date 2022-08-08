@@ -3,6 +3,7 @@ package com.lnvortex.server.models
 import com.lnvortex.server.config.VortexCoordinatorAppConfig
 import org.bitcoins.core.hd._
 import org.bitcoins.core.protocol.script.ScriptPubKey
+import org.bitcoins.core.psbt.PSBT
 import org.bitcoins.crypto._
 import org.bitcoins.db.{CRUD, DbCommonsColumnMappers, SlickUtil}
 import slick.lifted.ProvenShape
@@ -18,6 +19,9 @@ case class AliceDAO()(implicit
   import profile.api._
 
   private val mappers = new DbCommonsColumnMappers(profile)
+
+  implicit val PSBTMapper: BaseColumnType[PSBT] =
+    MappedColumnType.base[PSBT, String](_.base64, PSBT.fromBase64)
 
   import mappers._
 
@@ -152,7 +156,7 @@ case class AliceDAO()(implicit
 
     def blindOutputSigOpt: Rep[Option[FieldElement]] = column("blind_sig")
 
-    def signed: Rep[Boolean] = column("signed")
+    def signedPSBT: Rep[Option[PSBT]] = column("signed_psbt")
 
     def * : ProvenShape[AliceDb] =
       (peerId,
@@ -168,6 +172,6 @@ case class AliceDAO()(implicit
        blindedOutputOpt,
        changeSpkOpt,
        blindOutputSigOpt,
-       signed).<>(AliceDb.tupled, AliceDb.unapply)
+       signedPSBT).<>(AliceDb.tupled, AliceDb.unapply)
   }
 }

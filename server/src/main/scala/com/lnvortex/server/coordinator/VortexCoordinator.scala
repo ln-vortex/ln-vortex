@@ -27,8 +27,8 @@ import org.bitcoins.core.util._
 import org.bitcoins.core.wallet.builder._
 import org.bitcoins.core.wallet.fee.SatoshisPerVirtualByte
 import org.bitcoins.crypto._
-import org.bitcoins.feeprovider._
 import org.bitcoins.feeprovider.MempoolSpaceTarget.FastestFeeTarget
+import org.bitcoins.feeprovider._
 import org.bitcoins.rpc.client.common.BitcoindRpcClient
 import slick.dbio._
 
@@ -327,9 +327,11 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       val numNewEntrants = alices.count(!_.isRemix)
 
       if (numRemixes < config.minRemixPeers) {
-        throw new RuntimeException("Not enough remixes")
+        throw new RuntimeException(
+          s"Not enough remixes: $numRemixes < ${config.minRemixPeers}")
       } else if (numNewEntrants < config.minNewPeers) {
-        throw new RuntimeException("Not enough new entrants")
+        throw new RuntimeException(
+          s"Not enough new entrants: $numNewEntrants < ${config.minNewPeers}")
       }
 
       system.scheduler.scheduleOnce(config.outputRegistrationTime) {
@@ -411,15 +413,18 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
     f
   }
 
-  def getNonce(
+  private def getNonceAction(
       peerId: Sha256Digest,
-      connectionHandler: ActorRef,
-      askNonce: AskNonce): Future[AliceDb] = {
+      askNonce: AskNonce): DBIOAction[
+    AliceDb,
+    NoStream,
+    Effect.Read with Effect.Write] = {
     logger.info(s"Alice ${peerId.hex} asked for a nonce")
-    require(askNonce.roundId == currentRoundId,
-            "Alice asked for nonce of a different roundId")
+    require(
+      askNonce.roundId == getCurrentRoundId,
+      s"Alice asked for nonce of a different roundId ${askNonce.roundId.hex} != ${getCurrentRoundId.hex}")
 
-    val aliceDbA = aliceDAO.findByPrimaryKeyAction(peerId).flatMap {
+    aliceDAO.findByPrimaryKeyAction(peerId).flatMap {
       case Some(alice) => DBIO.successful(alice)
       case None =>
         for {
@@ -430,8 +435,13 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
           db <- aliceDAO.createAction(aliceDb)
         } yield db
     }
+  }
 
-    safeDatabase.run(aliceDbA).flatMap { db =>
+  def getNonce(
+      peerId: Sha256Digest,
+      connectionHandler: ActorRef,
+      askNonce: AskNonce): Future[AliceDb] = {
+    safeDatabase.run(getNonceAction(peerId, askNonce)).flatMap { db =>
       connectionHandlerMap.put(peerId, connectionHandler)
 
       if (connectionHandlerMap.values.size >= config.maxPeers) {
@@ -812,7 +822,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
             if (correctNumInputs && sameTx && validSigs) {
               // mark successful
               signedPMap(peerId).success(psbt)
-              val markSignedF = aliceDAO.update(aliceDb.markSigned())
+              val markSignedF = aliceDAO.update(aliceDb.markSigned(psbt))
 
               val signedFs = signedPMap.values.map(_.future)
 
@@ -885,31 +895,36 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       updated = round.copy(status = Canceled)
       _ <- roundDAO.updateAction(updated)
 
-      // get alices
-      alices <- aliceDAO.findRegisteredForRoundAction(round.roundId)
-      unsignedPeerIds = alices.filterNot(_.signed).map(_.peerId)
-      signedPeerIds = alices.filter(_.signed).map(_.peerId)
+      signedPeerIds <-
+        if (isNewRound) DBIO.successful(Vector.empty)
+        else {
+          for {
+            // get alices
+            alices <- aliceDAO.findRegisteredForRoundAction(round.roundId)
+            unsignedPeerIds = alices.filterNot(_.signed).map(_.peerId)
+            signedPeerIds = alices.filter(_.signed).map(_.peerId)
 
-      // ban inputs that didn't sign
-      inputsToBan <- inputsDAO.findByPeerIdsAction(unsignedPeerIds,
-                                                   round.roundId)
-      bannedUntil = TimeUtil.now.plusSeconds(
-        config.invalidSignatureBanDuration.toSeconds)
-      banReason = s"Alice never signed in round ${round.roundId.hex}"
-      banDbs = inputsToBan.map(db =>
-        BannedUtxoDb(db.outPoint, bannedUntil, banReason))
-      _ <- bannedUtxoDAO.upsertAllAction(banDbs)
+            // ban inputs that didn't sign
+            inputsToBan <- inputsDAO.findByPeerIdsAction(unsignedPeerIds,
+                                                         round.roundId)
+            bannedUntil = TimeUtil.now.plusSeconds(
+              config.invalidSignatureBanDuration.toSeconds)
+            banReason = s"Alice never signed in round ${round.roundId.hex}"
+            banDbs = inputsToBan.map(db =>
+              BannedUtxoDb(db.outPoint, bannedUntil, banReason))
+            _ <- bannedUtxoDAO.upsertAllAction(banDbs)
+          } yield signedPeerIds
+        }
 
       // delete previous inputs and outputs so they can registered again
       _ <- inputsDAO.deleteByRoundIdAction(round.roundId)
       _ <- outputsDAO.deleteByRoundIdAction(round.roundId)
-
     } yield signedPeerIds
 
     for {
       signedPeerIds <- safeDatabase.run(action)
-      // save connectionHandlerMap because newRound() will clear it
-      oldMap = connectionHandlerMap
+      // clone connectionHandlerMap because newRound() will clear it
+      oldMap = connectionHandlerMap.clone()
       // restart round with good alices
       newRound <- newRound(announce = isNewRound)
 
