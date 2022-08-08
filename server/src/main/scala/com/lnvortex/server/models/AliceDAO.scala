@@ -20,9 +20,6 @@ case class AliceDAO()(implicit
 
   private val mappers = new DbCommonsColumnMappers(profile)
 
-  implicit val PSBTMapper: BaseColumnType[PSBT] =
-    MappedColumnType.base[PSBT, String](_.base64, PSBT.fromBase64)
-
   import mappers._
 
   override val table: TableQuery[AliceTable] = TableQuery[AliceTable]
