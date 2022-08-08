@@ -1,6 +1,5 @@
 package com.lnvortex.server.models
 
-import com.lnvortex.core.RoundStatus
 import com.lnvortex.server.config.VortexCoordinatorAppConfig
 import org.bitcoins.core.protocol.script.ScriptWitness
 import org.bitcoins.core.protocol.transaction._
@@ -20,9 +19,6 @@ case class RegisteredInputDAO()(implicit
 
   private val mappers = new DbCommonsColumnMappers(profile)
 
-  implicit val roundStatusMapper: BaseColumnType[RoundStatus] =
-    MappedColumnType.base[RoundStatus, String](_.toString,
-                                               RoundStatus.fromString)
   import mappers._
 
   override val table: TableQuery[RegisteredInputsTable] =
