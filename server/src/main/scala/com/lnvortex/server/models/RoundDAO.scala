@@ -27,9 +27,6 @@ case class RoundDAO()(implicit
     MappedColumnType.base[RoundStatus, String](_.toString,
                                                RoundStatus.fromString)
 
-  implicit val psbtMapper: BaseColumnType[PSBT] =
-    MappedColumnType.base[PSBT, String](_.base64, PSBT.fromBase64)
-
   import mappers._
 
   override val table: TableQuery[RoundTable] = TableQuery[RoundTable]
