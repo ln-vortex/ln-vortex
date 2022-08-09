@@ -183,7 +183,9 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       beginInputRegistrationCancellable = Some(
         system.scheduler.scheduleOnce(config.roundInterval) {
           beginInputRegistration()
-            .recoverWith(_ => reconcileRound(isNewRound = true))
+            .recoverWith { _ =>
+              reconcileRound(isNewRound = true).map(_ => ())
+            }
           ()
         })
 
@@ -192,7 +194,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
         .flatMap(_ => beginOutputRegistration())
         .recoverWith { case ex: Throwable =>
           logger.info("Failed to complete input registration: ", ex)
-          reconcileRound(isNewRound = true)
+          reconcileRound(isNewRound = true).map(_ => ())
         }
 
       // handle sending psbt when all outputs registered
@@ -203,12 +205,14 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
           logger.info("Failed to complete output registration: ", ex)
           // We need to make a new round because we
           // don't know which inputs didn't register
-          reconcileRound(isNewRound = true)
+          reconcileRound(isNewRound = true).map(_ => ())
         }
 
       completedTxP.future
         .flatMap(onCompletedTransaction)
-        .recoverWith(_ => reconcileRound(isNewRound = false))
+        .recoverWith { _ =>
+          reconcileRound(isNewRound = false).map(_ => ())
+        }
 
       // Send round details to peers that were not in prev round
       if (announce) {
@@ -888,7 +892,8 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
     }
   }
 
-  def reconcileRound(isNewRound: Boolean): Future[Unit] = {
+  def reconcileRound(
+      isNewRound: Boolean): Future[Vector[RestartRoundMessage]] = {
     val action = for {
       // cancel round
       round <- currentRoundAction()
@@ -928,8 +933,8 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       // restart round with good alices
       newRound <- newRound(announce = isNewRound)
 
-      _ <-
-        if (isNewRound) Future.unit
+      restartMsgs <-
+        if (isNewRound) Future.successful(Vector.empty)
         else {
           // change state so they can begin registering inputs
           beginInputRegistration().flatMap { _ =>
@@ -937,12 +942,14 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
               val connectionHandler = oldMap(id)
               getNonce(id, oldMap(id), AskNonce(newRound.roundId)).map { db =>
                 val nonceMsg = NonceMessage(db.nonce)
-                connectionHandler ! RestartRoundMessage(roundParams, nonceMsg)
+                val restartMsg = RestartRoundMessage(roundParams, nonceMsg)
+                connectionHandler ! restartMsg
+                restartMsg
               }
             }
           }
         }
-    } yield ()
+    } yield restartMsgs
   }
 
   private def updateFeeRate(): Future[SatoshisPerVirtualByte] = {
