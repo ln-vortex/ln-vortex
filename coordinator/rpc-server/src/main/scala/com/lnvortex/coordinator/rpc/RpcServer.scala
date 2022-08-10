@@ -99,6 +99,11 @@ case class RpcServer(
     httpFut.foreach { http =>
       logger.info(s"Started coordinator RPC server at ${http.localAddress}")
     }
+
+    httpFut.failed.foreach { err =>
+      logger.error(s"Failed to start coordinator RPC server:", err)
+    }
+
     httpFut
   }
 }
