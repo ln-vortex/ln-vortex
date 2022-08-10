@@ -9,6 +9,8 @@ import org.scalacheck.Gen
 
 object Generators {
 
+  def warning: Gen[UTXOWarning] = Gen.oneOf(UTXOWarning.all)
+
   def unspentCoin: Gen[UnspentCoin] = {
     for {
       addr <- AddressGenerator.bitcoinAddress
@@ -16,9 +18,16 @@ object Generators {
       outpoint <- TransactionGenerators.outPoint
       confirmed <- NumberGenerator.bool
       anonSet <- NumberGenerator.positiveInts
+      warningOpt <- Gen.option(warning)
       change <- NumberGenerator.bool
     } yield {
-      UnspentCoin(addr, amt, outpoint, confirmed, anonSet, change)
+      UnspentCoin(address = addr,
+                  amount = amt,
+                  outPoint = outpoint,
+                  confirmed = confirmed,
+                  anonSet = anonSet,
+                  warning = warningOpt,
+                  isChange = change)
     }
   }
 

@@ -5,6 +5,7 @@ import org.bitcoins.core.number.UInt32
 import org.bitcoins.core.policy.Policy
 import org.bitcoins.core.protocol.BitcoinAddress
 import org.bitcoins.core.protocol.ln.node.NodeId
+import org.bitcoins.core.protocol.script.ScriptPubKey
 import org.bitcoins.core.protocol.transaction._
 import org.bitcoins.core.psbt.PSBT
 import org.bitcoins.crypto.{SchnorrNonce, StringFactory}
@@ -180,6 +181,12 @@ case class PSBTSigned(
 
       TransactionOutPoint(txId, vout)
     }
+
+  lazy val spks: Vector[ScriptPubKey] = {
+    initDetails.changeSpkOpt.toVector :+ initDetails.targetOutput.scriptPubKey
+  }
+
+  lazy val targetSpk: ScriptPubKey = initDetails.targetOutput.scriptPubKey
 
   def nextStage: NoDetails.type = NoDetails
 }

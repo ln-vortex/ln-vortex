@@ -74,6 +74,7 @@ case class CLightningVortexWallet(clightning: CLightningRpcClient)(implicit
                   outPoint = out.outPoint,
                   confirmed = out.blockheight.isDefined,
                   anonSet = 1,
+                  warning = None,
                   isChange = false)
     })
   }
