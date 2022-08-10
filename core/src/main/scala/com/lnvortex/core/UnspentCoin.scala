@@ -2,6 +2,7 @@ package com.lnvortex.core
 
 import org.bitcoins.core.currency._
 import org.bitcoins.core.protocol.BitcoinAddress
+import org.bitcoins.core.protocol.script.ScriptPubKey
 import org.bitcoins.core.protocol.transaction._
 
 case class UnspentCoin(
@@ -10,7 +11,10 @@ case class UnspentCoin(
     outPoint: TransactionOutPoint,
     confirmed: Boolean,
     anonSet: Int,
+    warning: Option[UTXOWarning],
     isChange: Boolean) {
+
+  val spk: ScriptPubKey = address.scriptPubKey
 
   val output: TransactionOutput =
     TransactionOutput(amount, address.scriptPubKey)

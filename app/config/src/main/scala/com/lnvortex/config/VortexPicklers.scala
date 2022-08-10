@@ -111,6 +111,18 @@ object VortexPicklers {
   implicit val OutputReferenceWrites: Writes[OutputReference] =
     Json.writes[OutputReference]
 
+  implicit val UTXOWarningWrites: Writes[UTXOWarning] =
+    (out: UTXOWarning) => JsString(out.warning)
+
+  implicit val UTXOWarningReads: Reads[UTXOWarning] = (js: JsValue) =>
+    SerializerUtil.processJsStringOpt(n => UTXOWarning.fromStringOpt(n))(js)
+
+  implicit val UTXOWarningRW: ReadWriter[UTXOWarning] =
+    readwriter[String].bimap[UTXOWarning](
+      warning => warning.warning,
+      str => UTXOWarning.fromString(str)
+    )
+
   implicit val unspentCoinRW: ReadWriter[UnspentCoin] = macroRW[UnspentCoin]
   implicit val unspentCoinReads: Reads[UnspentCoin] = Json.reads[UnspentCoin]
 

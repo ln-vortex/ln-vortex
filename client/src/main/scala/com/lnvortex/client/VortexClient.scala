@@ -67,7 +67,7 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
   override def start(): Future[Unit] = {
     for {
       coins <- vortexWallet.listCoins()
-      _ <- utxoDAO.createMissing(coins.map(_.outPoint))
+      _ <- utxoDAO.createMissing(coins)
       _ <- getNewRound
     } yield ()
   }
@@ -98,7 +98,9 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
         val utxoOpt = utxoDbs.get(coin.outPoint).flatten
         utxoOpt match {
           case Some(utxo) =>
-            coin.copy(anonSet = utxo.anonSet, isChange = utxo.isChange)
+            coin.copy(anonSet = utxo.anonSet,
+                      warning = utxo.warning,
+                      isChange = utxo.isChange)
           case None => coin
         }
       }
@@ -663,10 +665,7 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
             .labelTransaction(signedTx.txId,
                               s"LnVortex Anonymity set: $anonSet")
             .recover(_ => ())
-          _ <- utxoDAO.setAnonSets(state.initDetails.inputs.map(_.outPoint),
-                                   state.channelOutpoint,
-                                   state.changeOutpointOpt,
-                                   anonSet)
+          _ <- utxoDAO.setAnonSets(state, anonSet)
           _ <- stop()
           _ <- getNewRound
         } yield ()

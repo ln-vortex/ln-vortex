@@ -65,6 +65,7 @@ case class LndVortexWallet(lndRpcClient: LndRpcClient)(implicit
                   utxo.outPointOpt.get,
                   utxo.confirmations > 0,
                   anonSet = 1,
+                  warning = None,
                   isChange = false)
     })
   }

@@ -49,13 +49,13 @@ class VortexClientTest extends VortexClientFixture {
   it must "create missing utxos in its database" in { vortexClient =>
     for {
       coins <- vortexClient.listCoins()
-      _ <- vortexClient.utxoDAO.createMissing(coins.map(_.outPoint))
+      _ <- vortexClient.utxoDAO.createMissing(coins)
 
       utxos <- vortexClient.utxoDAO.findAll()
       _ = assert(coins.forall(c => utxos.exists(_.outPoint == c.outPoint)))
 
       // do it again, make sure it doesn't fail
-      _ <- vortexClient.utxoDAO.createMissing(coins.map(_.outPoint))
+      _ <- vortexClient.utxoDAO.createMissing(coins)
 
       utxos2 <- vortexClient.utxoDAO.findAll()
     } yield assert(utxos == utxos2)
