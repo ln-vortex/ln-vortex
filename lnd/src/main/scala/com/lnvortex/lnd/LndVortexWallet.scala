@@ -4,10 +4,15 @@ import akka.actor.ActorSystem
 import com.lnvortex.core.api._
 import com.lnvortex.core.{InputReference, UnspentCoin}
 import com.lnvortex.lnd.LndVortexWallet.getSignMethod
-import lnrpc.{AddressType, NewAddressRequest, NodeInfoRequest}
+import lnrpc.{
+  AddressType,
+  NewAddressRequest,
+  NodeInfoRequest,
+  PendingChannelsRequest
+}
 import org.bitcoins.core.config.{BitcoinNetwork, BitcoinNetworks}
 import org.bitcoins.core.currency._
-import org.bitcoins.core.number.UInt32
+import org.bitcoins.core.number.{UInt32, UInt64}
 import org.bitcoins.core.protocol.BitcoinAddress
 import org.bitcoins.core.protocol.ln.channel.ShortChannelId
 import org.bitcoins.core.protocol.ln.node.NodeId
@@ -188,9 +193,13 @@ case class LndVortexWallet(lndRpcClient: LndRpcClient)(implicit
   }
 
   override def listChannels(): Future[Vector[ChannelDetails]] = {
-    lndRpcClient
-      .listChannels()
-      .flatMap { channels =>
+    val f = for {
+      channels <- lndRpcClient.listChannels()
+      pending <- lndRpcClient.lnd.pendingChannels(PendingChannelsRequest())
+    } yield (channels, pending)
+
+    f
+      .flatMap { case (channels, pending) =>
         val fs = channels.map { channel =>
           val request = NodeInfoRequest(channel.remotePubkey)
           lndRpcClient.lnd.getNodeInfo(request).map { nodeInfo =>
@@ -205,7 +214,26 @@ case class LndVortexWallet(lndRpcClient: LndRpcClient)(implicit
           }
         }
 
-        Future.sequence(fs)
+        val fs2 =
+          pending.pendingOpenChannels.flatMap(_.channel).map { channel =>
+            val request = NodeInfoRequest(channel.remoteNodePub)
+            lndRpcClient.lnd.getNodeInfo(request).map { nodeInfo =>
+              ChannelDetails(
+                alias = nodeInfo.getNode.alias,
+                remotePubkey = NodeId(channel.remoteNodePub),
+                shortChannelId =
+                  ShortChannelId(UInt64.zero), // fixme make optional?
+                public = !channel.`private`,
+                amount = Satoshis(channel.capacity),
+                active = false
+              )
+            }
+          }
+
+        for {
+          chans <- Future.sequence(fs)
+          pending <- Future.sequence(fs2)
+        } yield chans ++ pending
       }
   }
 }
