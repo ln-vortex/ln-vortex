@@ -65,6 +65,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
       blind = ECPrivateKey.freshPrivateKey.fieldElement
       registerInputs = RegisterInputs(Vector(inputRef),
                                       blind,
+                                      Vector.empty,
                                       Some(addr.scriptPubKey))
 
       _ <- coordinator.registerAlice(Sha256Digest.empty, registerInputs)
@@ -97,7 +98,10 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
       addr <- bitcoind.getNewAddress
 
       blind = ECPrivateKey.freshPrivateKey.fieldElement
-      registerInputs = RegisterInputs(inputRefs, blind, Some(addr.scriptPubKey))
+      registerInputs = RegisterInputs(inputRefs,
+                                      blind,
+                                      Vector.empty,
+                                      Some(addr.scriptPubKey))
 
       res <- recoverToSucceededIf[NonMinimalInputsException](
         coordinator.registerAlice(Sha256Digest.empty, registerInputs))
@@ -129,6 +133,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
         blind = ECPrivateKey.freshPrivateKey.fieldElement
         registerInputs = RegisterInputs(Vector(inputRef),
                                         blind,
+                                        Vector.empty,
                                         utxo.scriptPubKey)
 
         res <- recoverToSucceededIf[AttemptedAddressReuseException](
@@ -179,6 +184,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
       blind = ECPrivateKey.freshPrivateKey.fieldElement
       registerInputs = RegisterInputs(Vector(inputRef),
                                       blind,
+                                      Vector.empty,
                                       utxo.scriptPubKey)
 
       res <- recoverToSucceededIf[InvalidInputsException](
@@ -213,6 +219,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
       blind = ECPrivateKey.freshPrivateKey.fieldElement
       registerInputs = RegisterInputs(Vector(inputRef),
                                       blind,
+                                      Vector.empty,
                                       Some(addr.scriptPubKey))
 
       res <- recoverToSucceededIf[InvalidInputsException](
@@ -253,6 +260,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
       blind = ECPrivateKey.freshPrivateKey.fieldElement
       registerInputs = RegisterInputs(Vector(inputRef),
                                       blind,
+                                      Vector.empty,
                                       Some(addr.scriptPubKey))
 
       res <- recoverToSucceededIf[NotEnoughFundingException](
@@ -290,6 +298,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
       blind = ECPrivateKey.freshPrivateKey.fieldElement
       registerInputs = RegisterInputs(Vector(inputRef),
                                       blind,
+                                      Vector.empty,
                                       Some(addr.scriptPubKey))
 
       res <- recoverToSucceededIf[InvalidInputsException](
@@ -326,6 +335,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
         blind = ECPrivateKey.freshPrivateKey.fieldElement
         registerInputs = RegisterInputs(Vector(inputRef),
                                         blind,
+                                        Vector.empty,
                                         Some(addr.scriptPubKey))
 
         res <- recoverToSucceededIf[InvalidInputsException](
@@ -369,6 +379,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
         blind = ECPrivateKey.freshPrivateKey.fieldElement
         registerInputs = RegisterInputs(Vector(inputRef),
                                         blind,
+                                        Vector.empty,
                                         Some(addr.scriptPubKey))
 
         res <- recoverToSucceededIf[InvalidInputsException](
@@ -401,6 +412,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
       blind = ECPrivateKey.freshPrivateKey.fieldElement
       registerInputs = RegisterInputs(Vector(inputRef),
                                       blind,
+                                      Vector.empty,
                                       Some(addr.scriptPubKey))
 
       res <- recoverToSucceededIf[IllegalArgumentException](
@@ -434,6 +446,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
       blind = ECPrivateKey.freshPrivateKey.fieldElement
       registerInputs = RegisterInputs(Vector(inputRef),
                                       blind,
+                                      Vector.empty,
                                       Some(addr.scriptPubKey))
 
       res <- recoverToSucceededIf[InvalidInputsException](
@@ -465,6 +478,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
       blind = ECPrivateKey.freshPrivateKey.fieldElement
       registerInputs = RegisterInputs(Vector(inputRef),
                                       blind,
+                                      Vector.empty,
                                       Some(addr.scriptPubKey))
 
       res <- recoverToSucceededIf[IllegalStateException](
@@ -511,6 +525,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
         blind = ECPrivateKey.freshPrivateKey.fieldElement
         registerInputs = RegisterInputs(Vector(inputRef),
                                         blind,
+                                        Vector.empty,
                                         Some(addr.scriptPubKey))
 
         res <- recoverToSucceededIf[InvalidChangeScriptPubKeyException](
@@ -544,11 +559,86 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
       blind = ECPrivateKey.freshPrivateKey.fieldElement
       registerInputs = RegisterInputs(Vector(inputRef),
                                       blind,
+                                      Vector.empty,
                                       Some(addr.scriptPubKey))
 
       res <- recoverToSucceededIf[InvalidChangeScriptPubKeyException](
         coordinator.registerAlice(Sha256Digest.empty, registerInputs))
     } yield res
+  }
+
+  it must "fail register inputs with a invalid change outputs" in {
+    coordinator =>
+      val bitcoind = coordinator.bitcoind
+      for {
+        aliceDb <- coordinator.getNonce(Sha256Digest.empty,
+                                        TestActorRef("test"),
+                                        AskNonce(coordinator.getCurrentRoundId))
+        _ <- coordinator.beginInputRegistration()
+
+        utxo <- bitcoind.listUnspent.map(_.head)
+        outputRef = {
+          val outpoint = TransactionOutPoint(utxo.txid, UInt32(utxo.vout))
+          val output = TransactionOutput(utxo.amount, utxo.scriptPubKey.get)
+          OutputReference(outpoint, output)
+        }
+        tx = InputReference.constructInputProofTx(outputRef, aliceDb.nonce)
+        signed <- bitcoind.walletProcessPSBT(PSBT.fromUnsignedTx(tx))
+        proof =
+          signed.psbt.inputMaps.head.finalizedScriptWitnessOpt.get.scriptWitness
+
+        inputRef = InputReference(outputRef, proof)
+        addr <- bitcoind.getNewAddress(AddressType.Bech32)
+        addr2 <- bitcoind.getNewAddress(AddressType.Bech32)
+
+        change = TransactionOutput(Satoshis(10_000), addr2.scriptPubKey)
+
+        blind = ECPrivateKey.freshPrivateKey.fieldElement
+        registerInputs = RegisterInputs(Vector(inputRef),
+                                        blind,
+                                        Vector(change),
+                                        Some(addr.scriptPubKey))
+
+        res <- recoverToSucceededIf[InvalidChangeOutputsException](
+          coordinator.registerAlice(Sha256Digest.empty, registerInputs))
+      } yield res
+  }
+
+  it must "fail register inputs with a invalid change outputs spk" in {
+    coordinator =>
+      val bitcoind = coordinator.bitcoind
+      for {
+        aliceDb <- coordinator.getNonce(Sha256Digest.empty,
+                                        TestActorRef("test"),
+                                        AskNonce(coordinator.getCurrentRoundId))
+        _ <- coordinator.beginInputRegistration()
+
+        utxo <- bitcoind.listUnspent.map(_.head)
+        outputRef = {
+          val outpoint = TransactionOutPoint(utxo.txid, UInt32(utxo.vout))
+          val output = TransactionOutput(utxo.amount, utxo.scriptPubKey.get)
+          OutputReference(outpoint, output)
+        }
+        tx = InputReference.constructInputProofTx(outputRef, aliceDb.nonce)
+        signed <- bitcoind.walletProcessPSBT(PSBT.fromUnsignedTx(tx))
+        proof =
+          signed.psbt.inputMaps.head.finalizedScriptWitnessOpt.get.scriptWitness
+
+        inputRef = InputReference(outputRef, proof)
+        addr <- bitcoind.getNewAddress(AddressType.Bech32)
+
+        change = TransactionOutput(coordinator.roundParams.amount,
+                                   addr.scriptPubKey)
+
+        blind = ECPrivateKey.freshPrivateKey.fieldElement
+        registerInputs = RegisterInputs(Vector(inputRef),
+                                        blind,
+                                        Vector(change),
+                                        Some(addr.scriptPubKey))
+
+        res <- recoverToSucceededIf[AttemptedAddressReuseException](
+          coordinator.registerAlice(Sha256Digest.empty, registerInputs))
+      } yield res
   }
 
   it must "fail register inputs with a invalid blind proof" in { coordinator =>
@@ -577,6 +667,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
       blind = FieldElement.zero
       registerInputs = RegisterInputs(Vector(inputRef),
                                       blind,
+                                      Vector.empty,
                                       Some(addr.scriptPubKey))
 
       res <- recoverToSucceededIf[InvalidBlindChallengeException](
@@ -621,6 +712,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
 
       registerInputs = RegisterInputs(Vector(inputRef),
                                       blind,
+                                      Vector.empty,
                                       Some(addr.scriptPubKey))
       blindSig <- coordinator.registerAlice(Sha256Digest.empty, registerInputs)
       sig = BlindSchnorrUtil.unblindSignature(blindSig,
@@ -670,6 +762,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
 
       registerInputs = RegisterInputs(Vector(inputRef),
                                       blind,
+                                      Vector.empty,
                                       Some(addr.scriptPubKey))
       _ <- coordinator.registerAlice(Sha256Digest.empty, registerInputs)
       _ <- coordinator.beginOutputRegistration()
@@ -721,6 +814,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
 
         registerInputs = RegisterInputs(Vector(inputRef),
                                         blind,
+                                        Vector.empty,
                                         Some(addr.scriptPubKey))
         blindSig <- coordinator.registerAlice(Sha256Digest.empty,
                                               registerInputs)
@@ -774,6 +868,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
 
         registerInputs = RegisterInputs(Vector(inputRef),
                                         blind,
+                                        Vector.empty,
                                         Some(addr.scriptPubKey))
         blindSig <- coordinator.registerAlice(Sha256Digest.empty,
                                               registerInputs)
@@ -826,6 +921,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
 
       registerInputs = RegisterInputs(Vector(inputRef),
                                       blind,
+                                      Vector.empty,
                                       Some(addr.scriptPubKey))
       blindSig <- coordinator.registerAlice(Sha256Digest.empty, registerInputs)
       sig = BlindSchnorrUtil.unblindSignature(blindSig,
@@ -876,6 +972,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
 
       registerInputs = RegisterInputs(Vector(inputRef),
                                       blind,
+                                      Vector.empty,
                                       Some(addr.scriptPubKey))
       blindSig <- coordinator.registerAlice(Sha256Digest.empty, registerInputs)
       sig = BlindSchnorrUtil.unblindSignature(blindSig,
@@ -927,6 +1024,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
 
         registerInputs = RegisterInputs(Vector(inputRef),
                                         blind,
+                                        Vector.empty,
                                         Some(addr.scriptPubKey))
         blindSig <- coordinator.registerAlice(Sha256Digest.empty,
                                               registerInputs)

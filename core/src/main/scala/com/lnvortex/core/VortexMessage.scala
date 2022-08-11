@@ -329,6 +329,7 @@ object AskInputs extends VortexMessageFactory[AskInputs] {
 case class RegisterInputs(
     inputs: Vector[InputReference],
     blindedOutput: FieldElement,
+    changeOutputs: Vector[TransactionOutput],
     changeSpkOpt: Option[ScriptPubKey])
     extends ClientVortexMessage {
   override val tpe: BigSizeUInt = RegisterInputs.tpe
@@ -340,15 +341,29 @@ case class RegisterInputs(
       case None            => UInt16.zero.bytes
     }
 
+    val changeOutputBytes = u16PrefixedList[TransactionOutput](
+      changeOutputs,
+      (t: TransactionOutput) => u16Prefix(t.bytes))
+
     u16PrefixedList[InputReference](
       inputs,
       (t: InputReference) => u16Prefix(t.bytes)) ++
       blindedOutput.bytes ++
+      changeOutputBytes ++
       changeSpkBytes
   }
 
   def isMinimal(target: CurrencyUnit): Boolean = {
     VortexUtils.isMinimalSelection(inputs.map(_.outputReference), target)
+  }
+
+  def validChangeOutputs(target: CurrencyUnit): Boolean = {
+    val remainder = inputs
+      .map(_.outputReference.output.value)
+      .sum - target - changeOutputs.map(_.value).sum
+
+    remainder >= CurrencyUnits.zero &&
+    changeOutputs.forall(o => o.value == target)
   }
 }
 
@@ -366,13 +381,17 @@ object RegisterInputs extends VortexMessageFactory[RegisterInputs] {
 
     val blindedOutput = FieldElement(iter.take(32))
 
+    val changeOutputs = iter.takeU16PrefixedList[TransactionOutput](() =>
+      iter.takeU16Prefixed[TransactionOutput](len =>
+        TransactionOutput(iter.take(len))))
+
     val changeSpkLen = iter.takeU16()
 
     val changeSpkOpt = if (changeSpkLen != UInt16.zero) {
       Some(ScriptPubKey.fromAsmBytes(iter.take(changeSpkLen.toInt)))
     } else None
 
-    RegisterInputs(inputs, blindedOutput, changeSpkOpt)
+    RegisterInputs(inputs, blindedOutput, changeOutputs, changeSpkOpt)
   }
 }
 
