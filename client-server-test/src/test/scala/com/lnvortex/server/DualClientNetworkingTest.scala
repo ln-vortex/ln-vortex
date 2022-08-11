@@ -70,13 +70,13 @@ class DualClientNetworkingTest
 
       // wait until clientA sees new channels
       _ <- TestAsyncUtil.awaitConditionF(
-        () => clientA.vortexWallet.lndRpcClient.listChannels().map(_.size == 2),
+        () => clientA.listChannels().map(_.exists(_.anonSet == 2)),
         interval = interval,
         maxTries = 500)
 
       // wait until clientB sees new channels
       _ <- TestAsyncUtil.awaitConditionF(
-        () => clientB.vortexWallet.lndRpcClient.listChannels().map(_.size == 2),
+        () => clientB.listChannels().map(_.exists(_.anonSet == 2)),
         interval = interval,
         maxTries = 500)
 

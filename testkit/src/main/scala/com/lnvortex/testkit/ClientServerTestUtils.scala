@@ -352,13 +352,13 @@ trait ClientServerTestUtils {
 
       // wait until clientA sees new channel
       _ <- TestAsyncUtil.awaitConditionF(
-        () => clientA.vortexWallet.lndRpcClient.listChannels().map(_.nonEmpty),
+        () => clientA.listChannels().map(_.exists(_.anonSet >= 2)),
         interval = 100.milliseconds,
         maxTries = 500)
 
       // wait until clientB sees new channel
       _ <- TestAsyncUtil.awaitConditionF(
-        () => clientB.vortexWallet.lndRpcClient.listChannels().map(_.nonEmpty),
+        () => clientB.listChannels().map(_.exists(_.anonSet >= 2)),
         interval = 100.milliseconds,
         maxTries = 500)
 
