@@ -3,8 +3,8 @@ package com.lnvortex.lnd
 import com.lnvortex.testkit.LndChannelOpenerFixture
 import org.bitcoins.core.currency.Satoshis
 import org.bitcoins.core.number.UInt32
-import org.bitcoins.core.protocol.script.P2WSHWitnessSPKV0
 import org.bitcoins.core.protocol.transaction.TransactionOutPoint
+import org.bitcoins.core.script.ScriptType
 import org.bitcoins.testkit.async.TestAsyncUtil
 import org.bitcoins.testkit.lnd.LndRpcTestUtil
 
@@ -26,7 +26,7 @@ class LndChannelOpenerTest extends LndChannelOpenerFixture {
                                                 privateChannel = false)
     } yield {
       assert(fundDetails.amount == amount)
-      assert(fundDetails.address.scriptPubKey.isInstanceOf[P2WSHWitnessSPKV0])
+      assert(fundDetails.scriptType == ScriptType.WITNESS_V0_SCRIPTHASH)
     }
   }
 
