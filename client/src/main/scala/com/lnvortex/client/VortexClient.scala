@@ -7,7 +7,7 @@ import com.lnvortex.client.config.VortexAppConfig
 import com.lnvortex.client.db.UTXODAO
 import com.lnvortex.client.networking.{P2PClient, Peer}
 import com.lnvortex.core._
-import com.lnvortex.core.api.{OutputDetails, VortexWalletApi}
+import com.lnvortex.core.api._
 import com.lnvortex.core.crypto.BlindSchnorrUtil
 import com.lnvortex.core.crypto.BlindingTweaks.freshBlindingTweaks
 import grizzled.slf4j.Logging
@@ -102,6 +102,22 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
                       warning = utxo.warning,
                       isChange = utxo.isChange)
           case None => coin
+        }
+      }
+    }
+  }
+
+  def listChannels(): Future[Vector[ChannelDetails]] = {
+    for {
+      channels <- vortexWallet.listChannels()
+      utxoDbs <- utxoDAO.createOutPointMap(channels.map(_.outPoint))
+    } yield {
+      channels.map { channel =>
+        val utxoOpt = utxoDbs.get(channel.outPoint).flatten
+        utxoOpt match {
+          case Some(utxo) =>
+            channel.copy(anonSet = utxo.anonSet)
+          case None => channel
         }
       }
     }

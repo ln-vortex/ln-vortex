@@ -193,23 +193,26 @@ case class LndVortexWallet(lndRpcClient: LndRpcClient)(implicit
   }
 
   override def listChannels(): Future[Vector[ChannelDetails]] = {
-    val f = for {
+    val allChannelsF = for {
       channels <- lndRpcClient.listChannels()
       pending <- lndRpcClient.lnd.pendingChannels(PendingChannelsRequest())
     } yield (channels, pending)
 
-    f
+    allChannelsF
       .flatMap { case (channels, pending) =>
         val fs = channels.map { channel =>
           val request = NodeInfoRequest(channel.remotePubkey)
           lndRpcClient.lnd.getNodeInfo(request).map { nodeInfo =>
+            val outPoint = TransactionOutPoint.fromString(channel.channelPoint)
             ChannelDetails(
               alias = nodeInfo.getNode.alias,
+              outPoint = outPoint,
               remotePubkey = NodeId(channel.remotePubkey),
               shortChannelId = ShortChannelId(channel.chanId),
               public = !channel.`private`,
               amount = Satoshis(channel.capacity),
-              active = channel.active
+              active = channel.active,
+              anonSet = 1
             )
           }
         }
@@ -218,14 +221,18 @@ case class LndVortexWallet(lndRpcClient: LndRpcClient)(implicit
           pending.pendingOpenChannels.flatMap(_.channel).map { channel =>
             val request = NodeInfoRequest(channel.remoteNodePub)
             lndRpcClient.lnd.getNodeInfo(request).map { nodeInfo =>
+              val outPoint =
+                TransactionOutPoint.fromString(channel.channelPoint)
               ChannelDetails(
                 alias = nodeInfo.getNode.alias,
+                outPoint = outPoint,
                 remotePubkey = NodeId(channel.remoteNodePub),
                 shortChannelId =
                   ShortChannelId(UInt64.zero), // fixme make optional?
                 public = !channel.`private`,
                 amount = Satoshis(channel.capacity),
-                active = false
+                active = false,
+                anonSet = 1
               )
             }
           }

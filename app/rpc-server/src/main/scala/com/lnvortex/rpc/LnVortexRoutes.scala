@@ -51,7 +51,7 @@ case class LnVortexRoutes(client: VortexClient[VortexWalletApi])(implicit
 
     case ServerCommand(id, "listchannels", _) =>
       complete {
-        client.vortexWallet.listChannels().map { channels =>
+        client.listChannels().map { channels =>
           RpcServer.httpSuccess(id, channels)
         }
       }
