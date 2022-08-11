@@ -384,7 +384,9 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
         val changeAmt =
           selectedAmt - round.amount - round.coordinatorFee - onChainFees
 
-        val needsChange = changeAmt >= Policy.dustThreshold
+        val numChangeOutputs = changeAmt / round.amount
+        val needsChange =
+          changeAmt - (numChangeOutputs * round.amount) >= Policy.dustThreshold
 
         // Reserve utxos until 10 minutes after the round is scheduled.
         val timeUtilRound =
@@ -398,6 +400,14 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
           inputRefs = outputRefs.zip(inputProofs).map { case (outRef, proof) =>
             InputReference(outRef, proof)
           }
+
+          changeOutputs <- FutureUtil
+            .sequentially(0.until(numChangeOutputs.satoshis.toInt)) { _ =>
+              vortexWallet
+                .getChangeAddress(round.outputType)
+                .map(addr => TransactionOutput(round.amount, addr.scriptPubKey))
+            }
+            .recover(_ => Vector.empty) // if we fail, just large change output
 
           changeAddrOpt <-
             if (needsChange)
@@ -465,6 +475,7 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
 
           RegisterInputs(inputRefs,
                          challenge,
+                         changeOutputs.toVector,
                          changeAddrOpt.map(_.scriptPubKey))
         }
     }
