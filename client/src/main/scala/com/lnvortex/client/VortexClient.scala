@@ -422,9 +422,7 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
                                  fundingAmount = scheduled.round.amount,
                                  privateChannel = true)
                 .map { details =>
-                  if (
-                    details.address.scriptPubKey.scriptType != round.outputType
-                  ) {
+                  if (details.scriptType != round.outputType) {
                     throw new InvalidTargetOutputException(
                       s"The channel is invalid, need a ${round.outputType} output")
                   } else details
