@@ -125,16 +125,14 @@ trait PeerValidation extends Logging { self: VortexCoordinator =>
 
       val enoughFunding = excess >= Satoshis.zero
 
-      lazy val changeSpkVec = registerInputs.changeOutputs.map(
-        _.scriptPubKey) ++ registerInputs.changeSpkOpt.toVector
-
+      lazy val changeSpkVec = registerInputs.changeSpkOpt match {
+        case Some(spk) => Vector(spk)
+        case None      => Vector.empty
+      }
       lazy val allSpks =
         registerInputs.inputs.map(_.output.scriptPubKey) ++ changeSpkVec
 
       lazy val uniqueSpks = allSpks.size == allSpks.distinct.size
-
-      val validChangeOutputs =
-        registerInputs.validChangeOutputs(roundParams.amount)
 
       if (!validChange) {
         Some(new InvalidChangeScriptPubKeyException(
@@ -147,8 +145,6 @@ trait PeerValidation extends Logging { self: VortexCoordinator =>
         Some(
           new AttemptedAddressReuseException(
             s"Cannot have duplicate spks, got $allSpks"))
-      } else if (!validChangeOutputs) {
-        Some(new InvalidChangeOutputsException("Change outputs are not valid"))
       } else None
     }
   }

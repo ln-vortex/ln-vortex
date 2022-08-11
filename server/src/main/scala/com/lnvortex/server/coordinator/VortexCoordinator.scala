@@ -526,7 +526,6 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
     val f = for {
       (roundDb, aliceDbOpt, otherInputDbs, isRemix) <- dbF
       validInputs <- validInputsF
-
       isMinimal = registerInputs.isMinimal(roundParams.getTargetAmount(isRemix))
       isMinimalErr =
         if (isMinimal) None
