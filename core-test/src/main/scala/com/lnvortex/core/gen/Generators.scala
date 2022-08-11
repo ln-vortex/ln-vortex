@@ -113,14 +113,9 @@ object Generators {
       changeSpk <- ScriptGenerators.scriptPubKey
         .map(_._1)
         .suchThat(_ != EmptyScriptPubKey)
-
-      outputs <- Gen.listOf(TransactionGenerators.output)
       isNone <- NumberGenerator.bool
       changeSpkOpt = if (isNone) None else Some(changeSpk)
-    } yield RegisterInputs(inputs.toVector,
-                           blindedOutput,
-                           outputs.toVector,
-                           changeSpkOpt)
+    } yield RegisterInputs(inputs.toVector, blindedOutput, changeSpkOpt)
   }
 
   def blindedSig: Gen[BlindedSig] = {

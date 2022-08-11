@@ -13,9 +13,6 @@ object VortexServerException {
   class InvalidInputsException(private val reason: String)
       extends VortexServerException(reason)
 
-  class InvalidChangeOutputsException(private val reason: String)
-      extends VortexServerException(reason)
-
   class InvalidChangeScriptPubKeyException(private val reason: String)
       extends VortexServerException(reason)
 
