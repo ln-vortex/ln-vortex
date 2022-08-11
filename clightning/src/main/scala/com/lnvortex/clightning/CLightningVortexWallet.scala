@@ -199,11 +199,13 @@ case class CLightningVortexWallet(clightning: CLightningRpcClient)(implicit
 
         ChannelDetails(
           alias = "todo", // todo waiting on PR to bitcoin-s
+          outPoint = EmptyTransactionOutPoint,
           remotePubkey = remote,
           shortChannelId = channel.short_channel_id,
           public = channel.public,
           amount = channel.satoshis,
-          active = channel.active
+          active = channel.active,
+          anonSet = 1
         )
       }
     }
