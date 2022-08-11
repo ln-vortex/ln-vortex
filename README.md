@@ -1,11 +1,11 @@
 # LnVortex
 
-LnVortex is a tool to allow users to open lightning channels in a coinjoin when
+LnVortex is a tool to allow users to open lightning channels in a collaborative transaction when
 using [lnd](https://github.com/lightningnetwork/lnd) and [Core Lightning](https://github.com/ElementsProject/lightning)
 
 ## Compatibility
 
-LnVortex is compatible with `lnd` version v0.14.2-beta and core lightning version v0.10.2.
+LnVortex is compatible with `lnd` version v0.15.0-beta and core lightning version v0.10.2.
 
 ## Building from source
 
