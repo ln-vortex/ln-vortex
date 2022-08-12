@@ -90,7 +90,13 @@ class DualClientTest
     for {
       _ <- completeChannelRound(peerIdA, peerIdB, clientA, clientB, coordinator)
 
+      channelsA <- clientA.listChannels()
+      channelsB <- clientB.listChannels()
       roundDbs <- coordinator.roundDAO.findAll()
-    } yield assert(roundDbs.size >= 2) // fixme change back to == 2
+    } yield {
+      assert(roundDbs.size >= 2) // fixme change back to == 2
+      assert(channelsA.exists(_.anonSet == 2))
+      assert(channelsB.exists(_.anonSet == 2))
+    }
   }
 }

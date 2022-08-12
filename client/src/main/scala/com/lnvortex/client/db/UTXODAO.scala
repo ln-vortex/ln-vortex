@@ -116,7 +116,9 @@ case class UTXODAO()(implicit
                isChange = true)
       }
 
-      val minPrevAnonSet = prev.map(_.anonSet).minOption.getOrElse(1)
+      val minPrevAnonSet =
+        prev.map(_.anonSet).filter(_ > 0).minOption.getOrElse(1)
+
       val (newAnonSet, warning) =
         if (bySpks.exists(_.scriptPubKey == state.targetSpk)) {
           (0, Some(UTXOWarning.AddressReuse))

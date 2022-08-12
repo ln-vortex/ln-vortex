@@ -200,12 +200,18 @@ case class LndVortexWallet(lndRpcClient: LndRpcClient)(implicit
 
     allChannelsF
       .flatMap { case (channels, pending) =>
-        val fs = channels.map { channel =>
+        val channelFs = channels.map { channel =>
           val request = NodeInfoRequest(channel.remotePubkey)
-          lndRpcClient.lnd.getNodeInfo(request).map { nodeInfo =>
-            val outPoint = TransactionOutPoint.fromString(channel.channelPoint)
+          val aliasF = lndRpcClient.lnd
+            .getNodeInfo(request)
+            .map(_.getNode.alias)
+            .recover(_ => "")
+
+          val outPoint = TransactionOutPoint.fromString(channel.channelPoint)
+
+          aliasF.map { alias =>
             ChannelDetails(
-              alias = nodeInfo.getNode.alias,
+              alias = alias,
               outPoint = outPoint,
               remotePubkey = NodeId(channel.remotePubkey),
               shortChannelId = ShortChannelId(channel.chanId),
@@ -217,14 +223,19 @@ case class LndVortexWallet(lndRpcClient: LndRpcClient)(implicit
           }
         }
 
-        val fs2 =
+        val pendingFs =
           pending.pendingOpenChannels.flatMap(_.channel).map { channel =>
             val request = NodeInfoRequest(channel.remoteNodePub)
-            lndRpcClient.lnd.getNodeInfo(request).map { nodeInfo =>
-              val outPoint =
-                TransactionOutPoint.fromString(channel.channelPoint)
+            val aliasF = lndRpcClient.lnd
+              .getNodeInfo(request)
+              .map(_.getNode.alias)
+              .recover(_ => "")
+
+            val outPoint = TransactionOutPoint.fromString(channel.channelPoint)
+
+            aliasF.map { alias =>
               ChannelDetails(
-                alias = nodeInfo.getNode.alias,
+                alias = alias,
                 outPoint = outPoint,
                 remotePubkey = NodeId(channel.remoteNodePub),
                 shortChannelId =
@@ -238,8 +249,8 @@ case class LndVortexWallet(lndRpcClient: LndRpcClient)(implicit
           }
 
         for {
-          chans <- Future.sequence(fs)
-          pending <- Future.sequence(fs2)
+          chans <- Future.sequence(channelFs)
+          pending <- Future.sequence(pendingFs)
         } yield chans ++ pending
       }
   }
