@@ -56,16 +56,15 @@ case class LnVortexAppConfig(
   lazy val bitcoind: BitcoindRpcClient = bitcoindConfig.versionOpt match {
     case Some(version) =>
       version match {
-        case BitcoindVersion.V16          => BitcoindV16RpcClient(instance)
-        case BitcoindVersion.V17          => BitcoindV17RpcClient(instance)
-        case BitcoindVersion.V18          => BitcoindV18RpcClient(instance)
-        case BitcoindVersion.V19          => BitcoindV19RpcClient(instance)
-        case BitcoindVersion.V20          => BitcoindV20RpcClient(instance)
-        case BitcoindVersion.V21          => BitcoindV21RpcClient(instance)
-        case BitcoindVersion.V22          => BitcoindV22RpcClient(instance)
-        case BitcoindVersion.V23          => BitcoindV23RpcClient(instance)
-        case BitcoindVersion.Experimental => BitcoindV18RpcClient(instance)
-        case BitcoindVersion.Unknown      => BitcoindRpcClient(instance)
+        case BitcoindVersion.V16     => BitcoindV16RpcClient(instance)
+        case BitcoindVersion.V17     => BitcoindV17RpcClient(instance)
+        case BitcoindVersion.V18     => BitcoindV18RpcClient(instance)
+        case BitcoindVersion.V19     => BitcoindV19RpcClient(instance)
+        case BitcoindVersion.V20     => BitcoindV20RpcClient(instance)
+        case BitcoindVersion.V21     => BitcoindV21RpcClient(instance)
+        case BitcoindVersion.V22     => BitcoindV22RpcClient(instance)
+        case BitcoindVersion.V23     => BitcoindV23RpcClient(instance)
+        case BitcoindVersion.Unknown => BitcoindRpcClient(instance)
       }
     case None => BitcoindRpcClient(instance)
   }
