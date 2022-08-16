@@ -4,12 +4,7 @@ import akka.actor.ActorSystem
 import com.lnvortex.core.api._
 import com.lnvortex.core.{InputReference, UnspentCoin}
 import com.lnvortex.lnd.LndVortexWallet.getSignMethod
-import lnrpc.{
-  AddressType,
-  NewAddressRequest,
-  NodeInfoRequest,
-  PendingChannelsRequest
-}
+import lnrpc.{AddressType, NewAddressRequest, NodeInfoRequest}
 import org.bitcoins.core.config.{BitcoinNetwork, BitcoinNetworks}
 import org.bitcoins.core.currency._
 import org.bitcoins.core.number.{UInt32, UInt64}
@@ -195,7 +190,7 @@ case class LndVortexWallet(lndRpcClient: LndRpcClient)(implicit
   override def listChannels(): Future[Vector[ChannelDetails]] = {
     val allChannelsF = for {
       channels <- lndRpcClient.listChannels()
-      pending <- lndRpcClient.lnd.pendingChannels(PendingChannelsRequest())
+      pending <- lndRpcClient.listPendingChannels()
     } yield (channels, pending)
 
     allChannelsF
