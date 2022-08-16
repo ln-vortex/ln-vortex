@@ -123,11 +123,18 @@ object VortexPicklers {
       str => UTXOWarning.fromString(str)
     )
 
+  // used from cli -> server
   implicit val unspentCoinRW: ReadWriter[UnspentCoin] = macroRW[UnspentCoin]
+
+  // return from server
   implicit val unspentCoinReads: Reads[UnspentCoin] = Json.reads[UnspentCoin]
 
-  implicit val unspentCoinWrites: OWrites[UnspentCoin] =
-    Json.writes[UnspentCoin]
+  implicit val unspentCoinWrites: OWrites[UnspentCoin] = (o: UnspentCoin) => {
+    val original = Json.writes[UnspentCoin].writes(o)
+    original ++ Json.obj(
+      "scriptType" -> o.address.scriptPubKey.scriptType
+    )
+  }
 
   implicit val TransactionDetailsRW: ReadWriter[TransactionDetails] =
     macroRW[TransactionDetails]
