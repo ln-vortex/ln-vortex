@@ -953,15 +953,18 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
   }
 
   private def updateFeeRate(): Future[SatoshisPerVirtualByte] = {
-    val feeRateF = config.network match {
-      case MainNet | TestNet3 | SigNet =>
-        feeProvider.getFeeRate().recoverWith { case _: Throwable =>
-          feeProviderBackup.getFeeRate()
+    val feeRateF =
+      feeProvider.getFeeRate().recoverWith { case _: Throwable =>
+        feeProviderBackup.getFeeRate().recover { case _: Throwable =>
+          config.network match {
+            case MainNet | TestNet3 | SigNet =>
+              throw new RuntimeException(
+                "Failed to get fee rate from fee providers")
+            case RegTest =>
+              SatoshisPerVirtualByte.fromLong(1)
+          }
         }
-      case RegTest =>
-        // allow for offline testing
-        Future.successful(SatoshisPerVirtualByte.fromLong(1))
-    }
+      }
 
     feeRateF.map { res =>
       feeRate = res
