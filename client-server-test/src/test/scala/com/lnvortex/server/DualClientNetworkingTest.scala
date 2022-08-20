@@ -32,13 +32,11 @@ class DualClientNetworkingTest
 
       _ <- clientA.askNonce()
       _ <- clientB.askNonce()
-      _ <- coordinator.beginInputRegistration()
       // don't select all coins
       utxosA <- clientA.listCoins().map(c => Random.shuffle(c).take(1))
       _ <- clientA.queueCoins(utxosA.map(_.outputReference), nodeIdB, None)
       utxosB <- clientB.listCoins().map(c => Random.shuffle(c).take(1))
       _ <- clientB.queueCoins(utxosB.map(_.outputReference), nodeIdA, None)
-      _ <- coordinator.beginInputRegistration()
       // wait until outputs are registered
       _ <- TestAsyncUtil.awaitConditionF(
         () =>
@@ -56,7 +54,6 @@ class DualClientNetworkingTest
         () => coordinator.getRound(roundId).map(_.psbtOpt.isDefined),
         interval = interval,
         maxTries = 500)
-
       // wait until the tx is signed
       // use getRound because we could start the new round
       _ <- TestAsyncUtil.awaitConditionF(

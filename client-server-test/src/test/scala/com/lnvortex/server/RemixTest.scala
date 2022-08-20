@@ -1,13 +1,14 @@
 package com.lnvortex.server
 
-import akka.testkit.TestActorRef
+import akka.http.scaladsl.model.ws.Message
+import akka.stream.OverflowStrategy
+import akka.stream.scaladsl._
 import com.lnvortex.testkit._
 import org.bitcoins.core.script.ScriptType
 import org.bitcoins.core.script.ScriptType._
-import org.bitcoins.crypto.{CryptoUtil, ECPrivateKey, Sha256Digest}
+import org.bitcoins.crypto._
 import org.bitcoins.testkit.EmbeddedPg
 import org.bitcoins.testkit.async.TestAsyncUtil
-import org.bitcoins.testkit.util.FileUtil
 
 import scala.concurrent.duration.DurationInt
 
@@ -20,8 +21,12 @@ class RemixTest
   override val changeScriptType: ScriptType = WITNESS_V1_TAPROOT
   override val inputScriptType: ScriptType = WITNESS_V1_TAPROOT
 
-  override def getTestActor: TestActorRef[Nothing] = TestActorRef(
-    s"ln-vortex-test-${FileUtil.randomDirName}")
+  override def getDummyQueue: SourceQueueWithComplete[Message] = Source
+    .queue[Message](bufferSize = 10,
+                    OverflowStrategy.backpressure,
+                    maxConcurrentOffers = 2)
+    .toMat(BroadcastHub.sink)(Keep.left)
+    .run()
 
   def peerId: Sha256Digest =
     CryptoUtil.sha256(ECPrivateKey.freshPrivateKey.bytes)

@@ -22,14 +22,13 @@ class OnChainNetworkingTest
     if (torEnabled) 500.milliseconds else 100.milliseconds
 
   it must "cancel a registration and ask nonce again" in {
-    case (client, coordinator, _) =>
+    case (client, _, _) =>
       for {
         _ <- client.askNonce()
 
         // don't select all coins
         utxos <- client.listCoins().map(_.take(1))
-        addr <- client.vortexWallet.getNewAddress(
-          coordinator.roundParams.outputType)
+        addr <- client.vortexWallet.getNewAddress(outputScriptType)
         _ = client.queueCoins(utxos.map(_.outputReference), addr)
 
         _ <- client.cancelRegistration()

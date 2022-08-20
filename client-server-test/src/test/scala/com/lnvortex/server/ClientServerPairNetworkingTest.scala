@@ -1,7 +1,6 @@
 package com.lnvortex.server
 
-import com.lnvortex.core.RoundDetails.getRoundParamsOpt
-import com.lnvortex.testkit.{ClientServerPairFixture, LnVortexTestUtils}
+import com.lnvortex.testkit._
 import org.bitcoins.core.script.ScriptType
 import org.bitcoins.core.script.ScriptType._
 import org.bitcoins.testkit.EmbeddedPg
@@ -35,21 +34,6 @@ class ClientServerPairNetworkingTest
         _ <- client.cancelRegistration()
         _ <- client.askNonce()
       } yield succeed
-  }
-
-  it must "announce a new round" in { case (client, coordinator, _) =>
-    val roundId = getRoundParamsOpt(client.getCurrentRoundDetails).get.roundId
-    assert(roundId == coordinator.getCurrentRoundId)
-    for {
-      db <- coordinator.newRound()
-      _ <- TestAsyncUtil.awaitCondition(
-        () =>
-          getRoundParamsOpt(
-            client.getCurrentRoundDetails).get.roundId == db.roundId,
-        interval,
-        maxTries = 500
-      )
-    } yield succeed
   }
 
   it must "open a channel" in { case (client, coordinator, peerLnd) =>

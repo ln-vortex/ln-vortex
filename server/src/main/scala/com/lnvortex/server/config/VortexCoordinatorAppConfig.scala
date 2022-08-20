@@ -14,8 +14,8 @@ import org.bitcoins.crypto._
 import org.bitcoins.db._
 import org.bitcoins.keymanager.bip39.BIP39KeyManager
 import org.bitcoins.keymanager.config.KeyManagerAppConfig
+import org.bitcoins.tor.TorParams
 import org.bitcoins.tor.config.TorAppConfig
-import org.bitcoins.tor.{Socks5ProxyParams, TorParams}
 
 import java.net.{InetSocketAddress, URI}
 import java.nio.file.{Files, Path, Paths}
@@ -68,9 +68,6 @@ case class VortexCoordinatorAppConfig(
 
   lazy val kmConf: KeyManagerAppConfig =
     KeyManagerAppConfig(directory, configOverrides)
-
-  lazy val socks5ProxyParams: Option[Socks5ProxyParams] =
-    torConf.socks5ProxyParams
 
   lazy val torParams: Option[TorParams] = torConf.torParams
 

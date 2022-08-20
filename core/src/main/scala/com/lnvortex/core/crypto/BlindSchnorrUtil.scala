@@ -41,7 +41,7 @@ object BlindSchnorrUtil {
   def generateBlindSig(
       privKey: ECPrivateKey,
       nonceKey: ECPrivateKey,
-      challenge: FieldElement): FieldElement = {
+      challenge: FieldElement): FieldElement = synchronized {
     require(!challenge.isZero, "challenge cannot be 0")
     privKey.schnorrKey.fieldElement
       .multiply(challenge)

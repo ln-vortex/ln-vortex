@@ -1,60 +1,41 @@
 package com.lnvortex.testkit
 
+import com.lnvortex.bitcoind.BitcoindVortexWallet
 import com.lnvortex.client.VortexClient
-import com.lnvortex.lnd.LndVortexWallet
 import com.lnvortex.server.coordinator.VortexCoordinator
 import com.lnvortex.server.networking.VortexHttpServer
 import com.typesafe.config.ConfigFactory
-import org.bitcoins.core.script.ScriptType
-import org.bitcoins.lnd.rpc.LndRpcClient
 import org.bitcoins.testkit.EmbeddedPg
-import org.bitcoins.testkit.async.TestAsyncUtil
 import org.bitcoins.testkit.fixtures.BitcoinSFixture
-import org.bitcoins.testkit.lnd.LndRpcTestUtil
 import org.bitcoins.testkit.rpc.CachedBitcoindV23
 import org.scalatest.FutureOutcome
 
 import scala.reflect.io.Directory
 
-trait ClientServerPairFixture
+trait HttpTestFixture
     extends BitcoinSFixture
     with CachedBitcoindV23
     with LnVortexTestUtils
     with EmbeddedPg {
 
   override type FixtureParam =
-    (VortexClient[LndVortexWallet], VortexCoordinator, LndRpcClient)
-
-  def isNetworkingTest: Boolean
-
-  def outputScriptType: ScriptType
-  def changeScriptType: ScriptType
-  def inputScriptType: ScriptType
+    (VortexClient[BitcoindVortexWallet], VortexCoordinator)
 
   override def withFixture(test: OneArgAsyncTest): FutureOutcome = {
     makeDependentFixture[(
-        VortexClient[LndVortexWallet],
-        VortexCoordinator,
-        LndRpcClient)](
+        VortexClient[BitcoindVortexWallet],
+        VortexCoordinator)](
       () => {
-        val scriptTypeConfig =
-          ConfigFactory
-            .parseString(s"""
-                            |coordinator.outputScriptType = $outputScriptType
-                            |coordinator.changeScriptType = $changeScriptType
-                            |coordinator.inputScriptType = $inputScriptType
-                            |""".stripMargin)
-        implicit val (_, serverConf) = getTestConfigs(Vector(scriptTypeConfig))
+        implicit val (_, serverConf) = getTestConfigs()
 
         for {
           _ <- serverConf.start()
           bitcoind <- cachedBitcoindWithFundsF
           coordinator = VortexCoordinator(bitcoind)
+          _ <- coordinator.start()
           server = new VortexHttpServer(coordinator)
           _ <- server.start()
           addr <- server.bindingP.future.map(_.localAddress)
-
-          _ = assert(serverConf.outputScriptType == outputScriptType)
 
           host =
             if (addr.getHostString == "0:0:0:0:0:0:0:0") "127.0.0.1"
@@ -65,24 +46,13 @@ trait ClientServerPairFixture
           clientConfig = getTestConfigs(Vector(netConfig))._1
           _ <- clientConfig.start()
 
-          (lnd, peerLnd) <- LndTestUtils.createNodePair(bitcoind,
-                                                        inputScriptType)
-          client = VortexClient(LndVortexWallet(lnd))(system, clientConfig)
-          _ <- client.start()
-
-          _ <- LndRpcTestUtil.connectLNNodes(lnd, peerLnd)
-
-          // wait for it to receive round params
-          _ <- TestAsyncUtil.awaitCondition(() =>
-            client.getCurrentRoundDetails.order > 0)
-
-          // don't send message if not networking test
-          _ = if (!isNetworkingTest) coordinator.connectionHandlerMap.clear()
-        } yield (client, coordinator, peerLnd)
+          vortexClient = VortexClient(BitcoindVortexWallet(bitcoind))(
+            system,
+            clientConfig)
+        } yield (vortexClient, coordinator)
       },
-      { case (client, coordinator, peerLnd) =>
+      { case (client, coordinator) =>
         for {
-          _ <- peerLnd.stop()
           _ <- client.vortexWallet.stop()
           _ <- client.stop()
           _ <- client.config.stop()

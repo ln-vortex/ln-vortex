@@ -233,7 +233,7 @@ lazy val testkit = project
   .in(file("testkit"))
   .settings(CommonSettings.testSettings: _*)
   .settings(name := "testkit", libraryDependencies ++= Deps.testkit)
-  .dependsOn(core, client, server, coreTest, lnd, clightning)
+  .dependsOn(core, client, server, coreTest, lnd, clightning, bitcoind)
 
 TaskKeys.downloadLnd := {
   implicit val ec: ExecutionContextExecutor =

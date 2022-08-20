@@ -1,16 +1,16 @@
 package com.lnvortex.server
 
-import akka.testkit.TestActorRef
+import akka.http.scaladsl.model.ws.Message
+import akka.stream.OverflowStrategy
+import akka.stream.scaladsl._
 import com.lnvortex.core.RoundDetails.getInitDetailsOpt
 import com.lnvortex.core._
 import com.lnvortex.testkit._
-import org.bitcoins.core.number.UInt64
 import org.bitcoins.core.script.ScriptType
 import org.bitcoins.core.script.ScriptType._
 import org.bitcoins.crypto.Sha256Digest
 import org.bitcoins.testkit.EmbeddedPg
 import org.bitcoins.testkit.async.TestAsyncUtil
-import org.bitcoins.testkit.util.FileUtil
 
 import scala.concurrent.duration.DurationInt
 
@@ -23,8 +23,12 @@ class OnChainTest
   override val changeScriptType: ScriptType = WITNESS_V1_TAPROOT
   override val inputScriptType: ScriptType = WITNESS_V1_TAPROOT
 
-  override def getTestActor: TestActorRef[Nothing] = TestActorRef(
-    s"ln-vortex-test-${FileUtil.randomDirName}")
+  override def getDummyQueue: SourceQueueWithComplete[Message] = Source
+    .queue[Message](bufferSize = 10,
+                    OverflowStrategy.backpressure,
+                    maxConcurrentOffers = 2)
+    .toMat(BroadcastHub.sink)(Keep.left)
+    .run()
   val peerId: Sha256Digest = Sha256Digest.empty
 
   it must "get the correct round details" in { case (client, coordinator, _) =>
@@ -38,7 +42,7 @@ class OnChainTest
           assert(round.amount == roundDb.amount)
           assert(round.coordinatorFee == roundDb.coordinatorFee)
           assert(round.publicKey == coordinator.publicKey)
-          assert(round.time == UInt64(roundDb.roundTime.getEpochSecond))
+          assert(round.time == roundDb.roundTime.getEpochSecond)
       }
     }
   }

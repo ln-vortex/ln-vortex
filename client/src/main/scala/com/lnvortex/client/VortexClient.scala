@@ -1,43 +1,41 @@
 package com.lnvortex.client
 
-import akka.actor.{ActorRef, ActorSystem}
-import com.lnvortex.core.RoundDetails.{getNonceOpt, getRoundParamsOpt}
+import akka.actor.ActorSystem
 import com.lnvortex.client.VortexClientException._
 import com.lnvortex.client.config.VortexAppConfig
-import com.lnvortex.client.db.UTXODAO
-import com.lnvortex.client.networking.{P2PClient, Peer}
+import com.lnvortex.client.db._
+import com.lnvortex.client.networking._
+import com.lnvortex.core.RoundDetails.{getNonceOpt, getRoundParamsOpt}
 import com.lnvortex.core._
 import com.lnvortex.core.api._
 import com.lnvortex.core.crypto.BlindSchnorrUtil
 import com.lnvortex.core.crypto.BlindingTweaks.freshBlindingTweaks
 import grizzled.slf4j.Logging
 import org.bitcoins.asyncutil.AsyncUtil
-import org.bitcoins.core.currency.{CurrencyUnit, Satoshis}
-import org.bitcoins.core.number.UInt16
+import org.bitcoins.core.currency._
 import org.bitcoins.core.policy.Policy
-import org.bitcoins.core.protocol.{BitcoinAddress, BlockStamp}
 import org.bitcoins.core.protocol.ln.node.NodeId
 import org.bitcoins.core.protocol.transaction._
+import org.bitcoins.core.protocol._
 import org.bitcoins.core.psbt.PSBT
 import org.bitcoins.core.script.ScriptType
-import org.bitcoins.core.util.{FutureUtil, StartStopAsync, TimeUtil}
+import org.bitcoins.core.util._
 import org.bitcoins.core.wallet.fee.SatoshisPerVirtualByte
 import org.bitcoins.crypto._
 
 import java.net.InetSocketAddress
+import scala.concurrent._
 import scala.concurrent.duration._
-import scala.concurrent.{Future, Promise}
 
 case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
-    system: ActorSystem,
+    val system: ActorSystem,
     val config: VortexAppConfig)
-    extends StartStopAsync[Unit]
+    extends VortexHttpClient[T]
+    with StartStopAsync[Unit]
     with Logging {
-  import system.dispatcher
+  implicit val ec: ExecutionContext = system.dispatcher
 
   lazy val utxoDAO: UTXODAO = UTXODAO()
-
-  private[client] var handlerP = Promise[ActorRef]()
 
   private var roundDetails: RoundDetails = NoDetails
 
@@ -53,40 +51,25 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
             _: InputsScheduled =>
           roundDetails = KnownRound(adv)
         case state: InitializedRound =>
-          throw new IllegalStateException(s"Cannot set round at state $state")
+          throw new IllegalStateException(
+            s"Cannot set new round at state $state")
       }
     } else {
       throw new RuntimeException(
-        s"Received unknown version ${adv.version.toInt}, consider updating software")
+        s"Received unknown version ${adv.version}, consider updating software")
     }
   }
-
-  lazy val peer: Peer = Peer(socket = config.coordinatorAddress,
-                             socks5ProxyParams = config.socks5ProxyParams)
 
   override def start(): Future[Unit] = {
     for {
       coins <- vortexWallet.listCoins()
       _ <- utxoDAO.createMissing(coins)
-      _ <- getNewRound
+      _ <- subscribeRounds(vortexWallet.network)
     } yield ()
   }
 
   override def stop(): Future[Unit] = {
-    handlerP.future.map { handler =>
-      system.stop(handler)
-    }
-  }
-
-  private def getNewRound: Future[Unit] = {
-    logger.info("Getting new round from coordinator")
-
-    roundDetails = NoDetails
-    handlerP = Promise[ActorRef]()
-    for {
-      _ <- P2PClient.connect(peer, this, Some(handlerP))
-      handler <- handlerP.future
-    } yield handler ! AskRoundParameters(vortexWallet.network)
+    disconnect()
   }
 
   def listCoins(): Future[Vector[UnspentCoin]] = {
@@ -128,15 +111,14 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
     roundDetails match {
       case KnownRound(round) =>
         for {
-          handler <- handlerP.future
-          _ = handler ! AskNonce(round.roundId)
+          _ <- startRegistration(round.roundId)
           _ <- AsyncUtil
             .awaitCondition(() => getNonceOpt(roundDetails).isDefined,
                             interval = 100.milliseconds,
                             maxTries = 300)
             .recover { case _: Throwable =>
               throw new RuntimeException(
-                "Did not receive response from coordinator")
+                "Did not receive nonce from coordinator")
             }
         } yield {
           val nonce = getNonceOpt(roundDetails).get
@@ -164,12 +146,14 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
     logger.info("Canceling registration")
     getNonceOpt(roundDetails) match {
       case Some(nonce) =>
-        handlerP.future.map { handler =>
-          // .get is safe, can't have nonce without round params
-          val roundParams = getRoundParamsOpt(roundDetails).get
-          handler ! CancelRegistrationMessage(nonce, roundParams.roundId)
-
-          roundDetails = KnownRound(roundParams)
+        val roundParams = getRoundParamsOpt(roundDetails).get
+        val msg = CancelRegistrationMessage(nonce, roundParams.roundId)
+        cancelRegistration(msg).map { valid =>
+          if (valid) {
+            roundDetails = KnownRound(roundParams)
+          } else {
+            throw new RuntimeException("Registration was not canceled")
+          }
         }
       case None =>
         Future.failed(new IllegalStateException("No registration to cancel"))
@@ -369,11 +353,11 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
       outputFee: CurrencyUnit,
       changeOutputFee: CurrencyUnit): Future[RegisterInputs] = {
     roundDetails match {
-      case state @ (NoDetails | _: ReceivedNonce | _: InitializedRound) =>
+      case state @ (NoDetails | _: InitializedRound) =>
         Future.failed(
           new IllegalStateException(
             s"At invalid state $state, cannot register coins"))
-      case _: KnownRound =>
+      case _: KnownRound | _: ReceivedNonce =>
         // Sometimes we get the AskInputs before the round details + nonce,
         // so we need to wait for the round details to be set.
         AsyncUtil
@@ -403,8 +387,7 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
         val needsChange = changeAmt >= Policy.dustThreshold
 
         // Reserve utxos until 10 minutes after the round is scheduled.
-        val timeUtilRound =
-          round.time.toLong + 600 - TimeUtil.currentEpochSecond
+        val timeUtilRound = round.time + 600 - TimeUtil.currentEpochSecond
 
         for {
           inputProofs <- FutureUtil.sequentially(outputRefs)(
@@ -512,14 +495,14 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
 
   private[client] def sendOutputMessageAsBob(
       msg: RegisterOutput): Future[Unit] = {
-    val bobHandlerP = Promise[ActorRef]()
-
     logger.info("Sending channel output as Bob")
     for {
-      _ <- P2PClient.connect(peer, this, Some(bobHandlerP))
-      bobHandler <- bobHandlerP.future
+      valid <- registerOutput(msg)
     } yield {
-      bobHandler ! msg
+      if (!valid) {
+        throw new RuntimeException(
+          "Coordinator told us our output was invalid!")
+      }
     }
   }
 
@@ -680,13 +663,13 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
                               s"LnVortex Anonymity set: $anonSet")
             .recover(_ => ())
           _ <- utxoDAO.setAnonSets(state, anonSet)
-          _ <- stop()
-          _ <- getNewRound
+          _ <- disconnectRegistration()
+          _ = roundDetails = NoDetails
         } yield ()
     }
   }
 }
 
 object VortexClient {
-  val knownVersions: Vector[UInt16] = Vector(UInt16.zero)
+  val knownVersions: Vector[Int] = Vector(0)
 }

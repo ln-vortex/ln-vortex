@@ -3,6 +3,7 @@ package com.lnvortex.testkit
 import com.lnvortex.client.VortexClient
 import com.lnvortex.lnd.LndVortexWallet
 import com.lnvortex.server.coordinator.VortexCoordinator
+import com.lnvortex.server.networking.VortexHttpServer
 import com.typesafe.config.ConfigFactory
 import org.bitcoins.core.script.ScriptType
 import org.bitcoins.testkit.EmbeddedPg
@@ -12,6 +13,7 @@ import org.bitcoins.testkit.lnd.LndRpcTestUtil
 import org.bitcoins.testkit.rpc.CachedBitcoindV23
 import org.scalatest.FutureOutcome
 
+import scala.concurrent.Future
 import scala.reflect.io.Directory
 
 trait DualClientFixture
@@ -49,8 +51,9 @@ trait DualClientFixture
           _ <- serverConf.start()
           bitcoind <- cachedBitcoindWithFundsF
           coordinator = VortexCoordinator(bitcoind)
-          _ <- coordinator.start()
-          (addr, _) <- coordinator.serverBindF
+          server = new VortexHttpServer(coordinator)
+          _ <- server.start()
+          addr <- server.bindingP.future.map(_.localAddress)
 
           _ = assert(serverConf.outputScriptType == outputScriptType)
 
@@ -79,7 +82,11 @@ trait DualClientFixture
           _ <- TestAsyncUtil.awaitCondition(() =>
             clientB.getCurrentRoundDetails.order > 0)
 
-          _ = if (!isNetworkingTest) coordinator.connectionHandlerMap.clear()
+          _ <-
+            if (!isNetworkingTest) {
+              coordinator.connectionHandlerMap.clear()
+              clientA.stop().flatMap(_ => clientB.stop())
+            } else Future.unit
         } yield (clientA, clientB, coordinator)
       },
       { case (clientA, clientB, coordinator) =>

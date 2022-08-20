@@ -4,6 +4,7 @@ import com.lnvortex.core._
 import org.bitcoins.core.protocol.script.EmptyScriptPubKey
 import org.bitcoins.core.protocol.transaction.OutputReference
 import org.bitcoins.core.script.ScriptType
+import org.bitcoins.core.util.TimeUtil
 import org.bitcoins.testkitcore.gen._
 import org.scalacheck.Gen
 
@@ -31,14 +32,6 @@ object Generators {
     }
   }
 
-  def askRoundParameters: Gen[AskRoundParameters] = {
-    for {
-      network <- ChainParamsGenerator.bitcoinNetworkParams
-    } yield {
-      AskRoundParameters(network)
-    }
-  }
-
   def validScriptType: Gen[ScriptType] = {
     Gen.oneOf(ScriptType.WITNESS_V0_KEYHASH,
               ScriptType.WITNESS_V0_SCRIPTHASH,
@@ -47,17 +40,17 @@ object Generators {
 
   def roundParameters: Gen[RoundParameters] = {
     for {
-      version <- NumberGenerator.uInt16
+      version <- NumberGenerator.uInt16.map(_.toInt)
       roundId <- CryptoGenerators.doubleSha256Digest
-      amount <- CurrencyUnitGenerator.positiveSatoshis
-      coordinatorFee <- CurrencyUnitGenerator.positiveSatoshis
+      amount <- CurrencyUnitGenerator.positiveRealistic
+      coordinatorFee <- CurrencyUnitGenerator.positiveRealistic
       pubkey <- CryptoGenerators.schnorrPublicKey
-      time <- NumberGenerator.uInt64
+      time = TimeUtil.currentEpochSecond
       inputType <- validScriptType
       outputType <- validScriptType
       changeType <- validScriptType
-      maxPeers <- NumberGenerator.uInt16
-      status <- StringGenerators.genUTF8String
+      maxPeers <- NumberGenerator.uInt16.map(_.toInt)
+      status <- StringGenerators.genString
     } yield {
       RoundParameters(
         version = version,
@@ -73,12 +66,6 @@ object Generators {
         status = status
       )
     }
-  }
-
-  def askNonce: Gen[AskNonce] = {
-    for {
-      roundId <- CryptoGenerators.doubleSha256Digest
-    } yield AskNonce(roundId)
   }
 
   def nonceMsg: Gen[NonceMessage] = {
@@ -110,11 +97,11 @@ object Generators {
       numInputs <- Gen.choose(1, 7)
       inputs <- Gen.listOfN(numInputs, inputReference)
       blindedOutput <- CryptoGenerators.fieldElement
-      changeSpk <- ScriptGenerators.scriptPubKey
-        .map(_._1)
-        .suchThat(_ != EmptyScriptPubKey)
-      isNone <- NumberGenerator.bool
-      changeSpkOpt = if (isNone) None else Some(changeSpk)
+      changeSpkOpt <- Gen.option {
+        ScriptGenerators.scriptPubKey
+          .map(_._1)
+          .suchThat(_ != EmptyScriptPubKey)
+      }
     } yield RegisterInputs(inputs.toVector, blindedOutput, changeSpkOpt)
   }
 

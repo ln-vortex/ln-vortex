@@ -1,31 +1,19 @@
 package com.lnvortex.core
 
-import com.lnvortex.core.VortexMessage.getScriptTypeBytes
 import grizzled.slf4j.Logging
-import org.bitcoins.core.config.{BitcoinNetwork, Networks}
+import org.bitcoins.commons.serializers.JsonSerializers._
+import org.bitcoins.commons.serializers.JsonWriters._
+import org.bitcoins.commons.serializers.JsonReaders._
 import org.bitcoins.core.currency._
-import org.bitcoins.core.number._
-import org.bitcoins.core.protocol._
 import org.bitcoins.core.protocol.script._
-import org.bitcoins.core.protocol.tlv.TLV._
-import org.bitcoins.core.protocol.tlv._
 import org.bitcoins.core.protocol.transaction._
 import org.bitcoins.core.psbt.PSBT
 import org.bitcoins.core.script.ScriptType
 import org.bitcoins.crypto._
+import play.api.libs.json._
 import scodec.bits.ByteVector
 
-sealed trait VortexMessage extends NetworkElement with TLVUtil {
-  def tpe: BigSizeUInt
-
-  def length: BigSizeUInt = BigSizeUInt.calcFor(value)
-
-  def value: ByteVector
-
-  override lazy val bytes: ByteVector = tpe.bytes ++ length.bytes ++ value
-
-  lazy val typeName: String = VortexMessage.getTypeName(tpe)
-}
+sealed trait VortexMessage
 
 /** Messages sent by the client */
 sealed abstract class ClientVortexMessage extends VortexMessage
@@ -33,260 +21,62 @@ sealed abstract class ClientVortexMessage extends VortexMessage
 /** Messages sent by the server */
 sealed abstract class ServerVortexMessage extends VortexMessage
 
-object VortexMessage extends Factory[VortexMessage] with Logging {
+object VortexMessage extends Logging {
 
-  val allFactories: Vector[VortexMessageFactory[VortexMessage]] =
-    Vector(
-      PingTLV,
-      PongTLV,
-      AskRoundParameters,
-      RoundParameters,
-      AskNonce,
-      NonceMessage,
-      AskInputs,
-      RegisterInputs,
-      BlindedSig,
-      RegisterOutput,
-      UnsignedPsbtMessage,
-      SignedPsbtMessage,
-      SignedTxMessage,
-      RestartRoundMessage,
-      CancelRegistrationMessage
-    )
-
-  lazy val knownTypes: Vector[BigSizeUInt] = allFactories.map(_.tpe)
-
-  def getTypeName(tpe: BigSizeUInt): String = {
-    allFactories
-      .find(_.tpe == tpe)
-      .map(_.typeName)
-      .getOrElse("Unknown TLV type")
-  }
-
-  def getScriptTypeBytes(scriptType: ScriptType): ByteVector = {
-    scriptType match {
-      case ScriptType.WITNESS_V0_KEYHASH    => ByteVector.fromByte(0x00)
-      case ScriptType.WITNESS_V0_SCRIPTHASH => ByteVector.fromByte(0x01)
-      case ScriptType.WITNESS_V1_TAPROOT    => ByteVector.fromByte(0x02)
-      case _: ScriptType =>
-        throw new IllegalArgumentException("Unhandled script type")
-    }
-  }
-
-  override def fromBytes(bytes: ByteVector): VortexMessage = {
-    val DecodeTLVResult(tpe, _, value) = TLV.decodeTLV(bytes)
-
-    allFactories.find(_.tpe == tpe) match {
-      case Some(fac) => fac.fromTLVValue(value)
-      case None =>
-        logger.warn(
-          s"Unknown $typeName type got $tpe (${TLV.getTypeName(tpe)})")
-
-        UnknownVortexMessage(tpe, value)
-    }
-  }
-}
-
-sealed trait VortexMessageFactory[+T <: VortexMessage] extends Factory[T] {
-  def tpe: BigSizeUInt
-
-  def typeName: String
-
-  def fromTLVValue(value: ByteVector): T
-
-  override def fromBytes(bytes: ByteVector): T = {
-    val DecodeTLVResult(tpe, _, value) = TLV.decodeTLV(bytes)
-
-    require(
-      tpe == this.tpe,
-      s"Invalid type $tpe (${TLV.getTypeName(tpe)}) when expecting ${this.tpe}")
-
-    fromTLVValue(value)
-  }
-}
-
-case class UnknownVortexMessage(tpe: BigSizeUInt, value: ByteVector)
-    extends VortexMessage {
-  require(!VortexMessage.knownTypes.contains(tpe), s"Type $tpe is known")
-}
-
-object UnknownVortexMessage extends Factory[UnknownVortexMessage] {
-
-  override def fromBytes(bytes: ByteVector): UnknownVortexMessage = {
-    val DecodeTLVResult(tpe, _, value) = TLV.decodeTLV(bytes)
-
-    UnknownVortexMessage(tpe, value)
-  }
-}
-
-case class PingTLV() extends VortexMessage {
-  override val tpe: BigSizeUInt = PingTLV.tpe
-
-  override val value: ByteVector = ByteVector.empty
-}
-
-object PingTLV extends VortexMessageFactory[PingTLV] {
-  override val tpe: BigSizeUInt = BigSizeUInt(18)
-
-  override def fromTLVValue(value: ByteVector): PingTLV = {
-    require(value.isEmpty, "PingTLV must be empty")
-    PingTLV()
-  }
-
-  override val typeName: String = "PingTLV"
-}
-
-case class PongTLV() extends VortexMessage {
-  override val tpe: BigSizeUInt = PongTLV.tpe
-
-  override val value: ByteVector = ByteVector.empty
-}
-
-object PongTLV extends VortexMessageFactory[PongTLV] {
-  override val tpe: BigSizeUInt = BigSizeUInt(19)
-
-  override def fromTLVValue(value: ByteVector): PongTLV = {
-    require(value.isEmpty, "PongTLV must be empty")
-    PongTLV()
-  }
-
-  override val typeName: String = "PongTLV"
-}
-
-case class AskRoundParameters(network: BitcoinNetwork)
-    extends ClientVortexMessage {
-  override val tpe: BigSizeUInt = AskRoundParameters.tpe
-
-  override val value: ByteVector = {
-    network.chainParams.genesisBlock.blockHeader.hashBE.bytes
-  }
-}
-
-object AskRoundParameters extends VortexMessageFactory[AskRoundParameters] {
-  override val tpe: BigSizeUInt = BigSizeUInt(42001)
-
-  override val typeName: String = "AskRoundParameters"
-
-  override def fromTLVValue(value: ByteVector): AskRoundParameters = {
-    val network = Networks.fromChainHash(DoubleSha256DigestBE(value)) match {
-      case network: BitcoinNetwork => network
-    }
-
-    AskRoundParameters(network)
+  implicit val vortexMessageReads: Reads[VortexMessage] = Reads { json =>
+    json
+      .validate[RoundParameters]
+      .orElse(json.validate[NonceMessage])
+      .orElse(json.validate[AskInputs])
+      .orElse(json.validate[RegisterInputs])
+      .orElse(json.validate[BlindedSig])
+      .orElse(json.validate[RegisterOutput])
+      .orElse(json.validate[UnsignedPsbtMessage])
+      .orElse(json.validate[SignedPsbtMessage])
+      .orElse(json.validate[SignedTxMessage])
+      .orElse(json.validate[RestartRoundMessage])
+      .orElse(json.validate[CancelRegistrationMessage])
   }
 }
 
 case class RoundParameters(
-    version: UInt16,
+    version: Int,
     roundId: DoubleSha256Digest,
     amount: CurrencyUnit,
     coordinatorFee: CurrencyUnit,
     publicKey: SchnorrPublicKey,
-    time: UInt64,
+    time: Long,
     inputType: ScriptType,
     outputType: ScriptType,
     changeType: ScriptType,
-    maxPeers: UInt16,
-    status: NormalizedString)
+    maxPeers: Int,
+    status: String)
     extends ServerVortexMessage {
-  override val tpe: BigSizeUInt = RoundParameters.tpe
-
-  override val value: ByteVector = {
-    version.bytes ++
-      roundId.bytes ++
-      amount.satoshis.toUInt64.bytes ++
-      coordinatorFee.satoshis.toUInt64.bytes ++
-      publicKey.bytes ++
-      time.bytes ++
-      getScriptTypeBytes(inputType) ++
-      getScriptTypeBytes(outputType) ++
-      getScriptTypeBytes(changeType) ++
-      maxPeers.bytes ++
-      TLV.getStringBytes(status)
-  }
 
   def getTargetAmount(isRemix: Boolean): CurrencyUnit = {
     if (isRemix) amount else amount + coordinatorFee
   }
 }
 
-object RoundParameters extends VortexMessageFactory[RoundParameters] {
-  override val tpe: BigSizeUInt = BigSizeUInt(42003)
+object RoundParameters {
 
-  override val typeName: String = "RoundParameters"
+  implicit val RoundParametersReads: Reads[RoundParameters] =
+    Json.reads[RoundParameters]
 
-  override def fromTLVValue(value: ByteVector): RoundParameters = {
-    val iter = com.lnvortex.core.ValueIterator(value)
+  implicit val RoundParametersWrites: OWrites[RoundParameters] =
+    Json.writes[RoundParameters]
 
-    val version = iter.takeU16()
-    val roundId = DoubleSha256Digest(iter.take(32))
-    val amount = iter.takeSats()
-    val coordinatorFee = iter.takeSats()
-    val publicKey = SchnorrPublicKey(iter.take(32))
-    val time = iter.takeU64()
-    val inputType = iter.takeScriptType()
-    val outputType = iter.takeScriptType()
-    val changeType = iter.takeScriptType()
-    val maxPeers = iter.takeU16()
-    val status = iter.takeString()
-
-    RoundParameters(
-      version = version,
-      roundId = roundId,
-      amount = amount,
-      coordinatorFee = coordinatorFee,
-      publicKey = publicKey,
-      time = time,
-      inputType = inputType,
-      outputType = outputType,
-      changeType = changeType,
-      maxPeers = maxPeers,
-      status = status
-    )
-  }
 }
 
-case class AskNonce(roundId: DoubleSha256Digest) extends ClientVortexMessage {
-  override val tpe: BigSizeUInt = AskNonce.tpe
+case class NonceMessage(schnorrNonce: SchnorrNonce) extends ServerVortexMessage
 
-  override val value: ByteVector = {
-    roundId.bytes
-  }
-}
+object NonceMessage {
 
-object AskNonce extends VortexMessageFactory[AskNonce] {
-  override val tpe: BigSizeUInt = BigSizeUInt(42005)
+  implicit lazy val NonceMessageReads: Reads[NonceMessage] =
+    Json.reads[NonceMessage]
 
-  override val typeName: String = "AskNonce"
-
-  override def fromTLVValue(value: ByteVector): AskNonce = {
-    val iter = ValueIterator(value)
-    val roundId = DoubleSha256Digest(iter.take(32))
-
-    AskNonce(roundId)
-  }
-}
-
-case class NonceMessage(schnorrNonce: SchnorrNonce)
-    extends ServerVortexMessage {
-  override val tpe: BigSizeUInt = NonceMessage.tpe
-
-  override val value: ByteVector = {
-    schnorrNonce.bytes
-  }
-}
-
-object NonceMessage extends VortexMessageFactory[NonceMessage] {
-  override val tpe: BigSizeUInt = BigSizeUInt(42007)
-
-  override val typeName: String = "NonceMessage"
-
-  override def fromTLVValue(value: ByteVector): NonceMessage = {
-    val iter = ValueIterator(value)
-    val nonce = SchnorrNonce(iter.take(32))
-
-    NonceMessage(nonce)
-  }
+  implicit lazy val NonceMessageWrites: OWrites[NonceMessage] =
+    Json.writes[NonceMessage]
 }
 
 case class AskInputs(
@@ -294,31 +84,13 @@ case class AskInputs(
     inputFee: CurrencyUnit,
     outputFee: CurrencyUnit,
     changeOutputFee: CurrencyUnit)
-    extends ServerVortexMessage {
-  override val tpe: BigSizeUInt = AskInputs.tpe
+    extends ServerVortexMessage
 
-  override val value: ByteVector = {
-    roundId.bytes ++
-      inputFee.satoshis.toUInt64.bytes ++
-      outputFee.satoshis.toUInt64.bytes ++
-      changeOutputFee.satoshis.toUInt64.bytes
-  }
-}
+object AskInputs {
 
-object AskInputs extends VortexMessageFactory[AskInputs] {
-  override val tpe: BigSizeUInt = BigSizeUInt(42009)
+  implicit lazy val AskInputsReads: Reads[AskInputs] = Json.reads[AskInputs]
+  implicit lazy val AskInputsWrites: OWrites[AskInputs] = Json.writes[AskInputs]
 
-  override val typeName: String = "AskInputs"
-
-  override def fromTLVValue(value: ByteVector): AskInputs = {
-    val iter = ValueIterator(value)
-    val roundId = DoubleSha256Digest(iter.take(32))
-    val inputFee = iter.takeSats()
-    val outputFee = iter.takeSats()
-    val changeOutputFee = iter.takeSats()
-
-    AskInputs(roundId, inputFee, outputFee, changeOutputFee)
-  }
 }
 
 /** First message from client to server
@@ -331,70 +103,33 @@ case class RegisterInputs(
     blindedOutput: FieldElement,
     changeSpkOpt: Option[ScriptPubKey])
     extends ClientVortexMessage {
-  override val tpe: BigSizeUInt = RegisterInputs.tpe
-
-  override val value: ByteVector = {
-
-    val changeSpkBytes = changeSpkOpt match {
-      case Some(changeSpk) => u16Prefix(changeSpk.asmBytes)
-      case None            => UInt16.zero.bytes
-    }
-
-    u16PrefixedList[InputReference](
-      inputs,
-      (t: InputReference) => u16Prefix(t.bytes)) ++
-      blindedOutput.bytes ++
-      changeSpkBytes
-  }
 
   def isMinimal(target: CurrencyUnit): Boolean = {
     VortexUtils.isMinimalSelection(inputs.map(_.outputReference), target)
   }
 }
 
-object RegisterInputs extends VortexMessageFactory[RegisterInputs] {
-  override val tpe: BigSizeUInt = BigSizeUInt(42011)
+object RegisterInputs {
 
-  override val typeName: String = "RegisterInputs"
+  implicit lazy val RegisterInputsReads: Reads[RegisterInputs] =
+    Json.reads[RegisterInputs]
 
-  override def fromTLVValue(value: ByteVector): RegisterInputs = {
-    val iter = ValueIterator(value)
+  implicit lazy val RegisterInputsWrites: OWrites[RegisterInputs] =
+    Json.writes[RegisterInputs]
 
-    val inputs = iter.takeU16PrefixedList[InputReference](() =>
-      iter.takeU16Prefixed[InputReference](len =>
-        InputReference(iter.take(len))))
-
-    val blindedOutput = FieldElement(iter.take(32))
-
-    val changeSpkLen = iter.takeU16()
-
-    val changeSpkOpt = if (changeSpkLen != UInt16.zero) {
-      Some(ScriptPubKey.fromAsmBytes(iter.take(changeSpkLen.toInt)))
-    } else None
-
-    RegisterInputs(inputs, blindedOutput, changeSpkOpt)
-  }
 }
 
 /** Response from coordinator to Alice's first message
   * @param blindOutputSig Response from BlindingTweaks.generateBlindSig
   */
-case class BlindedSig(blindOutputSig: FieldElement)
-    extends ServerVortexMessage {
-  override val tpe: BigSizeUInt = BlindedSig.tpe
+case class BlindedSig(blindOutputSig: FieldElement) extends ServerVortexMessage
 
-  override val value: ByteVector = blindOutputSig.bytes
-}
+object BlindedSig {
 
-object BlindedSig extends VortexMessageFactory[BlindedSig] {
-  override val tpe: BigSizeUInt = BigSizeUInt(42013)
+  implicit lazy val BlindedSigReads: Reads[BlindedSig] = Json.reads[BlindedSig]
 
-  override val typeName: String = "BlindedSig"
-
-  override def fromTLVValue(value: ByteVector): BlindedSig = {
-    val blindOutputSig = FieldElement(value)
-    BlindedSig(blindOutputSig)
-  }
+  implicit lazy val BlindedSigWrites: OWrites[BlindedSig] =
+    Json.writes[BlindedSig]
 }
 
 /** @param sig Response from BlindingTweaks.unblindSignature
@@ -404,9 +139,6 @@ case class RegisterOutput(
     sig: SchnorrDigitalSignature,
     output: TransactionOutput)
     extends ClientVortexMessage {
-  override val tpe: BigSizeUInt = RegisterOutput.tpe
-
-  override val value: ByteVector = sig.bytes ++ u16Prefix(output.bytes)
 
   def verifySig(
       publicKey: SchnorrPublicKey,
@@ -416,20 +148,13 @@ case class RegisterOutput(
   }
 }
 
-object RegisterOutput extends VortexMessageFactory[RegisterOutput] {
-  override val tpe: BigSizeUInt = BigSizeUInt(42015)
+object RegisterOutput {
 
-  override val typeName: String = "RegisterOutput"
+  implicit lazy val RegisterOutputReads: Reads[RegisterOutput] =
+    Json.reads[RegisterOutput]
 
-  override def fromTLVValue(value: ByteVector): RegisterOutput = {
-    val iter = ValueIterator(value)
-
-    val sig = iter.take(SchnorrDigitalSignature, 64)
-    val output = iter.takeU16Prefixed[TransactionOutput](len =>
-      TransactionOutput(iter.take(len)))
-
-    RegisterOutput(sig, output)
-  }
+  implicit lazy val RegisterOutputWrites: OWrites[RegisterOutput] =
+    Json.writes[RegisterOutput]
 
   def calculateChallenge(
       output: TransactionOutput,
@@ -440,110 +165,71 @@ object RegisterOutput extends VortexMessageFactory[RegisterOutput] {
 
 /** @param psbt Unsigned PSBT of the transaction
   */
-case class UnsignedPsbtMessage(psbt: PSBT) extends ServerVortexMessage {
-  override val tpe: BigSizeUInt = UnsignedPsbtMessage.tpe
+case class UnsignedPsbtMessage(psbt: PSBT) extends ServerVortexMessage
 
-  override lazy val value: ByteVector = psbt.bytes
+object UnsignedPsbtMessage {
+
+  implicit lazy val UnsignedPsbtMessageReads: Reads[UnsignedPsbtMessage] =
+    Json.reads[UnsignedPsbtMessage]
+
+  implicit lazy val UnsignedPsbtMessageWrites: OWrites[UnsignedPsbtMessage] =
+    Json.writes[UnsignedPsbtMessage]
+
 }
 
-object UnsignedPsbtMessage extends VortexMessageFactory[UnsignedPsbtMessage] {
-  override val tpe: BigSizeUInt = BigSizeUInt(42017)
+case class SignedPsbtMessage(signedPsbt: PSBT) extends ClientVortexMessage
 
-  override val typeName: String = "UnsignedPsbtMessage"
+object SignedPsbtMessage {
 
-  override def fromTLVValue(value: ByteVector): UnsignedPsbtMessage = {
-    val psbt = PSBT(value)
+  implicit lazy val SignedPsbtMessageReads: Reads[SignedPsbtMessage] =
+    Json.reads[SignedPsbtMessage]
 
-    UnsignedPsbtMessage(psbt)
-  }
-}
+  implicit lazy val SignedPsbtMessageWrites: OWrites[SignedPsbtMessage] =
+    Json.writes[SignedPsbtMessage]
 
-/** @param psbt Signed PSBT
-  */
-case class SignedPsbtMessage(psbt: PSBT) extends ClientVortexMessage {
-  override val tpe: BigSizeUInt = SignedPsbtMessage.tpe
-
-  override lazy val value: ByteVector = psbt.bytes
-}
-
-object SignedPsbtMessage extends VortexMessageFactory[SignedPsbtMessage] {
-  override val tpe: BigSizeUInt = BigSizeUInt(42019)
-
-  override val typeName: String = "SignedPsbtMessage"
-
-  override def fromTLVValue(value: ByteVector): SignedPsbtMessage = {
-    val psbt = PSBT(value)
-
-    SignedPsbtMessage(psbt)
-  }
 }
 
 /** @param transaction Full signed transaction
   */
-case class SignedTxMessage(transaction: Transaction)
-    extends ServerVortexMessage {
-  override val tpe: BigSizeUInt = SignedTxMessage.tpe
+case class SignedTxMessage(transaction: Transaction) extends ServerVortexMessage
 
-  override lazy val value: ByteVector = transaction.bytes
-}
+object SignedTxMessage {
 
-object SignedTxMessage extends VortexMessageFactory[SignedTxMessage] {
-  override val tpe: BigSizeUInt = BigSizeUInt(42021)
+  implicit lazy val SignedTxMessageReads: Reads[SignedTxMessage] =
+    Json.reads[SignedTxMessage]
 
-  override val typeName: String = "SignedTxMessage"
-
-  override def fromTLVValue(value: ByteVector): SignedTxMessage = {
-    val transaction = Transaction(value)
-
-    SignedTxMessage(transaction)
-  }
+  implicit lazy val SignedTxMessageWrites: OWrites[SignedTxMessage] =
+    Json.writes[SignedTxMessage]
 }
 
 case class RestartRoundMessage(
     roundParams: RoundParameters,
     nonceMessage: NonceMessage)
-    extends ServerVortexMessage {
-  override val tpe: BigSizeUInt = RestartRoundMessage.tpe
+    extends ServerVortexMessage
 
-  override lazy val value: ByteVector = roundParams.bytes ++ nonceMessage.bytes
-}
+object RestartRoundMessage {
 
-object RestartRoundMessage extends VortexMessageFactory[RestartRoundMessage] {
-  override val tpe: BigSizeUInt = BigSizeUInt(42023)
+  import NonceMessage._
 
-  override val typeName: String = "RestartRoundMessage"
+  implicit lazy val RestartRoundMessageReads: Reads[RestartRoundMessage] =
+    Json.reads[RestartRoundMessage]
 
-  override def fromTLVValue(value: ByteVector): RestartRoundMessage = {
-    val iter = ValueIterator(value)
-
-    val roundParams = iter.take(RoundParameters)
-    val nonceMessage = iter.take(NonceMessage)
-
-    RestartRoundMessage(roundParams, nonceMessage)
-  }
+  implicit lazy val RestartRoundMessageWrites: OWrites[RestartRoundMessage] =
+    Json.writes[RestartRoundMessage]
 }
 
 case class CancelRegistrationMessage(
     nonce: SchnorrNonce,
     roundId: DoubleSha256Digest)
-    extends ClientVortexMessage {
-  override val tpe: BigSizeUInt = CancelRegistrationMessage.tpe
+    extends ClientVortexMessage
 
-  override lazy val value: ByteVector = nonce.bytes ++ roundId.bytes
-}
+object CancelRegistrationMessage {
 
-object CancelRegistrationMessage
-    extends VortexMessageFactory[CancelRegistrationMessage] {
-  override val tpe: BigSizeUInt = BigSizeUInt(42025)
+  implicit lazy val CancelRegistrationMessageReads: Reads[
+    CancelRegistrationMessage] =
+    Json.reads[CancelRegistrationMessage]
 
-  override val typeName: String = "CancelRegistrationMessage"
-
-  override def fromTLVValue(value: ByteVector): CancelRegistrationMessage = {
-    val iter = ValueIterator(value)
-
-    val nonce = iter.take(SchnorrNonce, 32)
-    val roundId = iter.take(DoubleSha256Digest)
-
-    CancelRegistrationMessage(nonce, roundId)
-  }
+  implicit lazy val CancelRegistrationMessageWrites: OWrites[
+    CancelRegistrationMessage] =
+    Json.writes[CancelRegistrationMessage]
 }
