@@ -114,6 +114,11 @@ case class AliceDAO()(implicit
       .map(_.toVector)
   }
 
+  def deleteByPeerIdsAction(
+      peerIds: Seq[Sha256Digest]): DBIOAction[Int, NoStream, Effect.Write] = {
+    table.filter(_.peerId.inSet(peerIds)).delete
+  }
+
   def nextNonceIndexAction(): DBIOAction[Int, NoStream, Effect.Read] = {
     table.map(_.nonceIndex).max.result.map {
       case None        => 0

@@ -53,6 +53,7 @@ class OnChainNetworkingTest
         () => coordinator.inputsDAO.findAll().map(_.size == utxos.size),
         interval = interval,
         maxTries = 500)
+      _ <- coordinator.beginOutputRegistration()
       // wait until outputs are registered
       _ <- TestAsyncUtil.awaitConditionF(
         () => coordinator.outputsDAO.findAll().map(_.nonEmpty),
