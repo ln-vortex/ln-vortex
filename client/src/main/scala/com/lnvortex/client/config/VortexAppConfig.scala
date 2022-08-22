@@ -5,7 +5,7 @@ import com.lnvortex.client.db.UTXODAO
 import com.typesafe.config.Config
 import grizzled.slf4j.Logging
 import org.bitcoins.commons.config._
-import org.bitcoins.core.util.NetworkUtil
+import org.bitcoins.core.util.{FutureUtil, NetworkUtil}
 import org.bitcoins.db._
 import org.bitcoins.tor.config.TorAppConfig
 import org.bitcoins.tor.{Socks5ProxyParams, TorParams}
@@ -35,7 +35,7 @@ case class VortexAppConfig(baseDatadir: Path, configOverrides: Vector[Config])(
   override def newConfigOfType(configs: Vector[Config]): VortexAppConfig =
     VortexAppConfig(baseDatadir, configs)
 
-  override def start(): Future[Unit] = {
+  override def start(): Future[Unit] = FutureUtil.makeAsync { () =>
     logger.info(s"Initializing vortex app config")
 
     if (Files.notExists(datadir)) {
@@ -44,8 +44,6 @@ case class VortexAppConfig(baseDatadir: Path, configOverrides: Vector[Config])(
 
     val numMigrations = migrate().migrationsExecuted
     logger.debug(s"Applied $numMigrations")
-
-    Future.unit
   }
 
   override def stop(): Future[Unit] = Future.unit

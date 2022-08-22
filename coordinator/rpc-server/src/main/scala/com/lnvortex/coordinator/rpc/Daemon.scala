@@ -2,9 +2,11 @@ package com.lnvortex.coordinator.rpc
 
 import akka.actor.ActorSystem
 import com.lnvortex.coordinator.config.LnVortexRpcServerConfig
+import com.lnvortex.server.networking.VortexHttpServer
 import grizzled.slf4j.Logging
 
 import scala.concurrent._
+import scala.concurrent.duration.DurationInt
 import scala.util.Random
 
 object Daemon extends App with Logging {
@@ -33,12 +35,14 @@ object Daemon extends App with Logging {
 
   val coordinator = config.coordinator
 
+  val server = new VortexHttpServer(coordinator)
+
   logger.info("Starting...")
 
   val f = for {
     _ <- config.start()
     _ <- serverConfig.start()
-    _ <- coordinator.start()
+    _ <- server.start()
 
     routes = LnVortexRoutes(coordinator)
     server = RpcServer(
@@ -53,6 +57,16 @@ object Daemon extends App with Logging {
     _ <- server.start()
     _ = logger.info("Ln Vortex Coordinator started!")
   } yield ()
+
+  sys.addShutdownHook {
+    logger.info("Shutting down...")
+    val f = server.stop().map { _ =>
+      system.terminate()
+      logger.info("Shutdown complete")
+    }
+
+    Await.result(f, 60.seconds)
+  }
 
   f.failed.foreach { ex =>
     ex.printStackTrace()

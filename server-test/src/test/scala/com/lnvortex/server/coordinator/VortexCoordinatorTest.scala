@@ -1,6 +1,8 @@
 package com.lnvortex.server.coordinator
 
-import akka.testkit.TestActorRef
+import akka.http.scaladsl.model.ws.Message
+import akka.stream.OverflowStrategy
+import akka.stream.scaladsl._
 import com.lnvortex.core._
 import com.lnvortex.core.crypto.BlindSchnorrUtil
 import com.lnvortex.core.crypto.BlindingTweaks.freshBlindingTweaks
@@ -27,6 +29,14 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
   val badPeerId: Sha256Digest = Sha256Digest(
     "ded8ab0e14ee02492b1008f72a0a3a5abac201c731b7e71a92d36dc2db160d53")
 
+  private def dummyQueue(): SourceQueueWithComplete[Message] =
+    Source
+      .queue[Message](bufferSize = 10,
+                      OverflowStrategy.backpressure,
+                      maxConcurrentOffers = 2)
+      .toMat(BroadcastHub.sink)(Keep.left)
+      .run()
+
   it must "has the proper variable set after creating a new round" in {
     coordinator =>
       // coordinator should already have a round from _.start()
@@ -42,10 +52,19 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
 
   it must "successfully register inputs" in { coordinator =>
     val bitcoind = coordinator.bitcoind
+    val (queue, source) = Source
+      .queue[Message](bufferSize = 10,
+                      OverflowStrategy.backpressure,
+                      maxConcurrentOffers = 2)
+      .toMat(BroadcastHub.sink)(Keep.both)
+      .run()
+
+    val sink = source.runWith(Sink.seq)
+
     for {
       aliceDb <- coordinator.getNonce(Sha256Digest.empty,
-                                      TestActorRef("test"),
-                                      AskNonce(coordinator.getCurrentRoundId))
+                                      queue,
+                                      coordinator.getCurrentRoundId)
       _ <- coordinator.beginInputRegistration()
 
       utxo <- bitcoind.listUnspent.map(_.head)
@@ -68,15 +87,17 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
                                       Some(addr.scriptPubKey))
 
       _ <- coordinator.registerAlice(Sha256Digest.empty, registerInputs)
-    } yield succeed
+      _ = queue.complete()
+      msgs <- sink
+    } yield assert(msgs.size == 1)
   }
 
   it must "fail to register inputs without minimal utxos" in { coordinator =>
     val bitcoind = coordinator.bitcoind
     for {
       aliceDb <- coordinator.getNonce(Sha256Digest.empty,
-                                      TestActorRef("test"),
-                                      AskNonce(coordinator.getCurrentRoundId))
+                                      dummyQueue(),
+                                      coordinator.getCurrentRoundId)
       _ <- coordinator.beginInputRegistration()
 
       utxos <- bitcoind.listUnspent.map(_.map { utxo =>
@@ -109,8 +130,8 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
       val bitcoind = coordinator.bitcoind
       for {
         aliceDb <- coordinator.getNonce(Sha256Digest.empty,
-                                        TestActorRef("test"),
-                                        AskNonce(coordinator.getCurrentRoundId))
+                                        dummyQueue(),
+                                        coordinator.getCurrentRoundId)
         _ <- coordinator.beginInputRegistration()
 
         utxo <- bitcoind.listUnspent.map(_.head)
@@ -144,11 +165,11 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
 
     for {
       _ <- coordinator.getNonce(otherPeerId,
-                                TestActorRef("test1"),
-                                AskNonce(coordinator.getCurrentRoundId))
+                                dummyQueue(),
+                                coordinator.getCurrentRoundId)
       aliceDb <- coordinator.getNonce(Sha256Digest.empty,
-                                      TestActorRef("test"),
-                                      AskNonce(coordinator.getCurrentRoundId))
+                                      dummyQueue(),
+                                      coordinator.getCurrentRoundId)
       _ <- coordinator.beginInputRegistration()
 
       utxo <- bitcoind.listUnspent.map(_.head)
@@ -190,8 +211,8 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
     val bitcoind = coordinator.bitcoind
     for {
       aliceDb <- coordinator.getNonce(Sha256Digest.empty,
-                                      TestActorRef("test"),
-                                      AskNonce(coordinator.getCurrentRoundId))
+                                      dummyQueue(),
+                                      coordinator.getCurrentRoundId)
       _ <- coordinator.beginInputRegistration()
 
       legacyAddr <- bitcoind.getNewAddress(AddressType.Legacy)
@@ -224,8 +245,8 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
     val bitcoind = coordinator.bitcoind
     for {
       aliceDb <- coordinator.getNonce(Sha256Digest.empty,
-                                      TestActorRef("test"),
-                                      AskNonce(coordinator.getCurrentRoundId))
+                                      dummyQueue(),
+                                      coordinator.getCurrentRoundId)
       _ <- coordinator.beginInputRegistration()
 
       // send to self for small utxo
@@ -265,8 +286,8 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
 
     for {
       aliceDb <- coordinator.getNonce(Sha256Digest.empty,
-                                      TestActorRef("test"),
-                                      AskNonce(coordinator.getCurrentRoundId))
+                                      dummyQueue(),
+                                      coordinator.getCurrentRoundId)
       _ <- coordinator.beginInputRegistration()
 
       // send to self for unconfirmed tx
@@ -302,8 +323,8 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
       val bitcoind = coordinator.bitcoind
       for {
         _ <- coordinator.getNonce(Sha256Digest.empty,
-                                  TestActorRef("test"),
-                                  AskNonce(coordinator.getCurrentRoundId))
+                                  dummyQueue(),
+                                  coordinator.getCurrentRoundId)
         _ <- coordinator.beginInputRegistration()
 
         utxo <- bitcoind.listUnspent.map(_.head)
@@ -338,8 +359,8 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
       val bitcoind = coordinator.bitcoind
       for {
         aliceDb <- coordinator.getNonce(Sha256Digest.empty,
-                                        TestActorRef("test"),
-                                        AskNonce(coordinator.getCurrentRoundId))
+                                        dummyQueue(),
+                                        coordinator.getCurrentRoundId)
         _ <- coordinator.beginInputRegistration()
 
         // mine some blocks so bitcoind has more than one utxo
@@ -380,8 +401,8 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
     val bitcoind = coordinator.bitcoind
     for {
       aliceDb <- coordinator.getNonce(Sha256Digest.empty,
-                                      TestActorRef("test"),
-                                      AskNonce(coordinator.getCurrentRoundId))
+                                      dummyQueue(),
+                                      coordinator.getCurrentRoundId)
       _ <- coordinator.beginInputRegistration()
 
       utxo <- bitcoind.listUnspent.map(_.head)
@@ -416,8 +437,8 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
 
     for {
       _ <- coordinator.getNonce(Sha256Digest.empty,
-                                TestActorRef("test"),
-                                AskNonce(coordinator.getCurrentRoundId))
+                                dummyQueue(),
+                                coordinator.getCurrentRoundId)
       _ <- coordinator.beginInputRegistration()
 
       utxo <- bitcoind.listUnspent.map(_.head)
@@ -445,8 +466,8 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
     val bitcoind = coordinator.bitcoind
     for {
       aliceDb <- coordinator.getNonce(Sha256Digest.empty,
-                                      TestActorRef("test"),
-                                      AskNonce(coordinator.getCurrentRoundId))
+                                      dummyQueue(),
+                                      coordinator.getCurrentRoundId)
 
       utxo <- bitcoind.listUnspent.map(_.head)
       outputRef = {
@@ -476,8 +497,8 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
     val genInputs = Generators.registerInputs.sampleSome
     for {
       _ <- coordinator.getNonce(Sha256Digest.empty,
-                                TestActorRef("test"),
-                                AskNonce(coordinator.getCurrentRoundId))
+                                dummyQueue(),
+                                coordinator.getCurrentRoundId)
       _ <- coordinator.beginInputRegistration()
       res <- recoverToSucceededIf[InvalidAddressOrKey](
         coordinator.registerAlice(Sha256Digest.empty, genInputs))
@@ -489,8 +510,8 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
       val bitcoind = coordinator.bitcoind
       for {
         aliceDb <- coordinator.getNonce(Sha256Digest.empty,
-                                        TestActorRef("test"),
-                                        AskNonce(coordinator.getCurrentRoundId))
+                                        dummyQueue(),
+                                        coordinator.getCurrentRoundId)
         _ <- coordinator.beginInputRegistration()
 
         utxo <- bitcoind.listUnspent.map(_.head)
@@ -522,8 +543,8 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
     val bitcoind = coordinator.bitcoind
     for {
       aliceDb <- coordinator.getNonce(Sha256Digest.empty,
-                                      TestActorRef("test"),
-                                      AskNonce(coordinator.getCurrentRoundId))
+                                      dummyQueue(),
+                                      coordinator.getCurrentRoundId)
       _ <- coordinator.beginInputRegistration()
 
       utxo <- bitcoind.listUnspent.map(_.head)
@@ -555,8 +576,8 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
     val bitcoind = coordinator.bitcoind
     for {
       aliceDb <- coordinator.getNonce(Sha256Digest.empty,
-                                      TestActorRef("test"),
-                                      AskNonce(coordinator.getCurrentRoundId))
+                                      dummyQueue(),
+                                      coordinator.getCurrentRoundId)
       _ <- coordinator.beginInputRegistration()
 
       utxo <- bitcoind.listUnspent.map(_.head)
@@ -586,10 +607,20 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
 
   it must "register an output" in { coordinator =>
     val bitcoind = coordinator.bitcoind
+
+    val (queue, source) = Source
+      .queue[Message](bufferSize = 10,
+                      OverflowStrategy.backpressure,
+                      maxConcurrentOffers = 2)
+      .toMat(BroadcastHub.sink)(Keep.both)
+      .run()
+
+    val sink = source.runWith(Sink.seq)
+
     for {
       aliceDb <- coordinator.getNonce(Sha256Digest.empty,
-                                      TestActorRef("test"),
-                                      AskNonce(coordinator.getCurrentRoundId))
+                                      queue,
+                                      coordinator.getCurrentRoundId)
       _ <- coordinator.beginInputRegistration()
 
       utxo <- bitcoind.listUnspent.map(_.head)
@@ -629,16 +660,18 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
                                               tweaks,
                                               challenge)
       _ <- coordinator.beginOutputRegistration()
+      _ = queue.complete()
+      msgs <- sink
       _ <- coordinator.verifyAndRegisterBob(RegisterOutput(sig, targetOutput))
-    } yield succeed
+    } yield assert(msgs.size == 2)
   }
 
   it must "fail to register an output with an invalid sig" in { coordinator =>
     val bitcoind = coordinator.bitcoind
     for {
       aliceDb <- coordinator.getNonce(Sha256Digest.empty,
-                                      TestActorRef("test"),
-                                      AskNonce(coordinator.getCurrentRoundId))
+                                      dummyQueue(),
+                                      coordinator.getCurrentRoundId)
       _ <- coordinator.beginInputRegistration()
 
       utxo <- bitcoind.listUnspent.map(_.head)
@@ -687,8 +720,8 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
       val bitcoind = coordinator.bitcoind
       for {
         aliceDb <- coordinator.getNonce(Sha256Digest.empty,
-                                        TestActorRef("test"),
-                                        AskNonce(coordinator.getCurrentRoundId))
+                                        dummyQueue(),
+                                        coordinator.getCurrentRoundId)
         _ <- coordinator.beginInputRegistration()
 
         utxo <- bitcoind.listUnspent.map(_.head)
@@ -740,8 +773,8 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
       val bitcoind = coordinator.bitcoind
       for {
         aliceDb <- coordinator.getNonce(Sha256Digest.empty,
-                                        TestActorRef("test"),
-                                        AskNonce(coordinator.getCurrentRoundId))
+                                        dummyQueue(),
+                                        coordinator.getCurrentRoundId)
         _ <- coordinator.beginInputRegistration()
 
         utxo <- bitcoind.listUnspent.map(_.head)
@@ -792,8 +825,8 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
     val bitcoind = coordinator.bitcoind
     for {
       aliceDb <- coordinator.getNonce(Sha256Digest.empty,
-                                      TestActorRef("test"),
-                                      AskNonce(coordinator.getCurrentRoundId))
+                                      dummyQueue(),
+                                      coordinator.getCurrentRoundId)
       _ <- coordinator.beginInputRegistration()
 
       utxo <- bitcoind.listUnspent.map(_.head)
@@ -843,8 +876,8 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
     val bitcoind = coordinator.bitcoind
     for {
       aliceDb <- coordinator.getNonce(Sha256Digest.empty,
-                                      TestActorRef("test"),
-                                      AskNonce(coordinator.getCurrentRoundId))
+                                      dummyQueue(),
+                                      coordinator.getCurrentRoundId)
       _ <- coordinator.beginInputRegistration()
 
       utxo <- bitcoind.listUnspent.map(_.head)
@@ -894,8 +927,8 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
       val bitcoind = coordinator.bitcoind
       for {
         aliceDb <- coordinator.getNonce(Sha256Digest.empty,
-                                        TestActorRef("test"),
-                                        AskNonce(coordinator.getCurrentRoundId))
+                                        dummyQueue(),
+                                        coordinator.getCurrentRoundId)
         _ <- coordinator.beginInputRegistration()
 
         utxo <- bitcoind.listUnspent.map(_.head)
@@ -942,15 +975,22 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
   }
 
   it must "construct the unsigned tx" in { coordinator =>
+    val (queue, source) = Source
+      .queue[Message](bufferSize = 10,
+                      OverflowStrategy.backpressure,
+                      maxConcurrentOffers = 2)
+      .toMat(BroadcastHub.sink)(Keep.both)
+      .run()
+
+    val sink = source.runWith(Sink.seq)
+
     val peerIds =
       0.to(5)
         .map(_ => CryptoUtil.sha256(ECPrivateKey.freshPrivateKey.bytes))
         .toVector
 
     val aliceDbFs = peerIds.map(peerId =>
-      coordinator.getNonce(peerId,
-                           TestActorRef(peerId.hex),
-                           AskNonce(coordinator.getCurrentRoundId)))
+      coordinator.getNonce(peerId, queue, coordinator.getCurrentRoundId))
 
     for {
       aliceDbs <- Future.sequence(aliceDbFs)
@@ -999,7 +1039,12 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
 
       inputDbs <- coordinator.inputsDAO.findByRoundId(
         coordinator.getCurrentRoundId)
+
+      _ = queue.complete()
+      msgs <- sink
     } yield {
+      assert(msgs.size == 12)
+
       assert(inputDbs.forall(_.indexOpt.isDefined))
       val correctOutpoints = inputDbs.forall { db =>
         val index = db.indexOpt.get
@@ -1027,10 +1072,19 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
     val peerId = Sha256Digest.empty
     val bitcoind = coordinator.bitcoind
 
+    val (queue, source) = Source
+      .queue[Message](bufferSize = 10,
+                      OverflowStrategy.backpressure,
+                      maxConcurrentOffers = 2)
+      .toMat(BroadcastHub.sink)(Keep.both)
+      .run()
+
+    val sink = source.runWith(Sink.seq)
+
     for {
       aliceDb <- coordinator.getNonce(peerId,
-                                      TestActorRef(peerId.hex),
-                                      AskNonce(coordinator.getCurrentRoundId))
+                                      queue,
+                                      coordinator.getCurrentRoundId)
 
       addr <- bitcoind.getNewAddress
       unspent <- bitcoind.listUnspent.map(_.head)
@@ -1077,7 +1131,9 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
       signed <- bitcoind.walletProcessPSBT(psbt)
 
       _ <- coordinator.registerPSBTSignatures(peerId, signed.psbt)
-    } yield succeed
+      _ = queue.complete()
+      msgs <- sink
+    } yield assert(msgs.size == 2)
   }
 
   it must "fail register an invalid psbt signature" in { coordinator =>
@@ -1086,8 +1142,8 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
 
     for {
       aliceDb <- coordinator.getNonce(peerId,
-                                      TestActorRef(peerId.hex),
-                                      AskNonce(coordinator.getCurrentRoundId))
+                                      dummyQueue(),
+                                      coordinator.getCurrentRoundId)
 
       addr <- bitcoind.getNewAddress
       unspent <- bitcoind.listUnspent.map(_.head)
@@ -1150,8 +1206,8 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
 
     for {
       aliceDb <- coordinator.getNonce(peerId,
-                                      TestActorRef(peerId.hex),
-                                      AskNonce(coordinator.getCurrentRoundId))
+                                      dummyQueue(),
+                                      coordinator.getCurrentRoundId)
 
       addr <- bitcoind.getNewAddress
       unspent <- bitcoind.listUnspent.map(_.head)
@@ -1207,8 +1263,8 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
 
     for {
       aliceDb <- coordinator.getNonce(peerId,
-                                      TestActorRef(peerId.hex),
-                                      AskNonce(coordinator.getCurrentRoundId))
+                                      dummyQueue(),
+                                      coordinator.getCurrentRoundId)
 
       addr <- bitcoind.getNewAddress
       unspent <- bitcoind.listUnspent.map(_.head)

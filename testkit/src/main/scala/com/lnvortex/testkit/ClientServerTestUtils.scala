@@ -1,8 +1,8 @@
 package com.lnvortex.testkit
 
-import akka.testkit.TestActorRef
+import akka.http.scaladsl.model.ws.Message
+import akka.stream.scaladsl.SourceQueueWithComplete
 import com.lnvortex.client._
-import com.lnvortex.core.AskNonce
 import com.lnvortex.core.RoundDetails.getRoundParamsOpt
 import com.lnvortex.lnd.LndVortexWallet
 import com.lnvortex.server.coordinator.VortexCoordinator
@@ -23,7 +23,7 @@ import scala.util.Random
 
 trait ClientServerTestUtils {
 
-  def getTestActor: TestActorRef[Nothing]
+  def getDummyQueue: SourceQueueWithComplete[Message]
 
   def getNonce(
       peerId: Sha256Digest,
@@ -32,8 +32,8 @@ trait ClientServerTestUtils {
       ec: ExecutionContext): Future[AliceDb] = {
     for {
       aliceDb <- coordinator.getNonce(peerId,
-                                      getTestActor,
-                                      AskNonce(coordinator.getCurrentRoundId))
+                                      getDummyQueue,
+                                      coordinator.getCurrentRoundId)
       _ = client.storeNonce(aliceDb.nonce)
     } yield aliceDb
   }

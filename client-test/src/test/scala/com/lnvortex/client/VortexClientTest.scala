@@ -1,6 +1,5 @@
 package com.lnvortex.client
 
-import akka.testkit.TestActorRef
 import com.lnvortex.client.VortexClient.knownVersions
 import com.lnvortex.client.VortexClientException._
 import com.lnvortex.core._
@@ -12,6 +11,7 @@ import org.bitcoins.core.protocol.script._
 import org.bitcoins.core.protocol.transaction._
 import org.bitcoins.core.psbt.PSBT
 import org.bitcoins.core.script.ScriptType
+import org.bitcoins.core.util.TimeUtil
 import org.bitcoins.crypto._
 import org.bitcoins.testkitcore.gen.NumberGenerator
 
@@ -19,16 +19,16 @@ class VortexClientTest extends VortexClientFixture {
   behavior of "VortexClient"
 
   val roundParams: RoundParameters = RoundParameters(
-    version = UInt16.zero,
+    version = 0,
     roundId = DoubleSha256Digest.empty,
     amount = Satoshis(200000),
     coordinatorFee = Satoshis.zero,
     publicKey = ECPublicKey.freshPublicKey.schnorrPublicKey,
-    time = UInt64.zero,
+    time = TimeUtil.currentEpochSecond,
     inputType = ScriptType.WITNESS_V0_KEYHASH,
     outputType = ScriptType.WITNESS_V0_KEYHASH,
     changeType = ScriptType.WITNESS_V0_KEYHASH,
-    maxPeers = UInt16(5),
+    maxPeers = 5,
     status = "hello world"
   )
 
@@ -39,10 +39,12 @@ class VortexClientTest extends VortexClientFixture {
 
   it must "fail to process an unknown version AskRoundParameters" in {
     vortexClient =>
-      forAll(NumberGenerator.uInt16.suchThat(!knownVersions.contains(_))) {
-        version =>
-          assertThrows[RuntimeException](
-            vortexClient.setRound(roundParams.copy(version = version)))
+      forAll(
+        NumberGenerator.uInt16
+          .map(_.toInt)
+          .suchThat(!knownVersions.contains(_))) { version =>
+        assertThrows[RuntimeException](
+          vortexClient.setRound(roundParams.copy(version = version)))
       }
   }
 
@@ -59,28 +61,6 @@ class VortexClientTest extends VortexClientFixture {
 
       utxos2 <- vortexClient.utxoDAO.findAll()
     } yield assert(utxos == utxos2)
-  }
-
-  it must "cancel a registration" in { vortexClient =>
-    val lnd = vortexClient.vortexWallet
-
-    for {
-      nodeId <- lnd.lndRpcClient.nodeId
-      utxos <- vortexClient.listCoins()
-      refs = utxos.map(_.outputReference)
-
-      testState = InputsScheduled(round = roundParams,
-                                  nonce = nonce,
-                                  inputs = refs,
-                                  addressOpt = None,
-                                  nodeIdOpt = Some(nodeId),
-                                  peerAddrOpt = None)
-      _ = vortexClient.setRoundDetails(testState)
-
-      _ = vortexClient.handlerP.success(TestActorRef("test"))
-      _ <- vortexClient.cancelRegistration()
-    } yield assert(
-      vortexClient.getCurrentRoundDetails == KnownRound(roundParams))
   }
 
   it must "fail to sign a psbt with no fee info" in { vortexClient =>

@@ -2,10 +2,10 @@ package com.lnvortex.core
 
 import com.lnvortex.core.crypto.BlindingTweaks
 import org.bitcoins.core.currency._
-import org.bitcoins.core.number._
 import org.bitcoins.core.protocol.script._
 import org.bitcoins.core.protocol.transaction._
 import org.bitcoins.core.script.ScriptType
+import org.bitcoins.core.util.TimeUtil
 import org.bitcoins.crypto._
 import org.bitcoins.testkitcore.util.BitcoinSUnitTest
 
@@ -14,16 +14,16 @@ class RoundDetailsTest extends BitcoinSUnitTest {
   val roundAmount: Satoshis = Satoshis(200000)
 
   val roundParams: RoundParameters = RoundParameters(
-    version = UInt16.zero,
+    version = 0,
     roundId = DoubleSha256Digest.empty,
     amount = roundAmount,
     coordinatorFee = Satoshis.zero,
     publicKey = ECPublicKey.freshPublicKey.schnorrPublicKey,
-    time = UInt64.zero,
+    time = TimeUtil.currentEpochSecond,
     inputType = ScriptType.WITNESS_V0_KEYHASH,
     outputType = ScriptType.WITNESS_V0_KEYHASH,
     changeType = ScriptType.WITNESS_V0_KEYHASH,
-    maxPeers = UInt16(5),
+    maxPeers = 5,
     status = "hello world"
   )
 

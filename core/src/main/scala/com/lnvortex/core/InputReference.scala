@@ -8,6 +8,10 @@ import org.bitcoins.core.protocol.transaction._
 import org.bitcoins.core.script.interpreter.ScriptInterpreter
 import org.bitcoins.core.script.util.PreviousOutputMap
 import org.bitcoins.crypto._
+import org.bitcoins.commons.serializers.JsonSerializers._
+import org.bitcoins.commons.serializers.JsonWriters._
+import org.bitcoins.commons.serializers.JsonReaders._
+import play.api.libs.json._
 import scodec.bits._
 
 case class InputReference(
@@ -19,31 +23,12 @@ case class InputReference(
   val output: TransactionOutput = outputReference.output
   val outPoint: TransactionOutPoint = outputReference.outPoint
 
-  override val bytes: ByteVector = {
+  override def bytes: ByteVector = {
     u16Prefix(outputReference.bytes) ++ u16Prefix(inputProof.bytes)
   }
 }
 
-object InputReference extends Factory[InputReference] {
-
-  def apply(
-      outPoint: TransactionOutPoint,
-      output: TransactionOutput,
-      inputProof: ScriptWitness): InputReference = {
-    val outputRef = OutputReference(outPoint, output)
-    InputReference(outputRef, inputProof)
-  }
-
-  override def fromBytes(bytes: ByteVector): InputReference = {
-    val iter = ValueIterator(bytes)
-    val outputRef =
-      iter.takeU16Prefixed[OutputReference](i => OutputReference(iter.take(i)))
-
-    val inputProof =
-      iter.takeU16Prefixed[ScriptWitness](i => ScriptWitness(iter.take(i)))
-
-    InputReference(outputRef, inputProof)
-  }
+object InputReference {
 
   def constructInputProofTx(
       outPoint: TransactionOutPoint,
@@ -88,4 +73,10 @@ object InputReference extends Factory[InputReference] {
                                           PreviousOutputMap(outputMap),
                                         prevOut = inputReference.output)
   }
+
+  implicit lazy val InputReferenceReads: Reads[InputReference] =
+    Json.reads[InputReference]
+
+  implicit lazy val InputReferenceWrites: OWrites[InputReference] =
+    Json.writes[InputReference]
 }

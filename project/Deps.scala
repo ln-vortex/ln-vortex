@@ -7,7 +7,7 @@ object Deps {
     val akkaStreamV = "2.6.19"
     val akkaActorV: String = akkaStreamV
 
-    val bitcoinsV = "1.9.2-152-d0dadfa4-SNAPSHOT"
+    val bitcoinsV = "1.9.2-171-28311e15-SNAPSHOT"
 
     val scoptV = "4.0.1"
 
@@ -104,7 +104,7 @@ object Deps {
     )
 
   val core: List[ModuleID] = List(
-    Compile.bitcoinsCore,
+    Compile.bitcoinsAppCommons,
     Compile.grizzledSlf4j
   )
 
