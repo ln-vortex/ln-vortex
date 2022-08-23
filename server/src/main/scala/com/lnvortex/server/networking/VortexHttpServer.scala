@@ -23,7 +23,6 @@ class VortexHttpServer(coordinator: VortexCoordinator)(implicit
     } else {
       val bindAddress = coordinator.config.listenAddress
       for {
-        _ <- coordinator.start()
         onionAddress <- coordinator.config.torParams match {
           case Some(params) =>
             TorController
@@ -36,7 +35,7 @@ class VortexHttpServer(coordinator: VortexCoordinator)(implicit
               .map(Some(_))
           case None => Future.successful(None)
         }
-        routes = CoordinatorRoutes(coordinator).topLevelRoute
+        routes = new CoordinatorRoutes(coordinator).topLevelRoute
         bind <- Http()
           .newServerAt(bindAddress.getHostName, bindAddress.getPort)
           .bind(routes)

@@ -39,24 +39,36 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
 
   private var roundDetails: RoundDetails = NoDetails
 
+  // only used for debugging / testing
   private[client] def setRoundDetails(details: RoundDetails): Unit =
     roundDetails = details
 
   def getCurrentRoundDetails: RoundDetails = roundDetails
 
-  private[lnvortex] def setRound(adv: RoundParameters): Unit = {
+  private[lnvortex] def setRound(adv: RoundParameters): Future[Unit] = {
     if (VortexClient.knownVersions.contains(adv.version)) {
       roundDetails match {
         case NoDetails | _: ReceivedNonce | _: KnownRound |
             _: InputsScheduled =>
           roundDetails = KnownRound(adv)
+          Future.unit
         case state: InitializedRound =>
-          throw new IllegalStateException(
-            s"Cannot set new round at state $state")
+          // Potential race condition here
+          // Retry for a bit to set us to the new state
+          AsyncUtil
+            .awaitCondition(() => !roundDetails.isInstanceOf[InitializedRound],
+                            interval = 100.milliseconds,
+                            maxTries = 300)
+            .flatMap(_ => setRound(adv))
+            .recoverWith { _ =>
+              Future.failed(
+                new IllegalStateException(
+                  s"Cannot set new round at state $state"))
+            }
       }
     } else {
-      throw new RuntimeException(
-        s"Received unknown version ${adv.version}, consider updating software")
+      Future.failed(new RuntimeException(
+        s"Received unknown version ${adv.version}, consider updating software"))
     }
   }
 

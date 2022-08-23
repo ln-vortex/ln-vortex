@@ -256,7 +256,6 @@ trait VortexHttpClient[+V <: VortexWalletApi] { self: VortexClient[V] =>
           }
           logger.info(s"Received round details ${round.roundId.hex}")
           setRound(round)
-          Future.unit
         }
       case bm: BinaryMessage =>
         // ignore binary messages but drain content to avoid the stream being clogged
@@ -272,7 +271,6 @@ trait VortexHttpClient[+V <: VortexWalletApi] { self: VortexClient[V] =>
       case adv: RoundParameters =>
         logger.info(s"Received round details ${adv.roundId.hex}")
         setRound(adv)
-        Future.unit
       case NonceMessage(schnorrNonce) =>
         storeNonce(schnorrNonce)
         Future.unit

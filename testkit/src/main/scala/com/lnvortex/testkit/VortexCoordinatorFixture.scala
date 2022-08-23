@@ -26,8 +26,7 @@ trait VortexCoordinatorFixture
           addr <- bitcoind.getNewAddress
           _ <- bitcoind.generateToAddress(6, addr)
           _ <- conf.start()
-          coordinator = VortexCoordinator(bitcoind)
-          _ <- coordinator.start()
+          coordinator <- VortexCoordinator.initialize(bitcoind)
         } yield coordinator
       },
       { coordinator =>
@@ -35,7 +34,7 @@ trait VortexCoordinatorFixture
 
         for {
           _ <- config.dropAll().map(_ => config.clean())
-          _ <- coordinator.stop()
+          _ = coordinator.stop()
           _ <- coordinator.config.stop()
         } yield {
           val directory = new Directory(coordinator.config.baseDatadir.toFile)

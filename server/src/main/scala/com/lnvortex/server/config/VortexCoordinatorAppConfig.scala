@@ -5,13 +5,17 @@ import com.lnvortex.server.models._
 import com.typesafe.config.Config
 import grizzled.slf4j.Logging
 import org.bitcoins.commons.config._
+import org.bitcoins.core.config._
 import org.bitcoins.core.currency.Satoshis
 import org.bitcoins.core.hd.HDPurposes
 import org.bitcoins.core.script.ScriptType
 import org.bitcoins.core.util.FutureUtil
+import org.bitcoins.core.wallet.fee._
 import org.bitcoins.core.wallet.keymanagement.KeyManagerParams
 import org.bitcoins.crypto._
 import org.bitcoins.db._
+import org.bitcoins.feeprovider._
+import org.bitcoins.feeprovider.MempoolSpaceTarget._
 import org.bitcoins.keymanager.bip39.BIP39KeyManager
 import org.bitcoins.keymanager.config.KeyManagerAppConfig
 import org.bitcoins.tor.TorParams
@@ -154,6 +158,29 @@ case class VortexCoordinatorAppConfig(
   lazy val invalidSignatureBanDuration: FiniteDuration = {
     val dur = config.getDuration(s"$moduleName.invalidSignatureBanDuration")
     FiniteDuration(dur.getSeconds, SECONDS)
+  }
+
+  private val feeProvider: MempoolSpaceProvider =
+    MempoolSpaceProvider(FastestFeeTarget, network, None)
+
+  private val feeProviderBackup: BitcoinerLiveFeeRateProvider =
+    BitcoinerLiveFeeRateProvider(30, None)
+
+  def fetchFeeRate(): Future[SatoshisPerVirtualByte] = {
+    val feeRateF =
+      feeProvider.getFeeRate().recoverWith { case _: Throwable =>
+        feeProviderBackup.getFeeRate().recover { case _: Throwable =>
+          network match {
+            case MainNet | TestNet3 | SigNet =>
+              throw new RuntimeException(
+                "Failed to get fee rate from fee providers")
+            case RegTest =>
+              SatoshisPerVirtualByte.fromLong(1)
+          }
+        }
+      }
+
+    feeRateF
   }
 
   def initialize(): Unit = {

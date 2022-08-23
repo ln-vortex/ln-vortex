@@ -19,9 +19,11 @@ import org.bitcoins.core.psbt.PSBT
 import org.bitcoins.crypto._
 import org.bitcoins.rpc.BitcoindException.InvalidAddressOrKey
 import org.bitcoins.testkit.EmbeddedPg
+import org.bitcoins.testkit.async.TestAsyncUtil
 import org.bitcoins.testkitcore.Implicits.GeneratorOps
 
 import scala.concurrent.Future
+import scala.concurrent.duration.DurationInt
 
 class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
   behavior of "VortexCoordinator"
@@ -1068,7 +1070,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
     }
   }
 
-  it must "register a psbt signature" in { coordinator =>
+  it must "successfully register a psbt signature" in { coordinator =>
     val peerId = Sha256Digest.empty
     val bitcoind = coordinator.bitcoind
 
@@ -1133,6 +1135,10 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
       _ <- coordinator.registerPSBTSignatures(peerId, signed.psbt)
       _ = queue.complete()
       msgs <- sink
+
+      // wait for cleanup to complete
+      _ <- coordinator.completedTxP.future
+      _ <- TestAsyncUtil.nonBlockingSleep(2.seconds)
     } yield assert(msgs.size == 2)
   }
 
