@@ -248,7 +248,8 @@ trait ClientServerTestUtils {
       all <- client.listCoins()
       psbt <- signPSBT(peerId, client, coordinator, peerLnd)
 
-      tx <- coordinator.registerPSBTSignatures(peerId, psbt)
+      _ <- coordinator.registerPSBTSignatures(peerId, psbt)
+      tx <- coordinator.completedTxP.future
 
       _ <- client.completeRound(tx)
 
@@ -279,7 +280,8 @@ trait ClientServerTestUtils {
       all <- client.listCoins()
       psbt <- signPSBT(peerId, client, coordinator)
 
-      tx <- coordinator.registerPSBTSignatures(peerId, psbt)
+      _ <- coordinator.registerPSBTSignatures(peerId, psbt)
+      tx <- coordinator.completedTxP.future
 
       _ <- client.completeRound(tx)
 
@@ -326,13 +328,10 @@ trait ClientServerTestUtils {
                                  coordinator)
 
       // do async so they can complete
-      regAF = coordinator.registerPSBTSignatures(peerIdA, psbtA)
-      regBF = coordinator.registerPSBTSignatures(peerIdB, psbtB)
+      _ <- coordinator.registerPSBTSignatures(peerIdA, psbtA)
+      _ <- coordinator.registerPSBTSignatures(peerIdB, psbtB)
 
-      tx <- regAF
-      tx2 <- regBF
-
-      _ = require(tx == tx2)
+      tx <- coordinator.completedTxP.future
 
       _ <- clientA.completeRound(tx)
       _ <- clientB.completeRound(tx)
@@ -454,12 +453,10 @@ trait ClientServerTestUtils {
       signedB <- clientB.validateAndSignPsbt(psbt)
 
       // do async so they can complete
-      regAF = coordinator.registerPSBTSignatures(peerIdA, signedA)
-      regBF = coordinator.registerPSBTSignatures(peerIdB, signedB)
+      _ <- coordinator.registerPSBTSignatures(peerIdA, signedA)
+      _ <- coordinator.registerPSBTSignatures(peerIdB, signedB)
 
-      tx <- regAF
-      tx2 <- regBF
-      _ = assert(tx == tx2)
+      tx <- coordinator.completedTxP.future
 
       inputUtxos = (utxosA ++ utxosB).filter(t =>
         tx.inputs.map(_.previousOutput).contains(t.outPoint))

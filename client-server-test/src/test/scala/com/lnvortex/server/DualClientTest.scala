@@ -12,7 +12,6 @@ import org.bitcoins.testkit.EmbeddedPg
 import org.bitcoins.testkit.async.TestAsyncUtil
 import scodec.bits.ByteVector
 
-import scala.concurrent.TimeoutException
 import scala.concurrent.duration.DurationInt
 
 class DualClientTest
@@ -110,19 +109,17 @@ class DualClientTest
     }
   }
 
-  it must "correctly reconcile a round" ignore {
-    case (clientA, clientB, coordinator) =>
-      val peerLnd = clientB.vortexWallet.lndRpcClient
+  it must "correctly reconcile a round" in {
+    case (client, badClient, coordinator) =>
+      val peerLnd = badClient.vortexWallet.lndRpcClient
 
       for {
-        all <- clientA.listCoins()
+        all <- client.listCoins()
         _ <- registerInputsAndOutputs(peerIdA,
                                       peerIdB,
-                                      clientA,
-                                      clientB,
+                                      client,
+                                      badClient,
                                       coordinator)
-
-        _ = println("registered inputs and outputs")
 
         // registering inputs and outputs will make it construct the unsigned psbt
         _ <- TestAsyncUtil.awaitConditionF(
@@ -131,21 +128,18 @@ class DualClientTest
           maxTries = 500)
         psbt <- coordinator.currentRound().map(_.psbtOpt.get)
 
-        signedA <- clientA.validateAndSignPsbt(psbt)
+        signedA <- client.validateAndSignPsbt(psbt)
         idxA = signedA.inputMaps.indexWhere(_.isFinalized)
         idxB = signedA.inputMaps.indexWhere(!_.isFinalized)
         outPointA = signedA.transaction.inputs(idxA).previousOutput
         outPointB = signedA.transaction.inputs(idxB).previousOutput
 
-        registerF = coordinator.registerPSBTSignatures(peerIdA, signedA)
+        _ <- coordinator.registerPSBTSignatures(peerIdA, signedA)
         _ <- TestAsyncUtil.nonBlockingSleep(3.seconds)
-
-        _ = println("registered psbt signature")
 
         restartMsg <- coordinator.reconcileRound().map(_.head)
         newCoordinator <- coordinator.nextCoordinatorP.future
 
-        _ <- recoverToSucceededIf[TimeoutException](registerF)
         _ <- TestAsyncUtil.nonBlockingSleep(3.seconds)
 
         banned <- newCoordinator.bannedUtxoDAO.findAll()
@@ -153,16 +147,16 @@ class DualClientTest
         _ = assert(!banned.exists(_.outPoint == outPointA))
         _ = assert(banned.exists(_.outPoint == outPointB))
 
-        _ <- clientA.restartRound(restartMsg)
+        _ <- client.restartRound(restartMsg)
 
         // use fees from coordinator because we can't get ask inputs message here
-        registerInputsA <- clientA.registerCoins(restartMsg.roundParams.roundId,
-                                                 newCoordinator.inputFee,
-                                                 newCoordinator.outputFee(),
-                                                 newCoordinator.changeOutputFee)
+        registerInputsA <- client.registerCoins(restartMsg.roundParams.roundId,
+                                                newCoordinator.inputFee,
+                                                newCoordinator.outputFee(),
+                                                newCoordinator.changeOutputFee)
         blindSigA <- newCoordinator.registerAlice(peerIdA, registerInputsA)
 
-        registerA = clientA.processBlindOutputSig(blindSigA)
+        registerA = client.processBlindOutputSig(blindSigA)
         _ <- newCoordinator.beginOutputRegistration()
 
         _ <- newCoordinator.verifyAndRegisterBob(registerA)
@@ -173,13 +167,12 @@ class DualClientTest
           interval = 100.milliseconds,
           maxTries = 50)
         psbt <- newCoordinator.currentRound().map(_.psbtOpt.get)
-        _ = println("got psbt")
 
-        signedA <- clientA.validateAndSignPsbt(psbt)
+        signedA <- client.validateAndSignPsbt(psbt)
 
-        _ = newCoordinator.registerPSBTSignatures(peerIdA, signedA)
+        _ <- newCoordinator.registerPSBTSignatures(peerIdA, signedA)
         tx <- newCoordinator.completedTxP.future
-        _ <- clientA.completeRound(tx)
+        _ <- client.completeRound(tx)
 
         inputUtxos = all.filter(t =>
           tx.inputs.map(_.previousOutput).contains(t.outPoint))
@@ -197,8 +190,22 @@ class DualClientTest
           () => peerLnd.listChannels().map(_.nonEmpty),
           interval = 100.milliseconds,
           maxTries = 500)
+
+        banned <- newCoordinator.bannedUtxoDAO.findAll()
+
+        newCoinsA <- client.listCoins()
+        newCoinsB <- badClient.listCoins()
       } yield {
-        succeed
+        assert(banned.size == 1)
+        assert(!banned.exists(_.outPoint == outPointA))
+        assert(banned.exists(_.outPoint == outPointB))
+
+        val changeA = newCoinsA.filter(_.isChange)
+        assert(changeA.size == 1, s"${changeA.size} != 1")
+        assert(changeA.forall(_.anonSet == 1))
+
+        val changeB = newCoinsB.filter(_.isChange)
+        assert(changeB.isEmpty)
       }
   }
 }

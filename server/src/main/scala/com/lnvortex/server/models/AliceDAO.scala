@@ -114,6 +114,21 @@ case class AliceDAO()(implicit
       .map(_.toVector)
   }
 
+  def findSignedForRoundAction(roundId: DoubleSha256Digest): DBIOAction[
+    Vector[AliceDb],
+    NoStream,
+    Effect.Read] = {
+    table
+      .filter(t => t.roundId === roundId && t.signedPSBT.isDefined)
+      .result
+      .map(_.toVector)
+  }
+
+  def findSignedForRound(
+      roundId: DoubleSha256Digest): Future[Vector[AliceDb]] = {
+    safeDatabase.run(findSignedForRoundAction(roundId))
+  }
+
   def deleteByPeerIdsAction(
       peerIds: Seq[Sha256Digest]): DBIOAction[Int, NoStream, Effect.Write] = {
     table.filter(_.peerId.inSet(peerIds)).delete
