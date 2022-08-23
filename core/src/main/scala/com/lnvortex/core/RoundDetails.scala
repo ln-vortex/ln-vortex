@@ -13,12 +13,11 @@ import org.bitcoins.crypto.{SchnorrNonce, StringFactory}
 import java.net.InetSocketAddress
 
 sealed trait RoundDetails {
-  def order: Int
+  def order: Int = status.order
   def status: ClientStatus
 }
 
 case object NoDetails extends RoundDetails {
-  override val order: Int = 0
   override val status: ClientStatus = ClientStatus.NoDetails
 
   def nextStage(round: RoundParameters): KnownRound = {
@@ -27,7 +26,6 @@ case object NoDetails extends RoundDetails {
 }
 
 case class KnownRound(round: RoundParameters) extends RoundDetails {
-  override val order: Int = 1
   override val status: ClientStatus = ClientStatus.KnownRound
 
   def nextStage(nonce: SchnorrNonce): ReceivedNonce =
@@ -36,7 +34,6 @@ case class KnownRound(round: RoundParameters) extends RoundDetails {
 
 case class ReceivedNonce(round: RoundParameters, nonce: SchnorrNonce)
     extends RoundDetails {
-  override val order: Int = 2
   override val status: ClientStatus = ClientStatus.ReceivedNonce
 
   def nextStage(
@@ -55,7 +52,6 @@ case class InputsScheduled(
     nodeIdOpt: Option[NodeId],
     peerAddrOpt: Option[InetSocketAddress])
     extends RoundDetails {
-  override val order: Int = 3
   override val status: ClientStatus = ClientStatus.InputsScheduled
 
   def nextStage(
@@ -119,7 +115,6 @@ case class InputsRegistered(
     nonce: SchnorrNonce,
     initDetails: InitDetails)
     extends InitializedRound {
-  override val order: Int = 4
   override val status: ClientStatus = ClientStatus.InputsRegistered
 
   def nextStage: OutputRegistered =
@@ -139,7 +134,6 @@ case class OutputRegistered(
     nonce: SchnorrNonce,
     initDetails: InitDetails)
     extends InitializedRound {
-  override val order: Int = 5
   override val status: ClientStatus = ClientStatus.OutputRegistered
 
   def nextStage(psbt: PSBT): PSBTSigned =
@@ -161,7 +155,6 @@ case class PSBTSigned(
     initDetails: InitDetails,
     psbt: PSBT)
     extends InitializedRound {
-  override val order: Int = 6
   override val status: ClientStatus = ClientStatus.PSBTSigned
 
   val channelOutpoint: TransactionOutPoint = {
@@ -222,44 +215,44 @@ object RoundDetails {
   }
 }
 
-sealed abstract class ClientStatus
+sealed abstract class ClientStatus(val order: Int)
 
 object ClientStatus extends StringFactory[ClientStatus] {
 
   /** The client hasn't learned the details of the round yet */
-  case object NoDetails extends ClientStatus
+  case object NoDetails extends ClientStatus(0)
 
   /** The client has received the details of the round */
-  case object KnownRound extends ClientStatus
+  case object KnownRound extends ClientStatus(1)
 
   /** Intermediate step during queueing coins.
     * This nonce will be unique to the user and used for blind signing
     */
-  case object ReceivedNonce extends ClientStatus
+  case object ReceivedNonce extends ClientStatus(2)
 
   /** The user has scheduled inputs to be registered.
     * Once the coordinator sends the [[AskInputs]] message it register them.
     */
-  case object InputsScheduled extends ClientStatus
+  case object InputsScheduled extends ClientStatus(3)
 
   /** After the [[AskInputs]] message has been received and the client sends its
     * inputs to the coordinator its inputs will be registered.
     * This is the first state when the round begins.
     */
-  case object InputsRegistered extends ClientStatus
+  case object InputsRegistered extends ClientStatus(4)
 
   /** Intermediate step during the round.
     * The client has registered its output with unblinded signature
     * under its alternate Bob identity
     */
-  case object OutputRegistered extends ClientStatus
+  case object OutputRegistered extends ClientStatus(5)
 
   /** Final stage during the round.
     * The client has received the PSBT and signed it.
     * It will send it back to the coordinator to
     * complete the transaction and broadcast
     */
-  case object PSBTSigned extends ClientStatus
+  case object PSBTSigned extends ClientStatus(6)
 
   val all: Vector[ClientStatus] = Vector(NoDetails,
                                          KnownRound,

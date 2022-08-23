@@ -18,10 +18,21 @@ import play.api.libs.json._
 import scala.concurrent._
 import scala.util._
 
-case class CoordinatorRoutes(coordinator: VortexCoordinator)(implicit
+class CoordinatorRoutes(var coordinator: VortexCoordinator)(implicit
     system: ActorSystem)
     extends Logging {
   implicit val ec: ExecutionContext = system.dispatcher
+
+  // Need to switch coordinator when given a new one
+  def prepareNextCoordinator(): Unit = {
+    coordinator.nextCoordinatorP.future.map { nextCoordinator =>
+      coordinator = nextCoordinator
+      prepareNextCoordinator()
+    }
+    ()
+  }
+
+  prepareNextCoordinator()
 
   private val pingRoute = path("ping") {
     get {

@@ -40,20 +40,20 @@ class RemixTest
                                  clientB,
                                  coordinator)
 
-      _ <- coordinator.newRound()
-      _ = clientA.setRound(coordinator.roundParams)
-      _ = clientB.setRound(coordinator.roundParams)
+      nextCoordinator <- coordinator.nextCoordinatorP.future
+      _ <- clientA.setRound(nextCoordinator.roundParams)
+      _ <- clientB.setRound(nextCoordinator.roundParams)
 
       _ <- completeOnChainRound(Some(tx.txIdBE),
                                 peerId,
                                 peerId,
                                 clientA,
                                 clientB,
-                                coordinator)
+                                nextCoordinator)
 
       _ <- TestAsyncUtil.nonBlockingSleep(5.seconds)
 
-      roundDbs <- coordinator.roundDAO.findAll()
+      roundDbs <- nextCoordinator.roundDAO.findAll()
 
       coinsA <- clientA.listCoins()
       coinsB <- clientB.listCoins()

@@ -49,7 +49,7 @@ trait ClientServerPairFixture
         for {
           _ <- serverConf.start()
           bitcoind <- cachedBitcoindWithFundsF
-          coordinator = VortexCoordinator(bitcoind)
+          coordinator <- VortexCoordinator.initialize(bitcoind)
           server = new VortexHttpServer(coordinator)
           _ <- server.start()
           addr <- server.bindingP.future.map(_.localAddress)
@@ -88,7 +88,7 @@ trait ClientServerPairFixture
           _ <- client.config.stop()
 
           _ <- coordinator.config.dropAll().map(_ => coordinator.config.clean())
-          _ <- coordinator.stop()
+          _ = coordinator.stop()
           _ <- coordinator.config.stop()
         } yield {
           val directory = new Directory(coordinator.config.baseDatadir.toFile)

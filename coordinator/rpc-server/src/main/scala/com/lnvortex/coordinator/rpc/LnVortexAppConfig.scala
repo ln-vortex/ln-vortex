@@ -3,7 +3,6 @@ package com.lnvortex.coordinator.rpc
 import akka.actor.ActorSystem
 import com.lnvortex.coordinator.config.LnVortexRpcServerConfig
 import com.lnvortex.server.config.VortexCoordinatorAppConfig
-import com.lnvortex.server.coordinator.VortexCoordinator
 import com.typesafe.config.Config
 import org.bitcoins.commons.config._
 import org.bitcoins.rpc.client.common._
@@ -14,7 +13,7 @@ import org.bitcoins.rpc.client.v20.BitcoindV20RpcClient
 import org.bitcoins.rpc.client.v21.BitcoindV21RpcClient
 import org.bitcoins.rpc.client.v22.BitcoindV22RpcClient
 import org.bitcoins.rpc.client.v23.BitcoindV23RpcClient
-import org.bitcoins.rpc.config.{BitcoindInstance, BitcoindRpcAppConfig}
+import org.bitcoins.rpc.config._
 
 import java.nio.file.{Path, Paths}
 import scala.concurrent.{ExecutionContext, Future}
@@ -66,8 +65,6 @@ case class LnVortexAppConfig(
       }
     case None => BitcoindRpcClient(instance)
   }
-
-  lazy val coordinator: VortexCoordinator = VortexCoordinator(bitcoind)
 
 }
 

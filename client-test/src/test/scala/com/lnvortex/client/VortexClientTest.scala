@@ -39,11 +39,11 @@ class VortexClientTest extends VortexClientFixture {
 
   it must "fail to process an unknown version AskRoundParameters" in {
     vortexClient =>
-      forAll(
+      forAllAsync(
         NumberGenerator.uInt16
           .map(_.toInt)
           .suchThat(!knownVersions.contains(_))) { version =>
-        assertThrows[RuntimeException](
+        recoverToSucceededIf[RuntimeException](
           vortexClient.setRound(roundParams.copy(version = version)))
       }
   }

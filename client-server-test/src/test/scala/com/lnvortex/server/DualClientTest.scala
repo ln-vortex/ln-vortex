@@ -143,11 +143,12 @@ class DualClientTest
         _ = println("registered psbt signature")
 
         restartMsg <- coordinator.reconcileRound().map(_.head)
+        newCoordinator <- coordinator.nextCoordinatorP.future
 
         _ <- recoverToSucceededIf[TimeoutException](registerF)
         _ <- TestAsyncUtil.nonBlockingSleep(3.seconds)
 
-        banned <- coordinator.bannedUtxoDAO.findAll()
+        banned <- newCoordinator.bannedUtxoDAO.findAll()
         _ = assert(banned.size == 1)
         _ = assert(!banned.exists(_.outPoint == outPointA))
         _ = assert(banned.exists(_.outPoint == outPointB))
@@ -156,28 +157,28 @@ class DualClientTest
 
         // use fees from coordinator because we can't get ask inputs message here
         registerInputsA <- clientA.registerCoins(restartMsg.roundParams.roundId,
-                                                 coordinator.inputFee,
-                                                 coordinator.outputFee(),
-                                                 coordinator.changeOutputFee)
-        blindSigA <- coordinator.registerAlice(peerIdA, registerInputsA)
+                                                 newCoordinator.inputFee,
+                                                 newCoordinator.outputFee(),
+                                                 newCoordinator.changeOutputFee)
+        blindSigA <- newCoordinator.registerAlice(peerIdA, registerInputsA)
 
         registerA = clientA.processBlindOutputSig(blindSigA)
-        _ <- coordinator.beginOutputRegistration()
+        _ <- newCoordinator.beginOutputRegistration()
 
-        _ <- coordinator.verifyAndRegisterBob(registerA)
+        _ <- newCoordinator.verifyAndRegisterBob(registerA)
 
         // registering inputs and outputs will make it construct the unsigned psbt
         _ <- TestAsyncUtil.awaitConditionF(
-          () => coordinator.currentRound().map(_.psbtOpt.isDefined),
+          () => newCoordinator.currentRound().map(_.psbtOpt.isDefined),
           interval = 100.milliseconds,
           maxTries = 50)
-        psbt <- coordinator.currentRound().map(_.psbtOpt.get)
+        psbt <- newCoordinator.currentRound().map(_.psbtOpt.get)
         _ = println("got psbt")
 
         signedA <- clientA.validateAndSignPsbt(psbt)
 
-        _ = coordinator.registerPSBTSignatures(peerIdA, signedA)
-        tx <- coordinator.completedTxP.future
+        _ = newCoordinator.registerPSBTSignatures(peerIdA, signedA)
+        tx <- newCoordinator.completedTxP.future
         _ <- clientA.completeRound(tx)
 
         inputUtxos = all.filter(t =>
@@ -188,8 +189,8 @@ class DualClientTest
         _ = assert(feePaid === tx.vsize +- 1, s"$feePaid != ${tx.vsize} +- 1")
 
         // Mine some blocks
-        _ <- coordinator.bitcoind.getNewAddress.flatMap(
-          coordinator.bitcoind.generateToAddress(6, _))
+        _ <- newCoordinator.bitcoind.getNewAddress.flatMap(
+          newCoordinator.bitcoind.generateToAddress(6, _))
 
         // wait until peerLnd sees new channel
         _ <- TestAsyncUtil.awaitConditionF(

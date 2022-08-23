@@ -2,6 +2,8 @@ package com.lnvortex.coordinator.rpc
 
 import akka.actor.ActorSystem
 import com.lnvortex.coordinator.config.LnVortexRpcServerConfig
+import com.lnvortex.server.config.VortexCoordinatorAppConfig
+import com.lnvortex.server.coordinator.VortexCoordinator
 import com.lnvortex.server.networking.VortexHttpServer
 import grizzled.slf4j.Logging
 
@@ -33,16 +35,18 @@ object Daemon extends App with Logging {
   implicit val serverConfig: LnVortexRpcServerConfig =
     config.rpcConfig
 
-  val coordinator = config.coordinator
-
-  val server = new VortexHttpServer(coordinator)
+  implicit val coordinatorConfig: VortexCoordinatorAppConfig =
+    config.coordinatorConfig
 
   logger.info("Starting...")
 
   val f = for {
     _ <- config.start()
     _ <- serverConfig.start()
-    _ <- server.start()
+    coordinator <- VortexCoordinator.initialize(config.bitcoind)
+
+    httpServer = new VortexHttpServer(coordinator)
+    _ <- httpServer.start()
 
     routes = LnVortexRoutes(coordinator)
     server = RpcServer(
@@ -56,16 +60,16 @@ object Daemon extends App with Logging {
     _ = logger.info("Starting rpc server")
     _ <- server.start()
     _ = logger.info("Ln Vortex Coordinator started!")
-  } yield ()
+  } yield {
+    sys.addShutdownHook {
+      logger.info("Shutting down...")
+      val f = httpServer.stop().map { _ =>
+        system.terminate()
+        logger.info("Shutdown complete")
+      }
 
-  sys.addShutdownHook {
-    logger.info("Shutting down...")
-    val f = server.stop().map { _ =>
-      system.terminate()
-      logger.info("Shutdown complete")
+      Await.result(f, 60.seconds)
     }
-
-    Await.result(f, 60.seconds)
   }
 
   f.failed.foreach { ex =>
