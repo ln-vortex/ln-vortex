@@ -1,8 +1,8 @@
 package com.lnvortex.server.coordinator
 
 import akka.actor._
-import akka.http.scaladsl.model.ws.{Message, TextMessage}
-import akka.stream.scaladsl.{Source, SourceQueueWithComplete}
+import akka.http.scaladsl.model.ws._
+import akka.stream.scaladsl._
 import com.lnvortex.core.RoundStatus._
 import com.lnvortex.core._
 import com.lnvortex.server.VortexServerException
@@ -82,11 +82,11 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
 
   private def roundAddressLabel: String = s"Vortex Round: ${currentRoundId.hex}"
 
-  private[coordinator] def inputFee: CurrencyUnit = {
+  private[server] def inputFee: CurrencyUnit = {
     FeeCalculator.inputFee(feeRate, config.inputScriptType)
   }
 
-  private[coordinator] def outputFee(
+  private[server] def outputFee(
       feeRate: SatoshisPerVirtualByte = feeRate,
       numPeersOpt: Option[Int] = Some(config.minPeers)): CurrencyUnit = {
     FeeCalculator.outputFee(feeRate = feeRate,
@@ -95,7 +95,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
                             numPeersOpt = numPeersOpt)
   }
 
-  private[coordinator] def changeOutputFee: CurrencyUnit = {
+  private[server] def changeOutputFee: CurrencyUnit = {
     FeeCalculator.changeOutputFee(feeRate, config.changeScriptType)
   }
 
@@ -145,7 +145,8 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
   private val signedPMap: mutable.Map[Sha256Digest, Promise[PSBT]] =
     mutable.Map.empty
 
-  private var completedTxP: Promise[Transaction] = Promise[Transaction]()
+  private[server] var completedTxP: Promise[Transaction] =
+    Promise[Transaction]()
 
   def newRound(): Future[RoundDb] = {
     val feeRateF = updateFeeRate()
@@ -185,7 +186,9 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       created <- roundDAO.create(roundDb)
 
       offerFs = roundSubscribers.map { queue =>
-        queue.offer(TextMessage(Json.toJson(roundParams).toString))
+        queue
+          .offer(TextMessage(Json.toJson(roundParams).toString))
+          .recover(_ => roundSubscribers -= queue)
       }
       _ <- Future.sequence(offerFs)
     } yield {
@@ -194,7 +197,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
         system.scheduler.scheduleOnce(config.roundInterval) {
           beginInputRegistration()
             .recoverWith { _ =>
-              reconcileRound(isNewRound = true).map(_ => ())
+              cancelRound().map(_ => ())
             }
           ()
         })
@@ -204,7 +207,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
         .flatMap(_ => beginOutputRegistration())
         .recoverWith { case ex: Throwable =>
           logger.info("Failed to complete input registration: ", ex)
-          reconcileRound(isNewRound = true).map(_ => ())
+          cancelRound().map(_ => ())
         }
 
       // handle sending psbt when all outputs registered
@@ -215,13 +218,13 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
           logger.info("Failed to complete output registration: ", ex)
           // We need to make a new round because we
           // don't know which inputs didn't register
-          reconcileRound(isNewRound = true).map(_ => ())
+          cancelRound().map(_ => ())
         }
 
       completedTxP.future
         .flatMap(onCompletedTransaction)
         .recoverWith { _ =>
-          reconcileRound(isNewRound = false).map(_ => ())
+          reconcileRound().map(_ => ())
         }
 
       // return round
@@ -290,7 +293,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
           // Create Output Registration timer
           beginOutputRegistrationCancellable = Some(
             system.scheduler.scheduleOnce(config.inputRegistrationTime) {
-              inputsRegisteredP.success(())
+              inputsRegisteredP.trySuccess(())
               ()
             }
           )
@@ -300,14 +303,21 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
             AskInputs(currentRoundId, inputFee, outputFee(), changeOutputFee)
           // send messages async
           val parallelism = FutureUtil.getParallelism
-          Source(connectionHandlerMap.values.toVector)
-            .mapAsync(parallelism = parallelism) { peer =>
-              peer.offer(TextMessage(Json.toJson(msg).toString))
+          Source(connectionHandlerMap.toVector)
+            .mapAsync(parallelism = parallelism) { case (id, peer) =>
+              peer
+                .offer(TextMessage(Json.toJson(msg).toString))
+                .recover { ex =>
+                  logger.error(s"Failed to send AskInputs to peer ${id.hex}",
+                               ex)
+                }
             }
             .run()
             .map(_ => msg)
         } else {
-          Future.failed(new RuntimeException("Not enough peers registered."))
+          Future.failed(
+            new RuntimeException("Not enough peers registered. " +
+              s"Need ${config.minPeers} but only have $numAlices"))
         }
       }
     }
@@ -339,7 +349,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
 
       sendPSBTCancellable = Some(
         system.scheduler.scheduleOnce(config.outputRegistrationTime) {
-          Try(outputsRegisteredP.success(()))
+          outputsRegisteredP.trySuccess(())
           ()
         })
 
@@ -350,10 +360,16 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       logger.info(s"Sending blinded sigs to ${alices.size} peers")
       val peerSigMap = alices.map(t => (t.peerId, t.blindOutputSigOpt.get))
       val sendFs = peerSigMap.map { case (peerId, sig) =>
-        val peer = connectionHandlerMap(peerId)
-        logger.debug(s"Sending blinded sig to ${peerId.hex}")
-        val msg = TextMessage(Json.toJson(BlindedSig(sig)).toString)
-        peer.offer(msg)
+        connectionHandlerMap.get(peerId) match {
+          case Some(peer) =>
+            logger.debug(s"Sending blinded sig to ${peerId.hex}")
+            val msg = TextMessage(Json.toJson(BlindedSig(sig)).toString)
+
+            peer.offer(msg).map(_ => ()).recover { ex =>
+              logger.error(s"Failed to send blinded sig to ${peerId.hex}: ", ex)
+            }
+          case None => Future.unit
+        }
       }
       Future.sequence(sendFs).map(_ => ())
     }
@@ -386,7 +402,11 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       psbt <- constructUnsignedPSBT(addr)
 
       msg = TextMessage(Json.toJson(UnsignedPsbtMessage(psbt)).toString)
-      sendFs = connectionHandlerMap.values.map(_.offer(msg))
+      sendFs = connectionHandlerMap.map { case (id, peer) =>
+        peer.offer(msg).map(_ => ()).recover { ex =>
+          logger.error(s"Failed to send unsigned psbt to ${id.hex}: ", ex)
+        }
+      }
       _ <- Future.sequence(sendFs)
     } yield psbt
   }
@@ -434,7 +454,13 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       s"Alice asked for nonce of a different roundId ${peerRoundId.hex} != ${getCurrentRoundId.hex}")
 
     aliceDAO.findByPrimaryKeyAction(peerId).flatMap {
-      case Some(alice) => DBIO.successful(alice)
+      case Some(alice) =>
+        if (alice.roundId == peerRoundId) {
+          DBIO.successful(alice)
+        } else {
+          DBIO.failed(new RuntimeException(
+            s"Alice ${peerId.hex} asked for nonce of round ${peerRoundId.hex} but is in round ${alice.roundId.hex}"))
+        }
       case None =>
         for {
           (nonce, path) <- km.nextNonce()
@@ -586,7 +612,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
               registered <- aliceDAO.numRegisteredForRoundAction(currentRoundId)
               // check if we can to stop waiting for peers
               _ = if (registered >= config.maxPeers) {
-                inputsRegisteredP.success(())
+                inputsRegisteredP.trySuccess(())
               }
             } yield sig
             safeDatabase.run(action)
@@ -663,7 +689,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
         outputs <- outputsDAO.findByRoundIdAction(currentRoundId)
       } yield {
         if (outputs.size >= registeredAlices) {
-          outputsRegisteredP.success(())
+          outputsRegisteredP.trySuccess(())
         }
         ()
       }
@@ -710,6 +736,7 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
 
   private[coordinator] def constructUnsignedPSBT(
       feeAddr: BitcoinAddress): Future[PSBT] = {
+    logger.info(s"Constructing unsigned PSBT")
     bitcoind.getBlockCount.flatMap { height =>
       val dbsAction = for {
         aliceDbs <- aliceDAO.findRegisteredForRoundAction(currentRoundId)
@@ -860,8 +887,11 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
                 msg = SignedTxMessage(signed)
 
                 // Announce to peers
-                _ <- connectionHandlerMap(peerId).offer(
-                  TextMessage(Json.toJson(msg).toString))
+                _ <- connectionHandlerMap(peerId)
+                  .offer(TextMessage(Json.toJson(msg).toString))
+                  .recover { e =>
+                    logger.error(s"Error sending signed tx to ${peerId.hex}", e)
+                  }
 
                 // mark promise complete
                 _ = completedTxP.tryComplete(signedT)
@@ -913,40 +943,43 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
     }
   }
 
-  def reconcileRound(
-      isNewRound: Boolean): Future[Vector[RestartRoundMessage]] = {
+  def cancelRound(): Future[RoundDb] = {
     val action = for {
-      // cancel round
+      roundDb <- currentRoundAction()
+      _ <- roundDAO.updateAction(roundDb.copy(status = Canceled))
+    } yield ()
+    safeDatabase.run(action).flatMap(_ => newRound())
+  }
+
+  def reconcileRound(): Future[Vector[RestartRoundMessage]] = {
+    val action = for {
       round <- currentRoundAction()
-      updated = round.copy(status = Canceled)
+      updated = round.copy(status = Reconciled)
       _ <- roundDAO.updateAction(updated)
 
-      signedPeerIds <-
-        if (isNewRound) DBIO.successful(Vector.empty)
-        else {
-          for {
-            // get alices
-            alices <- aliceDAO.findRegisteredForRoundAction(round.roundId)
-            unsignedPeerIds = alices.filterNot(_.signed).map(_.peerId)
-            signedPeerIds = alices.filter(_.signed).map(_.peerId)
+      // get alices
+      alices <- aliceDAO.findRegisteredForRoundAction(round.roundId)
+      unsignedPeerIds = alices.filterNot(_.signed).map(_.peerId)
+      signedPeerIds = alices.filter(_.signed).map(_.peerId)
 
-            // ban inputs that didn't sign
-            inputsToBan <- inputsDAO.findByPeerIdsAction(unsignedPeerIds,
-                                                         round.roundId)
-            bannedUntil = TimeUtil.now.plusSeconds(
-              config.invalidSignatureBanDuration.toSeconds)
-            banReason = s"Alice never signed in round ${round.roundId.hex}"
-            banDbs = inputsToBan.map(db =>
-              BannedUtxoDb(db.outPoint, bannedUntil, banReason))
-            _ <- bannedUtxoDAO.upsertAllAction(banDbs)
-          } yield signedPeerIds
-        }
+      // ban inputs that didn't sign
+      inputsToBan <- inputsDAO.findByPeerIdsAction(unsignedPeerIds,
+                                                   round.roundId)
+      bannedUntil = TimeUtil.now.plusSeconds(
+        config.invalidSignatureBanDuration.toSeconds)
+      banReason = s"Alice never signed in round ${round.roundId.hex}"
+      banDbs = inputsToBan.map(db =>
+        BannedUtxoDb(db.outPoint, bannedUntil, banReason))
+      _ <- bannedUtxoDAO.upsertAllAction(banDbs)
 
-      // delete previous inputs and outputs so they can registered again
+      // delete previous inputs and outputs so they can be registered again
       _ <- inputsDAO.deleteByRoundIdAction(round.roundId)
       _ <- outputsDAO.deleteByRoundIdAction(round.roundId)
+      // delete alices that will be remade so they can register again
+      _ <- aliceDAO.deleteByPeerIdsAction(signedPeerIds)
     } yield signedPeerIds
 
+    // todo this is 2 DBIOActions, should be 1
     for {
       signedPeerIds <- safeDatabase.run(action)
       // clone connectionHandlerMap because newRound() will clear it
@@ -954,24 +987,26 @@ case class VortexCoordinator(bitcoind: BitcoindRpcClient)(implicit
       // restart round with good alices
       newRound <- newRound()
 
-      restartMsgs <-
-        if (isNewRound) Future.successful(Vector.empty)
-        else {
-          // change state so they can begin registering inputs
-          beginInputRegistration().flatMap { _ =>
-            FutureUtil.sequentially(signedPeerIds) { id =>
-              val connectionHandler = oldMap(id)
-              getNonce(id, oldMap(id), newRound.roundId).flatMap { db =>
-                val nonceMsg = NonceMessage(db.nonce)
-                val restartMsg = RestartRoundMessage(roundParams, nonceMsg)
+      actions = signedPeerIds.map { id =>
+        getNonceAction(peerId = id, newRound.roundId).flatMap { db =>
+          val nonceMsg = NonceMessage(db.nonce)
+          val restartMsg = RestartRoundMessage(roundParams, nonceMsg)
+          val connectionHandler = oldMap(id)
+          connectionHandlerMap.put(id, connectionHandler)
 
-                connectionHandler
-                  .offer(TextMessage(Json.toJson(restartMsg).toString))
-                  .map(_ => restartMsg)
-              }
-            }
-          }
+          // recover failures for disconnected peers
+          val sendF = connectionHandler
+            .offer(TextMessage(Json.toJson(restartMsg).toString))
+            .recover(_ => ())
+            .map(_ => restartMsg)
+
+          DBIO.from(sendF)
         }
+      }
+
+      restartMsgs <- safeDatabase.run(DBIO.sequence(actions))
+      // change state so they can begin registering inputs
+      _ <- beginInputRegistration()
     } yield restartMsgs
   }
 

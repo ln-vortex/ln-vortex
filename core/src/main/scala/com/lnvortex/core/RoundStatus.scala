@@ -32,12 +32,17 @@ object RoundStatus extends StringFactory[RoundStatus] {
     override val order: Int = 5
   }
 
+  case object Reconciled extends RoundStatus {
+    override val order: Int = 5
+  }
+
   val all: Vector[RoundStatus] = Vector(Pending,
                                         RegisterAlices,
                                         RegisterOutputs,
                                         SigningPhase,
                                         Signed,
-                                        Canceled)
+                                        Canceled,
+                                        Reconciled)
 
   override def fromStringOpt(string: String): Option[RoundStatus] = {
     all.find(_.toString.toLowerCase == string.toLowerCase)

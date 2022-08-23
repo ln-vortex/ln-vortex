@@ -45,9 +45,9 @@ trait LnVortexTestUtils { self: EmbeddedPg =>
          |  coordinatorFee = 10000
          |  roundInterval = 60m
          |  roundAmount = 1000000
-         |  inputRegistrationTime = 20s
-         |  outputRegistrationTime = 20s
-         |  signingTime = 20s
+         |  inputRegistrationTime = 120s
+         |  outputRegistrationTime = 120s
+         |  signingTime = 120s
          |}
       """.stripMargin
     }
