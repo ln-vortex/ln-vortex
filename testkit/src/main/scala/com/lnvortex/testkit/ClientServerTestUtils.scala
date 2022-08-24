@@ -249,7 +249,7 @@ trait ClientServerTestUtils {
       psbt <- signPSBT(peerId, client, coordinator, peerLnd)
 
       _ <- coordinator.registerPSBTSignatures(peerId, psbt)
-      tx <- coordinator.completedTxP.future
+      tx <- coordinator.getCompletedTx
 
       _ <- client.completeRound(tx)
 
@@ -281,7 +281,7 @@ trait ClientServerTestUtils {
       psbt <- signPSBT(peerId, client, coordinator)
 
       _ <- coordinator.registerPSBTSignatures(peerId, psbt)
-      tx <- coordinator.completedTxP.future
+      tx <- coordinator.getCompletedTx
 
       _ <- client.completeRound(tx)
 
@@ -331,7 +331,7 @@ trait ClientServerTestUtils {
       _ <- coordinator.registerPSBTSignatures(peerIdA, psbtA)
       _ <- coordinator.registerPSBTSignatures(peerIdB, psbtB)
 
-      tx <- coordinator.completedTxP.future
+      tx <- coordinator.getCompletedTx
 
       _ <- clientA.completeRound(tx)
       _ <- clientB.completeRound(tx)
@@ -456,7 +456,7 @@ trait ClientServerTestUtils {
       _ <- coordinator.registerPSBTSignatures(peerIdA, signedA)
       _ <- coordinator.registerPSBTSignatures(peerIdB, signedB)
 
-      tx <- coordinator.completedTxP.future
+      tx <- coordinator.getCompletedTx
 
       inputUtxos = (utxosA ++ utxosB).filter(t =>
         tx.inputs.map(_.previousOutput).contains(t.outPoint))

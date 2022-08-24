@@ -138,7 +138,7 @@ class DualClientTest
         _ <- TestAsyncUtil.nonBlockingSleep(3.seconds)
 
         restartMsg <- coordinator.reconcileRound().map(_.head)
-        newCoordinator <- coordinator.nextCoordinatorP.future
+        newCoordinator <- coordinator.getNextCoordinator
 
         _ <- TestAsyncUtil.nonBlockingSleep(3.seconds)
 
@@ -171,7 +171,7 @@ class DualClientTest
         signedA <- client.validateAndSignPsbt(psbt)
 
         _ <- newCoordinator.registerPSBTSignatures(peerIdA, signedA)
-        tx <- newCoordinator.completedTxP.future
+        tx <- newCoordinator.getCompletedTx
         _ <- client.completeRound(tx)
 
         inputUtxos = all.filter(t =>

@@ -35,7 +35,7 @@ trait HttpTestFixture
           coordinator <- VortexCoordinator.initialize(bitcoind)
           server = new VortexHttpServer(coordinator)
           _ <- server.start()
-          addr <- server.bindingP.future.map(_.localAddress)
+          addr <- server.getBinding.map(_.localAddress)
 
           _ <- clientConfig.start()
 

@@ -40,7 +40,7 @@ class RemixTest
                                  clientB,
                                  coordinator)
 
-      nextCoordinator <- coordinator.nextCoordinatorP.future
+      nextCoordinator <- coordinator.getNextCoordinator
       _ <- clientA.setRound(nextCoordinator.roundParams)
       _ <- clientB.setRound(nextCoordinator.roundParams)
 

@@ -15,7 +15,10 @@ class VortexHttpServer(coordinator: VortexCoordinator)(implicit
     with Logging {
   implicit val executionContext: ExecutionContext = system.dispatcher
 
-  val bindingP: Promise[Http.ServerBinding] = Promise[Http.ServerBinding]()
+  private val bindingP: Promise[Http.ServerBinding] =
+    Promise[Http.ServerBinding]()
+
+  def getBinding: Future[Http.ServerBinding] = bindingP.future
 
   override def start(): Future[Unit] = {
     if (bindingP.isCompleted) {
