@@ -206,6 +206,9 @@ class CoordinatorRoutes(var coordinator: VortexCoordinator)(implicit
               }
             }
 
+            logger.info(
+              s"Peer ${peerId.hex} connected to round ${roundId.hex}!")
+
             ws.handleMessages(wsFlow)
           }
         }
