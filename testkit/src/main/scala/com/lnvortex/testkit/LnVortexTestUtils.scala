@@ -37,10 +37,8 @@ trait LnVortexTestUtils { self: EmbeddedPg =>
          |  tor.use-random-ports = false
          |}
          |
-         |vortex.coordinator = "127.0.0.1:$listenPort"
-         |
          |coordinator {
-         |  listen = "0.0.0.0:$listenPort"
+         |  listen = "127.0.0.1:$listenPort"
          |  maxPeers = 2
          |  coordinatorFee = 10000
          |  roundInterval = 60m

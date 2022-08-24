@@ -31,14 +31,14 @@ object Daemon extends App with Logging {
   implicit val serverConfig: LnVortexRpcServerConfig =
     config.rpcConfig
 
-  val client = config.client
+  val clientManager = config.clientManager
 
   logger.info("Starting...")
 
   val configStartF = serverConfig.start()
 
   val server = RpcServer(
-    handlers = Vector(LnVortexRoutes(client)),
+    handlers = Vector(LnVortexRoutes(clientManager)),
     rpcBindOpt = serverConfig.rpcBind,
     rpcPort = serverConfig.rpcPort,
     rpcUser = serverConfig.rpcUsername,
@@ -54,8 +54,8 @@ object Daemon extends App with Logging {
 
   val clientF = configStartF.flatMap { _ =>
     for {
-      _ <- client.config.start()
-      _ <- client.start()
+      _ <- clientManager.config.start()
+      _ <- clientManager.start()
     } yield ()
   }
 

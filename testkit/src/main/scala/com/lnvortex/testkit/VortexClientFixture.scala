@@ -1,7 +1,7 @@
 package com.lnvortex.testkit
 
 import com.lnvortex.client.VortexClient
-import com.lnvortex.client.config.VortexAppConfig
+import com.lnvortex.client.config.{CoordinatorAddress, VortexAppConfig}
 import com.lnvortex.lnd.LndVortexWallet
 import org.bitcoins.core.currency.Bitcoins
 import org.bitcoins.core.number.UInt32
@@ -56,7 +56,7 @@ trait VortexClientFixture
           _ <- TestAsyncUtil.awaitConditionF(() =>
             lnd.listUnspent.map(_.nonEmpty))
 
-        } yield VortexClient(LndVortexWallet(lnd))
+        } yield VortexClient(LndVortexWallet(lnd), CoordinatorAddress.dummy)
       },
       { vortex =>
         for {

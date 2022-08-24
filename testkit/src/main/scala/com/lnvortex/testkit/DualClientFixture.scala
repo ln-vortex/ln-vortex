@@ -1,10 +1,12 @@
 package com.lnvortex.testkit
 
 import com.lnvortex.client.VortexClient
+import com.lnvortex.client.config.CoordinatorAddress
 import com.lnvortex.lnd.LndVortexWallet
 import com.lnvortex.server.coordinator.VortexCoordinator
 import com.lnvortex.server.networking.VortexHttpServer
 import com.typesafe.config.ConfigFactory
+import org.bitcoins.core.config.RegTest
 import org.bitcoins.core.script.ScriptType
 import org.bitcoins.testkit.EmbeddedPg
 import org.bitcoins.testkit.async.TestAsyncUtil
@@ -57,21 +59,21 @@ trait DualClientFixture
 
           _ = assert(serverConf.outputScriptType == outputScriptType)
 
-          host =
-            if (addr.getHostString == "0:0:0:0:0:0:0:0") "127.0.0.1"
-            else addr.getHostString
-
-          config = ConfigFactory.parseString(
-            s"""vortex.coordinator = "$host:${addr.getPort}" """)
-          clientConfigA = getTestConfigs(Vector(config))._1
-          clientConfigB = getTestConfigs(Vector(config))._1
+          clientConfigA = getTestConfigs()._1
+          clientConfigB = getTestConfigs()._1
           _ <- clientConfigA.start()
           _ <- clientConfigB.start()
 
+          coordinatorAddr = CoordinatorAddress("test", RegTest, addr)
+
           (lndA, lndB) <- LndTestUtils.createNodePair(bitcoind, inputScriptType)
-          clientA = VortexClient(LndVortexWallet(lndA))(system, clientConfigA)
+          clientA = VortexClient(LndVortexWallet(lndA), coordinatorAddr)(
+            system,
+            clientConfigA)
           _ <- clientA.start()
-          clientB = VortexClient(LndVortexWallet(lndB))(system, clientConfigB)
+          clientB = VortexClient(LndVortexWallet(lndB), coordinatorAddr)(
+            system,
+            clientConfigB)
           _ <- clientB.start()
 
           _ <- LndRpcTestUtil.connectLNNodes(lndA, lndB)

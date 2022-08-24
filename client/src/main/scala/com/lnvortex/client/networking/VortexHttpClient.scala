@@ -26,7 +26,7 @@ import scala.util.Try
 trait VortexHttpClient[+V <: VortexWalletApi] { self: VortexClient[V] =>
 
   private val baseUrl: String = {
-    val addr = config.coordinatorAddress
+    val addr = coordinatorAddress.address
     s"${addr.getHostString}:${addr.getPort}"
   }
 
@@ -95,6 +95,8 @@ trait VortexHttpClient[+V <: VortexWalletApi] { self: VortexClient[V] =>
 
   protected def subscribeRounds(network: BitcoinNetwork): Future[Unit] = {
     require(roundsSubscription.isEmpty, "Already subscribed to rounds")
+
+    logger.info(s"Connecting to coordinator $baseUrl")
 
     val url =
       "ws://" + baseUrl + "/rounds/" + network.chainParams.genesisBlock.blockHeader.hashBE.hex

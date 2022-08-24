@@ -1022,84 +1022,90 @@ object VortexCoordinator extends Logging {
       implicit
       system: ActorSystem,
       ec: ExecutionContext): Future[VortexCoordinator] = {
-    implicit val config: VortexCoordinatorAppConfig = old.config
-    config.fetchFeeRate().flatMap { feeRate =>
-      old.stop()
-      // generate new round id
-      val roundId = CryptoUtil.doubleSHA256(ECPrivateKey.freshPrivateKey.bytes)
-      logger.info(s"Creating new Round! ${roundId.hex}")
+    if (!old.nextCoordinatorP.isCompleted) {
+      implicit val config: VortexCoordinatorAppConfig = old.config
+      config.fetchFeeRate().flatMap { feeRate =>
+        old.stop()
+        // generate new round id
+        val roundId =
+          CryptoUtil.doubleSHA256(ECPrivateKey.freshPrivateKey.bytes)
+        logger.info(s"Creating new Round! ${roundId.hex}")
 
-      val roundStartTime =
-        TimeUtil.currentEpochSecond + config.roundInterval.toSeconds
+        val roundStartTime =
+          TimeUtil.currentEpochSecond + config.roundInterval.toSeconds
 
-      // disconnect peers so they all get new ids
-      old.disconnectPeers()
-      // clear some memory
-      old.connectionHandlerMap.clear()
-      old.signedPMap.clear()
+        // disconnect peers so they all get new ids
+        old.disconnectPeers()
+        // clear some memory
+        old.connectionHandlerMap.clear()
+        old.signedPMap.clear()
 
-      val roundDb = RoundDbs.newRound(
-        roundId = roundId,
-        roundTime = Instant.ofEpochSecond(roundStartTime),
-        feeRate = feeRate,
-        coordinatorFee = config.coordinatorFee,
-        inputFee = FeeCalculator.inputFee(feeRate, config.inputScriptType),
-        outputFee = FeeCalculator.outputFee(
-          feeRate = feeRate,
-          outputScriptType = config.outputScriptType,
-          coordinatorScriptType = config.changeScriptType,
-          numPeersOpt = Some(config.minPeers)),
-        changeFee =
-          FeeCalculator.changeOutputFee(feeRate, config.inputScriptType),
-        amount = config.roundAmount
-      )
-
-      val roundParams: RoundParameters =
-        RoundParameters(
-          version = 0,
+        val roundDb = RoundDbs.newRound(
           roundId = roundId,
-          amount = config.roundAmount,
+          roundTime = Instant.ofEpochSecond(roundStartTime),
+          feeRate = feeRate,
           coordinatorFee = config.coordinatorFee,
-          publicKey = old.publicKey,
-          time = roundStartTime,
-          maxPeers = config.maxPeers,
-          inputType = config.inputScriptType,
-          outputType = config.outputScriptType,
-          changeType = config.changeScriptType,
-          status = config.statusString
+          inputFee = FeeCalculator.inputFee(feeRate, config.inputScriptType),
+          outputFee = FeeCalculator.outputFee(
+            feeRate = feeRate,
+            outputScriptType = config.outputScriptType,
+            coordinatorScriptType = config.changeScriptType,
+            numPeersOpt = Some(config.minPeers)),
+          changeFee =
+            FeeCalculator.changeOutputFee(feeRate, config.inputScriptType),
+          amount = config.roundAmount
         )
 
-      for {
-        _ <- old.roundDAO.create(roundDb)
+        val roundParams: RoundParameters =
+          RoundParameters(
+            version = 0,
+            roundId = roundId,
+            amount = config.roundAmount,
+            coordinatorFee = config.coordinatorFee,
+            publicKey = old.publicKey,
+            time = roundStartTime,
+            maxPeers = config.maxPeers,
+            inputType = config.inputScriptType,
+            outputType = config.outputScriptType,
+            changeType = config.changeScriptType,
+            status = config.statusString
+          )
 
-        newCoordinator = new VortexCoordinator(old.km,
-                                               old.bitcoind,
-                                               feeRate,
-                                               roundId,
-                                               roundStartTime)
+        for {
+          _ <- old.roundDAO.create(roundDb)
 
-        _ = {
-          newCoordinator.roundSubscribers ++= old.roundSubscribers
-          newCoordinator.start()
+          newCoordinator = new VortexCoordinator(old.km,
+                                                 old.bitcoind,
+                                                 feeRate,
+                                                 roundId,
+                                                 roundStartTime)
 
-          old.nextCoordinatorP.success(newCoordinator)
-        }
+          _ = {
+            newCoordinator.roundSubscribers ++= old.roundSubscribers
+            newCoordinator.start()
 
-        // announce to peers
-        _ <-
-          if (announce) {
-            logger.info("Announcing round to peers")
-            val offerFs = old.roundSubscribers.map { queue =>
-              queue
-                .offer(TextMessage(Json.toJson(roundParams).toString))
-                .recover(_ => old.roundSubscribers -= queue)
-            }
-
-            Future.sequence(offerFs)
-          } else {
-            Future.unit
+            old.nextCoordinatorP.trySuccess(newCoordinator)
           }
-      } yield newCoordinator
+
+          // announce to peers
+          _ <-
+            if (announce) {
+              logger.info("Announcing round to peers")
+              val offerFs = old.roundSubscribers.map { queue =>
+                queue
+                  .offer(TextMessage(Json.toJson(roundParams).toString))
+                  .recover(_ => old.roundSubscribers -= queue)
+              }
+
+              Future.sequence(offerFs)
+            } else {
+              Future.unit
+            }
+        } yield newCoordinator
+      }
+    } else {
+      Future.failed(
+        new IllegalStateException("New round has already been created."))
     }
   }
 }

@@ -1,10 +1,12 @@
 package com.lnvortex.testkit
 
 import com.lnvortex.client.VortexClient
+import com.lnvortex.client.config.CoordinatorAddress
 import com.lnvortex.lnd.LndVortexWallet
 import com.lnvortex.server.coordinator.VortexCoordinator
 import com.lnvortex.server.networking.VortexHttpServer
 import com.typesafe.config.ConfigFactory
+import org.bitcoins.core.config.RegTest
 import org.bitcoins.core.script.ScriptType
 import org.bitcoins.lnd.rpc.LndRpcClient
 import org.bitcoins.testkit.EmbeddedPg
@@ -44,7 +46,8 @@ trait ClientServerPairFixture
                             |coordinator.changeScriptType = $changeScriptType
                             |coordinator.inputScriptType = $inputScriptType
                             |""".stripMargin)
-        implicit val (_, serverConf) = getTestConfigs(Vector(scriptTypeConfig))
+        implicit val (clientConfig, serverConf) =
+          getTestConfigs(Vector(scriptTypeConfig))
 
         for {
           _ <- serverConf.start()
@@ -56,18 +59,14 @@ trait ClientServerPairFixture
 
           _ = assert(serverConf.outputScriptType == outputScriptType)
 
-          host =
-            if (addr.getHostString == "0:0:0:0:0:0:0:0") "127.0.0.1"
-            else addr.getHostString
-
-          netConfig = ConfigFactory.parseString(
-            s"""vortex.coordinator = "$host:${addr.getPort}" """)
-          clientConfig = getTestConfigs(Vector(netConfig))._1
           _ <- clientConfig.start()
+          coordinatorAddr = CoordinatorAddress("test", RegTest, addr)
 
           (lnd, peerLnd) <- LndTestUtils.createNodePair(bitcoind,
                                                         inputScriptType)
-          client = VortexClient(LndVortexWallet(lnd))(system, clientConfig)
+          client = VortexClient(LndVortexWallet(lnd), coordinatorAddr)(
+            system,
+            clientConfig)
           _ <- client.start()
 
           _ <- LndRpcTestUtil.connectLNNodes(lnd, peerLnd)

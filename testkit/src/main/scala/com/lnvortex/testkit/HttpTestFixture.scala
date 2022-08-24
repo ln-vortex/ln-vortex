@@ -2,9 +2,10 @@ package com.lnvortex.testkit
 
 import com.lnvortex.bitcoind.BitcoindVortexWallet
 import com.lnvortex.client.VortexClient
+import com.lnvortex.client.config.CoordinatorAddress
 import com.lnvortex.server.coordinator.VortexCoordinator
 import com.lnvortex.server.networking.VortexHttpServer
-import com.typesafe.config.ConfigFactory
+import org.bitcoins.core.config.RegTest
 import org.bitcoins.testkit.EmbeddedPg
 import org.bitcoins.testkit.fixtures.BitcoinSFixture
 import org.bitcoins.testkit.rpc.CachedBitcoindV23
@@ -26,7 +27,7 @@ trait HttpTestFixture
         VortexClient[BitcoindVortexWallet],
         VortexCoordinator)](
       () => {
-        implicit val (_, serverConf) = getTestConfigs()
+        implicit val (clientConfig, serverConf) = getTestConfigs()
 
         for {
           _ <- serverConf.start()
@@ -36,18 +37,11 @@ trait HttpTestFixture
           _ <- server.start()
           addr <- server.bindingP.future.map(_.localAddress)
 
-          host =
-            if (addr.getHostString == "0:0:0:0:0:0:0:0") "127.0.0.1"
-            else addr.getHostString
-
-          netConfig = ConfigFactory.parseString(
-            s"""vortex.coordinator = "$host:${addr.getPort}" """)
-          clientConfig = getTestConfigs(Vector(netConfig))._1
           _ <- clientConfig.start()
 
-          vortexClient = VortexClient(BitcoindVortexWallet(bitcoind))(
-            system,
-            clientConfig)
+          coordinatorAddr = CoordinatorAddress("test", RegTest, addr)
+          vortexClient = VortexClient(BitcoindVortexWallet(bitcoind),
+                                      coordinatorAddr)(system, clientConfig)
         } yield (vortexClient, coordinator)
       },
       { case (client, coordinator) =>

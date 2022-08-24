@@ -54,9 +54,22 @@ object ConsoleCli {
       cmd("getinfo")
         .action((_, conf) => conf.copy(command = GetInfo))
         .text(s"Returns basic info about the oracle"),
+      cmd("getstatuses")
+        .action((_, conf) => conf.copy(command = GetStatuses))
+        .text(s"Get current status of the current round of all coordinators"),
       cmd("getstatus")
-        .action((_, conf) => conf.copy(command = GetStatus))
-        .text(s"Get current status of the current round"),
+        .action((_, conf) => conf.copy(command = GetStatus("")))
+        .text(
+          s"Get current status of the current round for the given coordinator")
+        .children(
+          arg[String]("coordinator")
+            .required()
+            .action((coordinator, conf) =>
+              conf.copy(command = conf.command match {
+                case c: GetStatus => c.copy(coordinator = coordinator)
+                case other        => other
+              }))
+        ),
       cmd("listutxos")
         .action((_, conf) => conf.copy(command = ListUtxos))
         .text("List wallet's utxos"),
@@ -70,13 +83,30 @@ object ConsoleCli {
         .action((_, conf) => conf.copy(command = GetBalance))
         .text("Get wallet balance"),
       cmd("cancelcoins")
-        .action((_, conf) => conf.copy(command = CancelCoins))
-        .text("Cancels the queued coins"),
+        .action((_, conf) => conf.copy(command = CancelCoins("")))
+        .text("Cancels the queued coins for the given coordinator")
+        .children(
+          arg[String]("coordinator")
+            .required()
+            .action((coordinator, conf) =>
+              conf.copy(command = conf.command match {
+                case c: CancelCoins => c.copy(coordinator = coordinator)
+                case other          => other
+              }))
+        ),
       cmd("queuecoins")
         .action((_, conf) =>
-          conf.copy(command = QueueCoins(Vector.empty, None, None, None)))
-        .text("Queues coins for collaborative transaction")
+          conf.copy(command = QueueCoins("", Vector.empty, None, None, None)))
+        .text(
+          "Queues coins for collaborative transaction for the given coordinator")
         .children(
+          arg[String]("coordinator")
+            .required()
+            .action((coordinator, conf) =>
+              conf.copy(command = conf.command match {
+                case c: QueueCoins => c.copy(coordinator = coordinator)
+                case other         => other
+              })),
           arg[Seq[TransactionOutPoint]]("utxos")
             .required()
             .action((utxos, conf) =>
@@ -145,12 +175,13 @@ object ConsoleCli {
 
     val requestParam: RequestParam = command match {
       case GetInfo          => RequestParam("getinfo")
-      case GetStatus        => RequestParam("getstatus")
+      case GetStatuses      => RequestParam("getstatuses")
+      case gs: GetStatus    => RequestParam("getstatus", Some(gs.json))
       case ListUtxos        => RequestParam("listutxos")
       case ListTransactions => RequestParam("listtransactions")
       case ListChannels     => RequestParam("listchannels")
       case GetBalance       => RequestParam("getbalance")
-      case CancelCoins      => RequestParam("cancelcoins")
+      case cc: CancelCoins  => RequestParam("cancelcoins", Some(cc.json))
       case qc: QueueCoins   => RequestParam("queuecoins", Some(qc.json))
       case GetVersion       =>
         // skip sending to server and just return version number of cli
@@ -269,7 +300,16 @@ object CliCommand {
 
   case object GetInfo extends CliCommand
 
-  case object GetStatus extends CliCommand
+  case object GetStatuses extends CliCommand
+
+  case class GetStatus(coordinator: String) extends CliCommand {
+
+    val json: Obj = {
+      Obj(
+        "coordinator" -> Str(coordinator)
+      )
+    }
+  }
 
   case object GetBalance extends CliCommand
 
@@ -279,9 +319,17 @@ object CliCommand {
 
   case object ListChannels extends CliCommand
 
-  case object CancelCoins extends CliCommand
+  case class CancelCoins(coordinator: String) extends CliCommand {
+
+    val json: Obj = {
+      Obj(
+        "coordinator" -> Str(coordinator)
+      )
+    }
+  }
 
   case class QueueCoins(
+      coordinator: String,
       outpoints: Vector[TransactionOutPoint],
       address: Option[BitcoinAddress],
       nodeId: Option[NodeId],
@@ -290,6 +338,7 @@ object CliCommand {
 
     val json: Obj = {
       Obj(
+        "coordinator" -> Str(coordinator),
         "outpoints" -> up.writeJs(outpoints),
         "address" -> up.writeJs(address),
         "nodeId" -> up.writeJs(nodeId),
