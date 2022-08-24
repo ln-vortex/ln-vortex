@@ -51,8 +51,8 @@ class RemixNetworkingTest
       utxosB <- clientB.listCoins().map(c => Random.shuffle(c).take(1))
       _ = clientB.queueCoins(utxosB.map(_.outputReference), addrB)
 
-      txId <- coordinator.completedTxP.future.map(_.txIdBE)
-      nextCoordinator <- coordinator.nextCoordinatorP.future
+      txId <- coordinator.getCompletedTx.map(_.txIdBE)
+      nextCoordinator <- coordinator.getNextCoordinator
 
       addrA <- clientA.vortexWallet.getNewAddress(
         nextCoordinator.roundParams.outputType)
@@ -87,8 +87,8 @@ class RemixNetworkingTest
       _ = clientB.queueCoins(coinsB, addrB)
 
       // await completion of the round
-      _ <- nextCoordinator.completedTxP.future
-      _ <- nextCoordinator.nextCoordinatorP.future
+      _ <- nextCoordinator.getCompletedTx
+      _ <- nextCoordinator.getNextCoordinator
 
       roundDbs <- nextCoordinator.roundDAO.findAll()
 

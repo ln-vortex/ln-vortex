@@ -64,8 +64,10 @@ class VortexCoordinator private (
 
   lazy val publicKey: SchnorrPublicKey = km.publicKey
 
-  val nextCoordinatorP: Promise[VortexCoordinator] =
+  private val nextCoordinatorP: Promise[VortexCoordinator] =
     Promise[VortexCoordinator]()
+
+  def getNextCoordinator: Future[VortexCoordinator] = nextCoordinatorP.future
 
   def getCurrentRoundId: DoubleSha256Digest = roundId
 
@@ -140,8 +142,10 @@ class VortexCoordinator private (
   private val signedPMap: mutable.Map[Sha256Digest, Boolean] =
     mutable.Map.empty
 
-  val completedTxP: Promise[Transaction] =
+  private val completedTxP: Promise[Transaction] =
     Promise[Transaction]()
+
+  def getCompletedTx: Future[Transaction] = completedTxP.future
 
   private def disconnectPeers(): Unit = {
     if (connectionHandlerMap.values.nonEmpty) {

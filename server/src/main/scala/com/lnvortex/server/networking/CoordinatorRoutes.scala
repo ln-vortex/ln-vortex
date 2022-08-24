@@ -25,7 +25,7 @@ class CoordinatorRoutes(var coordinator: VortexCoordinator)(implicit
 
   // Need to switch coordinator when given a new one
   def prepareNextCoordinator(): Unit = {
-    coordinator.nextCoordinatorP.future.map { nextCoordinator =>
+    coordinator.getNextCoordinator.map { nextCoordinator =>
       coordinator = nextCoordinator
       prepareNextCoordinator()
     }
