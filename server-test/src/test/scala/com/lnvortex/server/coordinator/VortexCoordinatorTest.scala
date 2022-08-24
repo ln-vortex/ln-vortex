@@ -19,11 +19,9 @@ import org.bitcoins.core.psbt.PSBT
 import org.bitcoins.crypto._
 import org.bitcoins.rpc.BitcoindException.InvalidAddressOrKey
 import org.bitcoins.testkit.EmbeddedPg
-import org.bitcoins.testkit.async.TestAsyncUtil
 import org.bitcoins.testkitcore.Implicits.GeneratorOps
 
 import scala.concurrent.Future
-import scala.concurrent.duration.DurationInt
 
 class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
   behavior of "VortexCoordinator"
@@ -1135,11 +1133,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
       _ <- coordinator.registerPSBTSignatures(peerId, signed.psbt)
       _ = queue.complete()
       msgs <- sink
-
-      // wait for cleanup to complete
-      _ <- coordinator.completedTxP.future
-      _ <- TestAsyncUtil.nonBlockingSleep(2.seconds)
-    } yield assert(msgs.size == 2)
+    } yield assert(msgs.size == 1)
   }
 
   it must "fail register an invalid psbt signature" in { coordinator =>

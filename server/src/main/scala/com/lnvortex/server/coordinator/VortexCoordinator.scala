@@ -137,10 +137,10 @@ class VortexCoordinator private (
   private val inputsRegisteredP: Promise[Unit] = Promise[Unit]()
   private val outputsRegisteredP: Promise[Unit] = Promise[Unit]()
 
-  private val signedPMap: mutable.Map[Sha256Digest, Promise[PSBT]] =
+  private val signedPMap: mutable.Map[Sha256Digest, Boolean] =
     mutable.Map.empty
 
-  private[server] val completedTxP: Promise[Transaction] =
+  val completedTxP: Promise[Transaction] =
     Promise[Transaction]()
 
   private def disconnectPeers(): Unit = {
@@ -318,6 +318,28 @@ class VortexCoordinator private (
         }
       }
       _ <- Future.sequence(sendFs)
+
+      _ <- AsyncUtil
+        .awaitCondition(() => signedPMap.forall(_._2),
+                        1.second,
+                        config.signingTime.toSeconds.toInt)
+        .recoverWith { case _: TimeoutException =>
+          logger.error("Timed out waiting for all peers to sign")
+          Future.failed(
+            new RuntimeException("Timed out waiting for all peers to sign"))
+        }
+
+      alices <- aliceDAO.findSignedForRound(roundId)
+
+      signedT = Try {
+        val psbts = alices.flatMap(_.signedPSBT)
+
+        val combined = psbts.reduce(_ combinePSBT _)
+        combined.extractTransactionAndValidate
+      }.flatten
+
+      // make promise complete
+      _ = completedTxP.tryComplete(signedT)
     } yield psbt
   }
 
@@ -326,6 +348,17 @@ class VortexCoordinator private (
     val f = for {
       _ <- bitcoind.sendRawTransaction(tx)
       _ = logger.info(s"Broadcasted transaction ${tx.txIdBE.hex}")
+
+      msg = SignedTxMessage(tx)
+
+      // Announce to peers
+      sendFs = connectionHandlerMap.map { case (peerId, peer) =>
+        peer
+          .offer(TextMessage(Json.toJson(msg).toString))
+          .recover { e =>
+            logger.error(s"Error sending signed tx to ${peerId.hex}", e)
+          }
+      }
 
       addrs <- bitcoind.listReceivedByAddress(confirmations = 0,
                                               includeEmpty = false,
@@ -341,6 +374,7 @@ class VortexCoordinator private (
       }
 
       _ <- safeDatabase.run(action)
+      _ <- Future.sequence(sendFs)
       _ <- VortexCoordinator.nextRound(this)
     } yield ()
 
@@ -733,7 +767,7 @@ class VortexCoordinator private (
           }
 
           inputDbs.map(_.peerId).distinct.foreach { peerId =>
-            signedPMap.put(peerId, Promise[PSBT]())
+            signedPMap.put(peerId, false)
           }
 
           for {
@@ -748,7 +782,7 @@ class VortexCoordinator private (
 
   private[lnvortex] def registerPSBTSignatures(
       peerId: Sha256Digest,
-      psbt: PSBT): Future[Transaction] = {
+      psbt: PSBT): Future[Unit] = {
     logger.info(s"${peerId.hex} is registering PSBT sigs")
 
     val action = for {
@@ -778,34 +812,11 @@ class VortexCoordinator private (
 
             if (correctNumInputs && sameTx && validSigs) {
               // mark successful
-              signedPMap(peerId).success(psbt)
-              val markSignedF = aliceDAO.update(aliceDb.markSigned(psbt))
-
-              val signedFs = signedPMap.values.map(_.future)
-
-              val signedT = Try {
-                val psbts =
-                  Await.result(Future.sequence(signedFs), config.signingTime)
-
-                val combined = psbts.reduce(_ combinePSBT _)
-                combined.extractTransactionAndValidate
-              }.flatten
-
+              logger.info(s"${peerId.hex} successfully registered signatures")
               for {
-                _ <- markSignedF
-                signed <- Future.fromTry(signedT)
-                msg = SignedTxMessage(signed)
-
-                // Announce to peers
-                _ <- connectionHandlerMap(peerId)
-                  .offer(TextMessage(Json.toJson(msg).toString))
-                  .recover { e =>
-                    logger.error(s"Error sending signed tx to ${peerId.hex}", e)
-                  }
-
-                // mark promise complete
-                _ = completedTxP.tryComplete(signedT)
-              } yield signed
+                _ <- aliceDAO.update(aliceDb.markSigned(psbt))
+                _ = signedPMap.update(peerId, true)
+              } yield ()
             } else {
               val bannedUntil =
                 TimeUtil.now.plusSeconds(
@@ -836,8 +847,6 @@ class VortexCoordinator private (
               // only ban if the user's fault
               val ban = !validSigs || !sameTx
 
-              signedPMap(peerId).failure(exception)
-
               if (ban) {
                 bannedUtxoDAO
                   .upsertAll(dbs)
@@ -847,7 +856,6 @@ class VortexCoordinator private (
           case None =>
             val exception =
               new IllegalStateException("Round in invalid state, no psbt")
-            signedPMap(peerId).failure(exception)
             Future.failed(exception)
         }
     }
@@ -896,32 +904,31 @@ class VortexCoordinator private (
       _ <- aliceDAO.deleteByPeerIdsAction(signedPeerIds)
     } yield signedPeerIds
 
-    // todo this is 2 DBIOActions, should be 1
     for {
       signedPeerIds <- safeDatabase.run(action)
       // clone connectionHandlerMap because newRound() will clear it
       oldMap = connectionHandlerMap.clone()
       // restart round with good alices
-      // todo need to not announce to everyone
-      nextCoordinator <- VortexCoordinator.nextRound(this)
+      nextCoordinator <- VortexCoordinator.nextRound(this, announce = false)
 
-      // todo maybe make remaining a beingReconciliation() method
       actions = signedPeerIds.map { id =>
-        getNonceAction(peerId = id, nextCoordinator.roundId).flatMap { db =>
-          val nonceMsg = NonceMessage(db.nonce)
-          val restartMsg =
-            RestartRoundMessage(nextCoordinator.roundParams, nonceMsg)
-          val connectionHandler = oldMap(id)
-          nextCoordinator.connectionHandlerMap.put(id, connectionHandler)
+        nextCoordinator
+          .getNonceAction(peerId = id, nextCoordinator.roundId)
+          .flatMap { db =>
+            val nonceMsg = NonceMessage(db.nonce)
+            val restartMsg =
+              RestartRoundMessage(nextCoordinator.roundParams, nonceMsg)
+            val connectionHandler = oldMap(id)
+            nextCoordinator.connectionHandlerMap.put(id, connectionHandler)
 
-          // recover failures for disconnected peers
-          val sendF = connectionHandler
-            .offer(TextMessage(Json.toJson(restartMsg).toString))
-            .recover(_ => ())
-            .map(_ => restartMsg)
+            // recover failures for disconnected peers
+            val sendF = connectionHandler
+              .offer(TextMessage(Json.toJson(restartMsg).toString))
+              .recover(_ => ())
+              .map(_ => restartMsg)
 
-          DBIO.from(sendF)
-        }
+            DBIO.from(sendF)
+          }
       }
 
       restartMsgs <- safeDatabase.run(DBIO.sequence(actions))
@@ -1011,7 +1018,8 @@ object VortexCoordinator extends Logging {
       }
   }
 
-  private def nextRound(old: VortexCoordinator)(implicit
+  private def nextRound(old: VortexCoordinator, announce: Boolean = true)(
+      implicit
       system: ActorSystem,
       ec: ExecutionContext): Future[VortexCoordinator] = {
     implicit val config: VortexCoordinatorAppConfig = old.config
@@ -1078,13 +1086,19 @@ object VortexCoordinator extends Logging {
         }
 
         // announce to peers
-        _ = logger.info("Announcing round to peers")
-        offerFs = old.roundSubscribers.map { queue =>
-          queue
-            .offer(TextMessage(Json.toJson(roundParams).toString))
-            .recover(_ => old.roundSubscribers -= queue)
-        }
-        _ <- Future.sequence(offerFs)
+        _ <-
+          if (announce) {
+            logger.info("Announcing round to peers")
+            val offerFs = old.roundSubscribers.map { queue =>
+              queue
+                .offer(TextMessage(Json.toJson(roundParams).toString))
+                .recover(_ => old.roundSubscribers -= queue)
+            }
+
+            Future.sequence(offerFs)
+          } else {
+            Future.unit
+          }
       } yield newCoordinator
     }
   }
