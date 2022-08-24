@@ -3,7 +3,7 @@ package com.lnvortex.rpc
 import akka.actor.ActorSystem
 import com.bitcoins.clightning.rpc.CLightningRpcClient
 import com.bitcoins.clightning.rpc.config._
-import com.lnvortex.client.VortexClient
+import com.lnvortex.client._
 import com.lnvortex.client.config.VortexAppConfig
 import com.lnvortex.clightning._
 import com.lnvortex.config.LnVortexRpcServerConfig
@@ -89,7 +89,8 @@ case class LnVortexAppConfig(
     case CLightning => CLightningVortexWallet(clightningClient)
   }
 
-  lazy val client: VortexClient[VortexWalletApi] = VortexClient(wallet)
+  lazy val clientManager: VortexClientManager[VortexWalletApi] =
+    new VortexClientManager(wallet)
 }
 
 object LnVortexAppConfig

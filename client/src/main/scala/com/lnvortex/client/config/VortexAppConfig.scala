@@ -5,14 +5,15 @@ import com.lnvortex.client.db.UTXODAO
 import com.typesafe.config.Config
 import grizzled.slf4j.Logging
 import org.bitcoins.commons.config._
-import org.bitcoins.core.util.{FutureUtil, NetworkUtil}
+import org.bitcoins.core.config._
+import org.bitcoins.core.util._
 import org.bitcoins.db._
 import org.bitcoins.tor.config.TorAppConfig
-import org.bitcoins.tor.{Socks5ProxyParams, TorParams}
+import org.bitcoins.tor._
 
-import java.net.InetSocketAddress
 import java.nio.file.{Files, Path, Paths}
 import scala.concurrent._
+import scala.jdk.CollectionConverters._
 import scala.util.Properties
 
 /** Configuration for Ln Vortex
@@ -52,17 +53,26 @@ case class VortexAppConfig(baseDatadir: Path, configOverrides: Vector[Config])(
     TorAppConfig(baseDatadir, None, configOverrides)
 
   lazy val socks5ProxyParams: Option[Socks5ProxyParams] = {
-    val host = coordinatorAddress.getHostString
-    if (host == "localhost" || host == "127.0.0.1") {
-      None
-    } else torConf.socks5ProxyParams
+    torConf.socks5ProxyParams
   }
 
-  lazy val torParams: Option[TorParams] = torConf.torParams
+  lazy val coordinatorAddresses: Map[
+    BitcoinNetwork,
+    Vector[CoordinatorAddress]] = {
+    val coordinators =
+      config.getConfigList(s"$moduleName.coordinators").asScala.toList
 
-  lazy val coordinatorAddress: InetSocketAddress = {
-    val str = config.getString(s"$moduleName.coordinator")
-    NetworkUtil.parseInetSocketAddress(str, 12523)
+    val list = for {
+      coordinatorConfig <- coordinators
+      name = coordinatorConfig.getString("name")
+      networkStr = coordinatorConfig.getString("network")
+      address = coordinatorConfig.getString("address")
+    } yield CoordinatorAddress(
+      name,
+      BitcoinNetworks.fromString(networkStr),
+      NetworkUtil.parseInetSocketAddress(address, 12523))
+
+    list.toVector.groupBy(_.network)
   }
 
   override lazy val appConfig: VortexAppConfig = this

@@ -18,7 +18,23 @@ import java.time.Instant
 import scala.util._
 import scala.util.control.NonFatal
 
+case class SelectCoordinator(coordinator: String)
+
+object SelectCoordinator extends ServerJsonModels {
+
+  implicit val SelectCoordinatorRW: Reader[SelectCoordinator] =
+    reader[ujson.Obj].map[SelectCoordinator](json =>
+      SelectCoordinator(
+        json("coordinator").str
+      ))
+
+  def fromJsObj(obj: ujson.Obj): Try[SelectCoordinator] = {
+    Try(upickle.default.read[SelectCoordinator](obj))
+  }
+}
+
 case class QueueCoins(
+    coordinator: String,
     outpoints: Vector[TransactionOutPoint],
     address: Option[BitcoinAddress],
     nodeId: Option[NodeId],
@@ -32,6 +48,7 @@ object QueueCoins extends ServerJsonModels {
   implicit val queueCoinsRW: Reader[QueueCoins] =
     reader[ujson.Obj].map[QueueCoins](json =>
       QueueCoins(
+        json("coordinator").str,
         up.read[Vector[TransactionOutPoint]](json("outpoints")),
         if (json.obj.contains("address")) {
           val res = Try(up.read[BitcoinAddress](json("address"))).getOrElse(
@@ -54,29 +71,6 @@ object QueueCoins extends ServerJsonModels {
           Some(res)
         } else None
       ))
-
-  def fromJsArr(jsArr: ujson.Arr): Try[QueueCoins] = {
-    jsArr.arr.toList match {
-      case outpointsJs :: addrJs :: nodeIdJs :: peerAddrOptJs :: Nil =>
-        Try {
-          val outpoints = jsToTransactionOutPointSeq(outpointsJs).toVector
-          val addrOpt = nullToOpt(addrJs).map(js => BitcoinAddress(js.str))
-          val nodeIdOpt = nullToOpt(nodeIdJs).map(js => NodeId(js.str))
-          val peerOpt = nullToOpt(peerAddrOptJs).map(js =>
-            new InetSocketAddress(js.str, 9735))
-
-          QueueCoins(outpoints, addrOpt, nodeIdOpt, peerOpt)
-        }
-      case Nil =>
-        Failure(
-          new IllegalArgumentException(
-            "Missing outpoints and nodeId arguments"))
-      case other =>
-        Failure(
-          new IllegalArgumentException(
-            s"Bad number of arguments: ${other.length}. Expected: 2 or 3"))
-    }
-  }
 
   def fromJsObj(obj: ujson.Obj): Try[QueueCoins] = {
     Try(upickle.default.read[QueueCoins](obj))

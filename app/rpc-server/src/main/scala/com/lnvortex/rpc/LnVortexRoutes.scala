@@ -3,7 +3,7 @@ package com.lnvortex.rpc
 import akka.actor.ActorSystem
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server._
-import com.lnvortex.client.VortexClient
+import com.lnvortex.client._
 import com.lnvortex.config.VortexPicklers._
 import com.lnvortex.core.RoundDetails.getRoundParamsOpt
 import com.lnvortex.core.api.VortexWalletApi
@@ -11,32 +11,36 @@ import play.api.libs.json._
 
 import scala.concurrent._
 
-case class LnVortexRoutes(client: VortexClient[VortexWalletApi])(implicit
-    system: ActorSystem)
+case class LnVortexRoutes(clientManager: VortexClientManager[VortexWalletApi])(
+    implicit system: ActorSystem)
     extends ServerRoute {
   implicit val ec: ExecutionContext = system.dispatcher
+
+  def getClient(coordinator: String): VortexClient[VortexWalletApi] = {
+    clientManager.clients(coordinator)
+  }
 
   override def handleCommand: PartialFunction[ServerCommand, Route] = {
     case ServerCommand(id, "listutxos", _) =>
       complete {
-        client.listCoins().map { utxos =>
+        clientManager.listCoins().map { utxos =>
           RpcServer.httpSuccess(id, utxos)
         }
       }
 
     case ServerCommand(id, "getinfo", _) =>
       complete {
-        val json = JsObject(
-          Vector(
-            "network" -> JsString(client.vortexWallet.network.toString)
-          ))
+        val json = Json.obj(
+          "network" -> clientManager.vortexWallet.network.toString,
+          "coordinators" -> clientManager.coordinators.map(_.name)
+        )
 
         RpcServer.httpSuccess(id, json)
       }
 
     case ServerCommand(id, "getbalance", _) =>
       complete {
-        client.listCoins().map { utxos =>
+        clientManager.listCoins().map { utxos =>
           val balance = utxos.map(_.amount).sum.satoshis
           RpcServer.httpSuccess(id, balance.toLong)
         }
@@ -44,35 +48,55 @@ case class LnVortexRoutes(client: VortexClient[VortexWalletApi])(implicit
 
     case ServerCommand(id, "listtransactions", _) =>
       complete {
-        client.vortexWallet.listTransactions().map { txs =>
+        clientManager.vortexWallet.listTransactions().map { txs =>
           RpcServer.httpSuccess(id, txs)
         }
       }
 
     case ServerCommand(id, "listchannels", _) =>
       complete {
-        client.listChannels().map { channels =>
+        clientManager.listChannels().map { channels =>
           RpcServer.httpSuccess(id, channels)
         }
       }
 
-    case ServerCommand(id, "getstatus", _) =>
+    case ServerCommand(id, "getstatuses", _) =>
       complete {
-        val details = client.getCurrentRoundDetails
-        RpcServer.httpSuccess(id, details)
+        val allDetails =
+          clientManager.clients.values.map(_.getCurrentRoundDetails)
+        RpcServer.httpSuccess(id, allDetails)
       }
 
-    case ServerCommand(id, "cancelcoins", _) =>
-      complete {
-        client.cancelRegistration().map { _ =>
-          RpcServer.httpSuccess(id, JsNull)
-        }
+    case ServerCommand(id, "getstatus", obj) =>
+      withValidServerCommand(SelectCoordinator.fromJsObj(obj)) {
+        case SelectCoordinator(coordinator) =>
+          complete {
+            val client = getClient(coordinator)
+            val details = client.getCurrentRoundDetails
+            RpcServer.httpSuccess(id, details)
+          }
+      }
+
+    case ServerCommand(id, "cancelcoins", obj) =>
+      withValidServerCommand(SelectCoordinator.fromJsObj(obj)) {
+        case SelectCoordinator(coordinator) =>
+          complete {
+            val client = getClient(coordinator)
+            client.cancelRegistration().map { _ =>
+              RpcServer.httpSuccess(id, JsNull)
+            }
+          }
       }
 
     case ServerCommand(id, "queuecoins", obj) =>
       withValidServerCommand(QueueCoins.fromJsObj(obj)) {
-        case QueueCoins(outpoints, addrOpt, nodeIdOpt, peerAddrOpt) =>
+        case QueueCoins(coordinator,
+                        outpoints,
+                        addrOpt,
+                        nodeIdOpt,
+                        peerAddrOpt) =>
           complete {
+            val client = getClient(coordinator)
             val f = client.askNonce().flatMap { _ =>
               (addrOpt, nodeIdOpt) match {
                 case (Some(_), Some(_)) =>

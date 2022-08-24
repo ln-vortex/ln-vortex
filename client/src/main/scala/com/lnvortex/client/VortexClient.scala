@@ -2,7 +2,7 @@ package com.lnvortex.client
 
 import akka.actor.ActorSystem
 import com.lnvortex.client.VortexClientException._
-import com.lnvortex.client.config.VortexAppConfig
+import com.lnvortex.client.config.{CoordinatorAddress, VortexAppConfig}
 import com.lnvortex.client.db._
 import com.lnvortex.client.networking._
 import com.lnvortex.core.RoundDetails.{getNonceOpt, getRoundParamsOpt}
@@ -27,13 +27,18 @@ import java.net.InetSocketAddress
 import scala.concurrent._
 import scala.concurrent.duration._
 
-case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
+case class VortexClient[+T <: VortexWalletApi](
+    vortexWallet: T,
+    coordinatorAddress: CoordinatorAddress)(implicit
     val system: ActorSystem,
     val config: VortexAppConfig)
     extends VortexHttpClient[T]
     with StartStopAsync[Unit]
     with Logging {
   implicit val ec: ExecutionContext = system.dispatcher
+
+  require(coordinatorAddress.network == vortexWallet.network,
+          "Coordinator address network must match wallet network")
 
   lazy val utxoDAO: UTXODAO = UTXODAO()
 
@@ -74,8 +79,6 @@ case class VortexClient[+T <: VortexWalletApi](vortexWallet: T)(implicit
 
   override def start(): Future[Unit] = {
     for {
-      coins <- vortexWallet.listCoins()
-      _ <- utxoDAO.createMissing(coins)
       _ <- subscribeRounds(vortexWallet.network)
     } yield ()
   }
