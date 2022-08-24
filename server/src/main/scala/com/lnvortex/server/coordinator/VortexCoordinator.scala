@@ -1056,21 +1056,6 @@ object VortexCoordinator extends Logging {
           amount = config.roundAmount
         )
 
-        val roundParams: RoundParameters =
-          RoundParameters(
-            version = 0,
-            roundId = roundId,
-            amount = config.roundAmount,
-            coordinatorFee = config.coordinatorFee,
-            publicKey = old.publicKey,
-            time = roundStartTime,
-            maxPeers = config.maxPeers,
-            inputType = config.inputScriptType,
-            outputType = config.outputScriptType,
-            changeType = config.changeScriptType,
-            status = config.statusString
-          )
-
         for {
           _ <- old.roundDAO.create(roundDb)
 
@@ -1093,7 +1078,8 @@ object VortexCoordinator extends Logging {
               logger.info("Announcing round to peers")
               val offerFs = old.roundSubscribers.map { queue =>
                 queue
-                  .offer(TextMessage(Json.toJson(roundParams).toString))
+                  .offer(TextMessage(
+                    Json.toJson(newCoordinator.roundParams).toString))
                   .recover(_ => old.roundSubscribers -= queue)
               }
 
