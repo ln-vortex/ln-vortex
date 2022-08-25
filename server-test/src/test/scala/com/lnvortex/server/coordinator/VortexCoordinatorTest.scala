@@ -44,9 +44,6 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
         dbOpt <- coordinator.roundDAO.read(coordinator.getCurrentRoundId)
       } yield {
         assert(dbOpt.isDefined)
-        assert(coordinator.inputFee != Satoshis.zero)
-        assert(coordinator.outputFee() != Satoshis.zero)
-        assert(coordinator.changeOutputFee != Satoshis.zero)
       }
   }
 
@@ -170,7 +167,9 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
       aliceDb <- coordinator.getNonce(Sha256Digest.empty,
                                       dummyQueue(),
                                       coordinator.getCurrentRoundId)
-      _ <- coordinator.beginInputRegistration()
+      _ <- coordinator
+        .beginInputRegistration()
+        .recover(_ => ())
 
       utxo <- bitcoind.listUnspent.map(_.head)
       outputRef = {
@@ -201,6 +200,8 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
       registerInputs = RegisterInputs(Vector(inputRef),
                                       blind,
                                       utxo.scriptPubKey)
+
+      _ <- coordinator.getAskInputsMessage
 
       res <- recoverToSucceededIf[InvalidInputsException](
         coordinator.registerAlice(Sha256Digest.empty, registerInputs))
@@ -975,22 +976,13 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
   }
 
   it must "construct the unsigned tx" in { coordinator =>
-    val (queue, source) = Source
-      .queue[Message](bufferSize = 10,
-                      OverflowStrategy.backpressure,
-                      maxConcurrentOffers = 2)
-      .toMat(BroadcastHub.sink)(Keep.both)
-      .run()
-
-    val sink = source.runWith(Sink.seq)
-
     val peerIds =
       0.to(5)
         .map(_ => CryptoUtil.sha256(ECPrivateKey.freshPrivateKey.bytes))
         .toVector
 
     val aliceDbFs = peerIds.map(peerId =>
-      coordinator.getNonce(peerId, queue, coordinator.getCurrentRoundId))
+      coordinator.getNonce(peerId, dummyQueue(), coordinator.getCurrentRoundId))
 
     for {
       aliceDbs <- Future.sequence(aliceDbFs)
@@ -1039,12 +1031,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
 
       inputDbs <- coordinator.inputsDAO.findByRoundId(
         coordinator.getCurrentRoundId)
-
-      _ = queue.complete()
-      msgs <- sink
     } yield {
-      assert(msgs.size == 12)
-
       assert(inputDbs.forall(_.indexOpt.isDefined))
       val correctOutpoints = inputDbs.forall { db =>
         val index = db.indexOpt.get
@@ -1088,6 +1075,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
 
       addr <- bitcoind.getNewAddress
       unspent <- bitcoind.listUnspent.map(_.head)
+      _ <- coordinator.beginInputRegistration()
 
       updatedAliceDbs = {
         aliceDb.setOutputValues(
@@ -1133,7 +1121,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
       _ <- coordinator.registerPSBTSignatures(peerId, signed.psbt)
       _ = queue.complete()
       msgs <- sink
-    } yield assert(msgs.size == 1)
+    } yield assert(msgs.size == 2)
   }
 
   it must "fail register an invalid psbt signature" in { coordinator =>
@@ -1147,6 +1135,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
 
       addr <- bitcoind.getNewAddress
       unspent <- bitcoind.listUnspent.map(_.head)
+      _ <- coordinator.beginInputRegistration()
 
       updatedAliceDbs = {
         aliceDb.setOutputValues(
@@ -1211,6 +1200,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
 
       addr <- bitcoind.getNewAddress
       unspent <- bitcoind.listUnspent.map(_.head)
+      _ <- coordinator.beginInputRegistration()
 
       updatedAliceDbs = {
         // wrong number of inputs
@@ -1268,6 +1258,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
 
       addr <- bitcoind.getNewAddress
       unspent <- bitcoind.listUnspent.map(_.head)
+      _ <- coordinator.beginInputRegistration()
 
       updatedAliceDbs = {
         aliceDb.setOutputValues(isRemix = false,

@@ -67,9 +67,9 @@ class RoundDetailsTest extends BitcoinSUnitTest {
                                     hasChange = true)
     )
 
-    val amt = details.expectedAmtBackOpt(numRemixes = 1, numNewEntrants = 1)
+    val amt = details.expectedAmtBack(numRemixes = 1, numNewEntrants = 1)
 
-    assert(amt.contains(Satoshis(99424)))
+    assert(amt == Satoshis(99424))
   }
 
   it must "calculate expected change amount with no change" in {
@@ -84,8 +84,8 @@ class RoundDetailsTest extends BitcoinSUnitTest {
                                     hasChange = false)
     )
 
-    val amt = details.expectedAmtBackOpt(numRemixes = 1, numNewEntrants = 1)
+    val amt = details.expectedAmtBack(numRemixes = 1, numNewEntrants = 1)
 
-    assert(amt.isEmpty)
+    assert(amt == Satoshis.zero)
   }
 }

@@ -25,7 +25,7 @@ import java.net.{InetSocketAddress, URI}
 import java.nio.file.{Files, Path, Paths}
 import scala.concurrent._
 import scala.concurrent.duration._
-import scala.util.Properties
+import scala.util.{Properties, Random}
 
 /** Configuration for Ln Vortex
   *
@@ -166,21 +166,19 @@ case class VortexCoordinatorAppConfig(
   private val feeProviderBackup: BitcoinerLiveFeeRateProvider =
     BitcoinerLiveFeeRateProvider(30, None)
 
-  def fetchFeeRate(): Future[SatoshisPerVirtualByte] = {
-    val feeRateF =
-      feeProvider.getFeeRate().recoverWith { case _: Throwable =>
-        feeProviderBackup.getFeeRate().recover { case _: Throwable =>
-          network match {
-            case MainNet | TestNet3 | SigNet =>
-              throw new RuntimeException(
-                "Failed to get fee rate from fee providers")
-            case RegTest =>
-              SatoshisPerVirtualByte.fromLong(1)
-          }
-        }
-      }
+  private val random = new Random(System.currentTimeMillis())
 
-    feeRateF
+  def fetchFeeRate(): Future[SatoshisPerVirtualByte] = {
+    network match {
+      case MainNet | TestNet3 | SigNet =>
+        feeProvider.getFeeRate().recoverWith { case _: Throwable =>
+          feeProviderBackup.getFeeRate()
+        }
+      case RegTest =>
+        val rand = random.nextInt() % 50
+        val max = Math.max(Math.abs(rand), 1)
+        Future.successful(SatoshisPerVirtualByte.fromLong(max))
+    }
   }
 
   def initialize(): Unit = {

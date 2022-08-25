@@ -2,7 +2,7 @@ package com.lnvortex.server.models
 
 import com.lnvortex.core.RoundStatus
 import com.lnvortex.server.config.VortexCoordinatorAppConfig
-import org.bitcoins.core.currency.CurrencyUnit
+import org.bitcoins.core.currency._
 import org.bitcoins.core.protocol.transaction.Transaction
 import org.bitcoins.core.psbt.PSBT
 import org.bitcoins.core.wallet.fee.SatoshisPerVirtualByte
@@ -27,7 +27,15 @@ case class RoundDAO()(implicit
     MappedColumnType.base[RoundStatus, String](_.toString,
                                                RoundStatus.fromString)
 
-  import mappers._
+  implicit val satoshisPerVirtualByteMapper: BaseColumnType[
+    SatoshisPerVirtualByte] = {
+    MappedColumnType
+      .base[SatoshisPerVirtualByte, Int](
+        _.toLong.toInt,
+        int => SatoshisPerVirtualByte.fromLong(int.toLong))
+  }
+
+  import mappers.{satoshisPerVirtualByteMapper => _, _}
 
   override val table: TableQuery[RoundTable] = TableQuery[RoundTable]
 
@@ -57,17 +65,11 @@ case class RoundDAO()(implicit
 
     def roundTime: Rep[Instant] = column("round_time")
 
-    def feeRate: Rep[SatoshisPerVirtualByte] = column("fee_rate")
-
     def coordinatorFee: Rep[CurrencyUnit] = column("coordinator_fee")
 
-    def inputFee: Rep[CurrencyUnit] = column("input_fee")
-
-    def outputFee: Rep[CurrencyUnit] = column("output_fee")
-
-    def changeOutputFee: Rep[CurrencyUnit] = column("change_fee")
-
     def amount: Rep[CurrencyUnit] = column("amount")
+
+    def feeRate: Rep[Option[SatoshisPerVirtualByte]] = column("fee_rate")
 
     def psbtOpt: Rep[Option[PSBT]] = column("psbt")
 
@@ -81,12 +83,9 @@ case class RoundDAO()(implicit
       (roundId,
        status,
        roundTime,
-       feeRate,
        coordinatorFee,
-       inputFee,
-       outputFee,
-       changeOutputFee,
        amount,
+       feeRate,
        psbtOpt,
        transactionOpt,
        txIdOpt,

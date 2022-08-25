@@ -13,6 +13,7 @@ import com.lnvortex.server.models._
 import grizzled.slf4j.Logging
 import org.bitcoins.asyncutil.AsyncUtil
 import org.bitcoins.commons.jsonmodels.bitcoind.RpcOpts.AddressType
+import org.bitcoins.core.config._
 import org.bitcoins.core.currency._
 import org.bitcoins.core.number._
 import org.bitcoins.core.policy.Policy
@@ -39,7 +40,6 @@ import scala.util._
 class VortexCoordinator private (
     private[coordinator] val km: CoordinatorKeyManager,
     val bitcoind: BitcoindRpcClient,
-    feeRate: SatoshisPerVirtualByte,
     val roundId: DoubleSha256Digest,
     roundStartTime: Long)(implicit
     system: ActorSystem,
@@ -69,16 +69,21 @@ class VortexCoordinator private (
 
   def getNextCoordinator: Future[VortexCoordinator] = nextCoordinatorP.future
 
+  private val askInputsP: Promise[AskInputs] = Promise[AskInputs]()
+
+  def getAskInputsMessage: Future[AskInputs] = askInputsP.future
+
   def getCurrentRoundId: DoubleSha256Digest = roundId
 
   private def roundAddressLabel: String = s"Vortex Round: ${roundId.hex}"
 
-  private[server] def inputFee: CurrencyUnit = {
+  private[server] def inputFee(
+      feeRate: SatoshisPerVirtualByte): CurrencyUnit = {
     FeeCalculator.inputFee(feeRate, config.inputScriptType)
   }
 
   private[server] def outputFee(
-      feeRate: SatoshisPerVirtualByte = feeRate,
+      feeRate: SatoshisPerVirtualByte,
       numPeersOpt: Option[Int] = Some(config.minPeers)): CurrencyUnit = {
     FeeCalculator.outputFee(feeRate = feeRate,
                             outputScriptType = config.outputScriptType,
@@ -86,7 +91,8 @@ class VortexCoordinator private (
                             numPeersOpt = numPeersOpt)
   }
 
-  private[server] def changeOutputFee: CurrencyUnit = {
+  private[server] def changeOutputFee(
+      feeRate: SatoshisPerVirtualByte): CurrencyUnit = {
     FeeCalculator.changeOutputFee(feeRate, config.changeScriptType)
   }
 
@@ -186,55 +192,69 @@ class VortexCoordinator private (
   }
 
   private[lnvortex] def beginInputRegistration(): Future[AskInputs] = {
-    logger.info("Starting input registration")
+    if (beginInputRegistrationCancellable.cancel()) {
+      logger.info("Starting input registration")
 
-    beginInputRegistrationCancellable.cancel()
+      val feeRateF = config.network match {
+        case MainNet | TestNet3 | SigNet =>
+          // Wait 3 seconds to help prevent race conditions in clients
+          // but only in live environments
+          AsyncUtil
+            .nonBlockingSleep(3.seconds)
+            .flatMap(_ => config.fetchFeeRate())
+        case RegTest => config.fetchFeeRate()
+      }
 
-    // Wait 3 seconds to help prevent race conditions in clients
-    val feeRateF =
-      AsyncUtil.nonBlockingSleep(3.seconds).flatMap(_ => config.fetchFeeRate())
+      feeRateF.flatMap { feeRate =>
+        val action = for {
+          roundDb <- currentRoundAction()
+          updated = roundDb.copy(status = RegisterAlices,
+                                 feeRate = Some(feeRate))
+          _ <- roundDAO.updateAction(updated)
+          alices <- aliceDAO.findByRoundIdAction(roundDb.roundId)
+        } yield alices.size
 
-    feeRateF.flatMap { feeRate =>
-      val action = for {
-        roundDb <- currentRoundAction()
-        updated = roundDb.copy(status = RegisterAlices, feeRate = feeRate)
-        _ <- roundDAO.updateAction(updated)
-        alices <- aliceDAO.findByRoundIdAction(roundDb.roundId)
-      } yield alices.size
+        safeDatabase.run(action).flatMap { numAlices =>
+          if (numAlices >= config.minPeers) {
+            // Create Output Registration timer
+            beginOutputRegistrationCancellable = Some(
+              system.scheduler.scheduleOnce(config.inputRegistrationTime) {
+                inputsRegisteredP.trySuccess(())
+                ()
+              }
+            )
 
-      safeDatabase.run(action).flatMap { numAlices =>
-        if (numAlices >= config.minPeers) {
-          // Create Output Registration timer
-          beginOutputRegistrationCancellable = Some(
-            system.scheduler.scheduleOnce(config.inputRegistrationTime) {
-              inputsRegisteredP.trySuccess(())
-              ()
-            }
-          )
-
-          logger.info("Sending AskInputs to peers")
-          val msg =
-            AskInputs(roundId, inputFee, outputFee(), changeOutputFee)
-          // send messages async
-          val parallelism = FutureUtil.getParallelism
-          Source(connectionHandlerMap.toVector)
-            .mapAsync(parallelism = parallelism) { case (id, peer) =>
-              peer
-                .offer(TextMessage(Json.toJson(msg).toString))
-                .recover { ex =>
-                  logger.error(s"Failed to send AskInputs to peer ${id.hex}",
-                               ex)
-                }
-            }
-            .run()
-            .map(_ => msg)
-        } else {
-          Future.failed(
-            new RuntimeException("Not enough peers registered. " +
-              s"Need ${config.minPeers} but only have $numAlices"))
+            logger.info("Sending AskInputs to peers")
+            val msg =
+              AskInputs(roundId,
+                        inputFee(feeRate),
+                        outputFee(feeRate),
+                        changeOutputFee(feeRate))
+            // send messages async
+            val parallelism = FutureUtil.getParallelism
+            Source(connectionHandlerMap.toVector)
+              .mapAsync(parallelism = parallelism) { case (id, peer) =>
+                peer
+                  .offer(TextMessage(Json.toJson(msg).toString))
+                  .recover { ex =>
+                    logger.error(s"Failed to send AskInputs to peer ${id.hex}",
+                                 ex)
+                  }
+              }
+              .run()
+              .map { _ =>
+                askInputsP.trySuccess(msg)
+                msg
+              }
+          } else {
+            Future.failed(
+              new RuntimeException("Not enough peers registered. " +
+                s"Need ${config.minPeers} but only have $numAlices"))
+          }
         }
       }
-    }
+    } else
+      Future.failed(new RuntimeException("Input registration already started"))
   }
 
   private[lnvortex] def beginOutputRegistration(): Future[Unit] = {
@@ -658,19 +678,20 @@ class VortexCoordinator private (
     TransactionOutput] = {
     if (isRemix) Left(Satoshis.zero)
     else {
-      val updatedOutputFee = outputFee(roundDb.feeRate, Some(numNewEntrants))
+      val feeRate = roundDb.feeRate.get
+      val inputFee = this.inputFee(feeRate)
+      val updatedOutputFee = outputFee(feeRate, Some(numNewEntrants))
       val totalNewEntrantFee =
-        Satoshis(numRemixes) * (roundDb.inputFee + outputFee(roundDb.feeRate,
-                                                             None))
+        Satoshis(numRemixes) * (inputFee + outputFee(feeRate, None))
       val newEntrantFee = totalNewEntrantFee / Satoshis(numNewEntrants)
       val excess =
         inputAmount - roundDb.amount - roundDb.coordinatorFee - (Satoshis(
-          numInputs) * roundDb.inputFee) - updatedOutputFee - newEntrantFee
+          numInputs) * inputFee) - updatedOutputFee - newEntrantFee
 
       changeSpkOpt match {
         case Some(changeSpk) =>
           val dummy = TransactionOutput(Satoshis.zero, changeSpk)
-          val changeCost = roundDb.feeRate * dummy.byteSize
+          val changeCost = feeRate * dummy.byteSize
 
           val excessAfterChange = excess - changeCost
 
@@ -949,8 +970,7 @@ class VortexCoordinator private (
   override def start(): Unit = {
     if (
       roundStartTime == 0 ||
-      roundId == DoubleSha256Digest.empty ||
-      feeRate == SatoshisPerVirtualByte.zero
+      roundId == DoubleSha256Digest.empty
     ) {
       throw new IllegalStateException(
         "Cannot start server with invalid round parameters")
@@ -1012,11 +1032,8 @@ object VortexCoordinator extends Logging {
       .recover(_ => ())
       .flatMap { _ =>
         val km = new CoordinatorKeyManager()
-        val dummyOld = new VortexCoordinator(km,
-                                             bitcoind,
-                                             SatoshisPerVirtualByte.zero,
-                                             DoubleSha256Digest.empty,
-                                             0)
+        val dummyOld =
+          new VortexCoordinator(km, bitcoind, DoubleSha256Digest.empty, 0)
 
         nextRound(dummyOld)
       }
@@ -1028,71 +1045,59 @@ object VortexCoordinator extends Logging {
       ec: ExecutionContext): Future[VortexCoordinator] = {
     if (!old.nextCoordinatorP.isCompleted) {
       implicit val config: VortexCoordinatorAppConfig = old.config
-      config.fetchFeeRate().flatMap { feeRate =>
-        old.stop()
-        // generate new round id
-        val roundId =
-          CryptoUtil.doubleSHA256(ECPrivateKey.freshPrivateKey.bytes)
-        logger.info(s"Creating new Round! ${roundId.hex}")
+      old.stop()
+      // generate new round id
+      val roundId =
+        CryptoUtil.doubleSHA256(ECPrivateKey.freshPrivateKey.bytes)
+      logger.info(s"Creating new Round! ${roundId.hex}")
 
-        val roundStartTime =
-          TimeUtil.currentEpochSecond + config.roundInterval.toSeconds
+      val roundStartTime =
+        TimeUtil.currentEpochSecond + config.roundInterval.toSeconds
 
-        // disconnect peers so they all get new ids
-        old.disconnectPeers()
-        // clear some memory
-        old.connectionHandlerMap.clear()
-        old.signedPMap.clear()
+      // disconnect peers so they all get new ids
+      old.disconnectPeers()
+      // clear some memory
+      old.connectionHandlerMap.clear()
+      old.signedPMap.clear()
 
-        val roundDb = RoundDbs.newRound(
-          roundId = roundId,
-          roundTime = Instant.ofEpochSecond(roundStartTime),
-          feeRate = feeRate,
-          coordinatorFee = config.coordinatorFee,
-          inputFee = FeeCalculator.inputFee(feeRate, config.inputScriptType),
-          outputFee = FeeCalculator.outputFee(
-            feeRate = feeRate,
-            outputScriptType = config.outputScriptType,
-            coordinatorScriptType = config.changeScriptType,
-            numPeersOpt = Some(config.minPeers)),
-          changeFee =
-            FeeCalculator.changeOutputFee(feeRate, config.inputScriptType),
-          amount = config.roundAmount
-        )
+      val roundDb = RoundDbs.newRound(
+        roundId = roundId,
+        roundTime = Instant.ofEpochSecond(roundStartTime),
+        coordinatorFee = config.coordinatorFee,
+        amount = config.roundAmount
+      )
 
-        for {
-          _ <- old.roundDAO.create(roundDb)
+      for {
+        _ <- old.roundDAO.create(roundDb)
 
-          newCoordinator = new VortexCoordinator(old.km,
-                                                 old.bitcoind,
-                                                 feeRate,
-                                                 roundId,
-                                                 roundStartTime)
+        newCoordinator = new VortexCoordinator(old.km,
+                                               old.bitcoind,
+                                               roundId,
+                                               roundStartTime)
 
-          _ = {
-            newCoordinator.roundSubscribers ++= old.roundSubscribers
-            newCoordinator.start()
+        _ = {
+          newCoordinator.roundSubscribers ++= old.roundSubscribers
+          newCoordinator.start()
 
-            old.nextCoordinatorP.trySuccess(newCoordinator)
-          }
+          old.nextCoordinatorP.trySuccess(newCoordinator)
+        }
 
-          // announce to peers
-          _ <-
-            if (announce) {
-              logger.info("Announcing round to peers")
-              val offerFs = old.roundSubscribers.map { queue =>
-                queue
-                  .offer(TextMessage(
-                    Json.toJson(newCoordinator.roundParams).toString))
-                  .recover(_ => old.roundSubscribers -= queue)
-              }
-
-              Future.sequence(offerFs)
-            } else {
-              Future.unit
+        // announce to peers
+        _ <-
+          if (announce) {
+            logger.info("Announcing round to peers")
+            val offerFs = old.roundSubscribers.map { queue =>
+              queue
+                .offer(
+                  TextMessage(Json.toJson(newCoordinator.roundParams).toString))
+                .recover(_ => old.roundSubscribers -= queue)
             }
-        } yield newCoordinator
-      }
+
+            Future.sequence(offerFs)
+          } else {
+            Future.unit
+          }
+      } yield newCoordinator
     } else {
       Future.failed(
         new IllegalStateException("New round has already been created."))

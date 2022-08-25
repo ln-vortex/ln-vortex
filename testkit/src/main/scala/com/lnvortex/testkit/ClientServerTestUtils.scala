@@ -4,6 +4,7 @@ import akka.http.scaladsl.model.ws.Message
 import akka.stream.scaladsl.SourceQueueWithComplete
 import com.lnvortex.client._
 import com.lnvortex.core.RoundDetails.getRoundParamsOpt
+import com.lnvortex.core.UnspentCoin
 import com.lnvortex.lnd.LndVortexWallet
 import com.lnvortex.server.coordinator.VortexCoordinator
 import com.lnvortex.server.models.AliceDb
@@ -11,7 +12,8 @@ import org.bitcoins.core.currency.Satoshis
 import org.bitcoins.core.number.Int32
 import org.bitcoins.core.protocol.transaction.Transaction
 import org.bitcoins.core.psbt.PSBT
-import org.bitcoins.crypto.{DoubleSha256DigestBE, FieldElement, Sha256Digest}
+import org.bitcoins.core.wallet.fee.SatoshisPerVirtualByte
+import org.bitcoins.crypto._
 import org.bitcoins.lnd.rpc.LndRpcClient
 import org.bitcoins.testkit.async.TestAsyncUtil
 import org.scalactic.Tolerance.convertNumericToPlusOrMinusWrapper
@@ -22,6 +24,22 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Random
 
 trait ClientServerTestUtils {
+
+  def verifyFeeRate(
+      feeRate: SatoshisPerVirtualByte,
+      utxoSet: Vector[UnspentCoin],
+      tx: Transaction): Unit = {
+    val inputUtxos =
+      utxoSet.filter(t => tx.inputs.map(_.previousOutput).contains(t.outPoint))
+    assert(inputUtxos.size == tx.inputs.size)
+    val inputAmt = inputUtxos.map(_.amount).sum
+    val feePaid = (inputAmt - tx.totalOutput).satoshis.toLong
+    val expectedFee = (feeRate * tx.vsize).satoshis.toLong
+    val buffer = (feeRate * 2).satoshis.toLong
+
+    assert(feePaid === expectedFee +- buffer,
+           s"$feePaid != $expectedFee +- $buffer")
+  }
 
   def getDummyQueue: SourceQueueWithComplete[Message]
 
@@ -103,7 +121,7 @@ trait ClientServerTestUtils {
       utxos <- clientB.listCoins().map(c => Random.shuffle(c).take(1))
       _ <- clientB.queueCoins(utxos.map(_.outputReference), nodeIdA, None)
 
-      msg <- coordinator.beginInputRegistration()
+      msg <- coordinator.getAskInputsMessage
 
       registerInputsA <- clientA.registerCoins(msg.roundId,
                                                msg.inputFee,
@@ -253,12 +271,9 @@ trait ClientServerTestUtils {
 
       _ <- client.completeRound(tx)
 
-      inputUtxos = all.filter(t =>
-        tx.inputs.map(_.previousOutput).contains(t.outPoint))
-      inputAmt = inputUtxos.map(_.amount).sum
-      feePaid = (inputAmt - tx.totalOutput).satoshis.toLong
-      // regtest uses 1 sat/vbyte fee
-      _ = assert(feePaid === tx.vsize +- 1, s"$feePaid != ${tx.vsize} +- 1")
+      feeRate <- coordinator.currentRound().map(_.feeRate.get)
+      _ = verifyFeeRate(feeRate, all, tx)
+
       // Mine some blocks
       _ <- coordinator.bitcoind.getNewAddress.flatMap(
         coordinator.bitcoind.generateToAddress(6, _))
@@ -285,12 +300,8 @@ trait ClientServerTestUtils {
 
       _ <- client.completeRound(tx)
 
-      inputUtxos = all.filter(t =>
-        tx.inputs.map(_.previousOutput).contains(t.outPoint))
-      inputAmt = inputUtxos.map(_.amount).sum
-      feePaid = (inputAmt - tx.totalOutput).satoshis.toLong
-      // regtest uses 1 sat/vbyte fee
-      _ = assert(feePaid === tx.vsize +- 2, s"$feePaid != ${tx.vsize} +- 2")
+      feeRate <- coordinator.currentRound().map(_.feeRate.get)
+      _ = verifyFeeRate(feeRate, all, tx)
 
       _ <- coordinator.bitcoind.sendRawTransaction(tx)
 
@@ -336,12 +347,8 @@ trait ClientServerTestUtils {
       _ <- clientA.completeRound(tx)
       _ <- clientB.completeRound(tx)
 
-      inputUtxos = (utxosA ++ utxosB).filter(t =>
-        tx.inputs.map(_.previousOutput).contains(t.outPoint))
-      inputAmt = inputUtxos.map(_.amount).sum
-      feePaid = (inputAmt - tx.totalOutput).satoshis.toLong
-      // regtest uses 1 sat/vbyte fee
-      _ = assert(feePaid === tx.vsize +- 1, s"$feePaid != ${tx.vsize} +- 1")
+      feeRate <- coordinator.currentRound().map(_.feeRate.get)
+      _ = verifyFeeRate(feeRate, utxosA ++ utxosB, tx)
 
       _ <- coordinator.bitcoind.sendRawTransaction(tx)
 
@@ -421,7 +428,7 @@ trait ClientServerTestUtils {
         coordinator.roundParams.outputType)
       coinsB = Random.shuffle(utxosB.map(_.outputReference)).take(1)
       _ = clientB.queueCoins(coinsB, addrB)
-      msg <- coordinator.beginInputRegistration()
+      msg <- coordinator.getAskInputsMessage
 
       registerInputsA <- clientA.registerCoins(msg.roundId,
                                                msg.inputFee,
@@ -458,12 +465,8 @@ trait ClientServerTestUtils {
 
       tx <- coordinator.getCompletedTx
 
-      inputUtxos = (utxosA ++ utxosB).filter(t =>
-        tx.inputs.map(_.previousOutput).contains(t.outPoint))
-      inputAmt = inputUtxos.map(_.amount).sum
-      feePaid = (inputAmt - tx.totalOutput).satoshis.toLong
-      // regtest uses 1 sat/vbyte fee
-      _ = assert(feePaid === tx.vsize +- 1, s"$feePaid != ${tx.vsize} +- 1")
+      feeRate <- coordinator.currentRound().map(_.feeRate.get)
+      _ = verifyFeeRate(feeRate, utxosA ++ utxosB, tx)
 
       height <- coordinator.bitcoind.getBlockCount
 
