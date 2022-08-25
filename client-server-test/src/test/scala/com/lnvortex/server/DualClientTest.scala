@@ -149,11 +149,13 @@ class DualClientTest
 
         _ <- client.restartRound(restartMsg)
 
+        feeRate <- newCoordinator.currentRound().map(_.feeRate.get)
         // use fees from coordinator because we can't get ask inputs message here
-        registerInputsA <- client.registerCoins(restartMsg.roundParams.roundId,
-                                                newCoordinator.inputFee,
-                                                newCoordinator.outputFee(),
-                                                newCoordinator.changeOutputFee)
+        registerInputsA <- client.registerCoins(
+          restartMsg.roundParams.roundId,
+          newCoordinator.inputFee(feeRate),
+          newCoordinator.outputFee(feeRate),
+          newCoordinator.changeOutputFee(feeRate))
         blindSigA <- newCoordinator.registerAlice(peerIdA, registerInputsA)
 
         registerA = client.processBlindOutputSig(blindSigA)
@@ -174,12 +176,7 @@ class DualClientTest
         tx <- newCoordinator.getCompletedTx
         _ <- client.completeRound(tx)
 
-        inputUtxos = all.filter(t =>
-          tx.inputs.map(_.previousOutput).contains(t.outPoint))
-        inputAmt = inputUtxos.map(_.amount).sum
-        feePaid = (inputAmt - tx.totalOutput).satoshis.toLong
-        // regtest uses 1 sat/vbyte fee
-        _ = assert(feePaid === tx.vsize +- 1, s"$feePaid != ${tx.vsize} +- 1")
+        _ = verifyFeeRate(feeRate, all, tx)
 
         // Mine some blocks
         _ <- newCoordinator.bitcoind.getNewAddress.flatMap(
