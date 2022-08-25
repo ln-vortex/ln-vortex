@@ -285,12 +285,17 @@ trait ClientServerTestUtils {
 
       _ <- client.completeRound(tx)
 
+      feeRate <- coordinator.currentRound().map(_.feeRate)
+
       inputUtxos = all.filter(t =>
         tx.inputs.map(_.previousOutput).contains(t.outPoint))
+      _ = assert(inputUtxos.size == tx.inputs.size)
       inputAmt = inputUtxos.map(_.amount).sum
       feePaid = (inputAmt - tx.totalOutput).satoshis.toLong
-      // regtest uses 1 sat/vbyte fee
-      _ = assert(feePaid === tx.vsize +- 2, s"$feePaid != ${tx.vsize} +- 2")
+      expectedFee = feeRate * tx.vsize
+      buffer = feeRate * 2
+      _ = assert(feePaid === expectedFee +- buffer,
+                 s"$feePaid != $expectedFee +- 2")
 
       _ <- coordinator.bitcoind.sendRawTransaction(tx)
 

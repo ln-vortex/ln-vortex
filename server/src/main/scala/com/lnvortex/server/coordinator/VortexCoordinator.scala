@@ -15,9 +15,7 @@ import org.bitcoins.asyncutil.AsyncUtil
 import org.bitcoins.commons.jsonmodels.bitcoind.RpcOpts.AddressType
 import org.bitcoins.core.currency._
 import org.bitcoins.core.number._
-import org.bitcoins.core.policy.Policy
 import org.bitcoins.core.protocol.BitcoinAddress
-import org.bitcoins.core.protocol.script._
 import org.bitcoins.core.protocol.transaction._
 import org.bitcoins.core.psbt.PSBT
 import org.bitcoins.core.script.ScriptType
@@ -39,7 +37,7 @@ import scala.util._
 class VortexCoordinator private (
     private[coordinator] val km: CoordinatorKeyManager,
     val bitcoind: BitcoindRpcClient,
-    feeRate: SatoshisPerVirtualByte,
+    initFeeRate: SatoshisPerVirtualByte,
     val roundId: DoubleSha256Digest,
     roundStartTime: Long)(implicit
     system: ActorSystem,
@@ -71,12 +69,13 @@ class VortexCoordinator private (
 
   private def roundAddressLabel: String = s"Vortex Round: ${roundId.hex}"
 
-  private[server] def inputFee: CurrencyUnit = {
+  private[server] def inputFee(
+      feeRate: SatoshisPerVirtualByte): CurrencyUnit = {
     FeeCalculator.inputFee(feeRate, config.inputScriptType)
   }
 
   private[server] def outputFee(
-      feeRate: SatoshisPerVirtualByte = feeRate,
+      feeRate: SatoshisPerVirtualByte,
       numPeersOpt: Option[Int] = Some(config.minPeers)): CurrencyUnit = {
     FeeCalculator.outputFee(feeRate = feeRate,
                             outputScriptType = config.outputScriptType,
@@ -84,7 +83,8 @@ class VortexCoordinator private (
                             numPeersOpt = numPeersOpt)
   }
 
-  private[server] def changeOutputFee: CurrencyUnit = {
+  private[server] def changeOutputFee(
+      feeRate: SatoshisPerVirtualByte): CurrencyUnit = {
     FeeCalculator.changeOutputFee(feeRate, config.changeScriptType)
   }
 
@@ -190,7 +190,8 @@ class VortexCoordinator private (
     val feeRateF =
       AsyncUtil.nonBlockingSleep(3.seconds).flatMap(_ => config.fetchFeeRate())
 
-    feeRateF.flatMap { feeRate =>
+    feeRateF.flatMap { _ =>
+      val feeRate = SatoshisPerVirtualByte.one
       val action = for {
         roundDb <- currentRoundAction()
         updated = roundDb.copy(status = RegisterAlices, feeRate = feeRate)
@@ -209,8 +210,10 @@ class VortexCoordinator private (
           )
 
           logger.info("Sending AskInputs to peers")
-          val msg =
-            AskInputs(roundId, inputFee, outputFee(), changeOutputFee)
+          val msg = AskInputs(roundId,
+                              inputFee(feeRate),
+                              outputFee(feeRate),
+                              changeOutputFee(feeRate))
           // send messages async
           val parallelism = FutureUtil.getParallelism
           Source(connectionHandlerMap.toVector)
@@ -642,42 +645,6 @@ class VortexCoordinator private (
     }
   }
 
-  private[server] def calculateChangeOutput(
-      roundDb: RoundDb,
-      isRemix: Boolean,
-      numInputs: Int,
-      numRemixes: Int,
-      numNewEntrants: Int,
-      inputAmount: CurrencyUnit,
-      changeSpkOpt: Option[ScriptPubKey]): Either[
-    CurrencyUnit,
-    TransactionOutput] = {
-    if (isRemix) Left(Satoshis.zero)
-    else {
-      val updatedOutputFee = outputFee(roundDb.feeRate, Some(numNewEntrants))
-      val totalNewEntrantFee =
-        Satoshis(numRemixes) * (roundDb.inputFee + outputFee(roundDb.feeRate,
-                                                             None))
-      val newEntrantFee = totalNewEntrantFee / Satoshis(numNewEntrants)
-      val excess =
-        inputAmount - roundDb.amount - roundDb.coordinatorFee - (Satoshis(
-          numInputs) * roundDb.inputFee) - updatedOutputFee - newEntrantFee
-
-      changeSpkOpt match {
-        case Some(changeSpk) =>
-          val dummy = TransactionOutput(Satoshis.zero, changeSpk)
-          val changeCost = roundDb.feeRate * dummy.byteSize
-
-          val excessAfterChange = excess - changeCost
-
-          if (excessAfterChange >= Policy.dustThreshold)
-            Right(TransactionOutput(excessAfterChange, changeSpk))
-          else Left(excess)
-        case None => Left(excess)
-      }
-    }
-  }
-
   private[coordinator] def constructUnsignedPSBT(
       feeAddr: BitcoinAddress): Future[PSBT] = {
     logger.info(s"Constructing unsigned PSBT")
@@ -712,8 +679,13 @@ class VortexCoordinator private (
           }
 
           val changeOutputResults = aliceDbs.map { db =>
-            calculateChangeOutput(
-              roundDb = roundDb,
+            FeeCalculator.calculateChangeOutput(
+              roundAmount = roundDb.amount,
+              coordinatorFee = roundDb.coordinatorFee,
+              inputScriptType = config.inputScriptType,
+              outputScriptType = config.outputScriptType,
+              coordinatorScriptType = config.changeScriptType,
+              feeRate = roundDb.feeRate,
               isRemix = db.isRemix,
               numInputs = db.numInputs,
               numNewEntrants = numNewEntrants,
@@ -946,7 +918,7 @@ class VortexCoordinator private (
     if (
       roundStartTime == 0 ||
       roundId == DoubleSha256Digest.empty ||
-      feeRate == SatoshisPerVirtualByte.zero
+      initFeeRate == SatoshisPerVirtualByte.zero
     ) {
       throw new IllegalStateException(
         "Cannot start server with invalid round parameters")

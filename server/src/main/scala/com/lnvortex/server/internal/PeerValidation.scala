@@ -109,15 +109,21 @@ trait PeerValidation extends Logging { self: VortexCoordinator =>
         _.scriptType == config.changeScriptType) && uniqueChangeSpk
 
       val inputAmt = registerInputs.inputs.map(_.output.value).sum
-      val changeE = calculateChangeOutput(
-        roundDb = roundDb,
-        isRemix = isRemix,
-        numInputs = registerInputs.inputs.size,
-        numRemixes = 0,
-        numNewEntrants = 1,
-        inputAmount = inputAmt,
-        changeSpkOpt = registerInputs.changeSpkOpt
-      )
+      val changeE =
+        FeeCalculator.calculateChangeOutput(
+          roundAmount = roundDb.amount,
+          coordinatorFee = roundDb.coordinatorFee,
+          inputScriptType = config.inputScriptType,
+          outputScriptType = config.outputScriptType,
+          coordinatorScriptType = config.changeScriptType,
+          feeRate = roundDb.feeRate,
+          isRemix = isRemix,
+          numInputs = registerInputs.inputs.size,
+          numRemixes = 0,
+          numNewEntrants = 1,
+          inputAmount = inputAmt,
+          changeSpkOpt = registerInputs.changeSpkOpt
+        )
       val excess = changeE match {
         case Left(amt)     => amt
         case Right(output) => output.value

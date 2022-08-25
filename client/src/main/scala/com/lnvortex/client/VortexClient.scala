@@ -551,24 +551,12 @@ case class VortexClient[+T <: VortexWalletApi](
           val numNewEntrants =
             tx.outputs.count(_.value == state.round.amount) - numRemixes
 
-          lazy val expectedAmtBackOpt =
-            state.expectedAmtBackOpt(numRemixes, numNewEntrants)
+          lazy val expectedAmtBack =
+            state.expectedAmtBack(numRemixes, numNewEntrants)
 
-          lazy val hasCorrectChange =
-            (expectedAmtBackOpt, state.initDetails.changeSpkOpt) match {
-              case (Some(changeAmt), Some(changeSpk)) =>
-                val outputOpt =
-                  tx.outputs.find(_.scriptPubKey == changeSpk)
-                outputOpt.exists(_.value >= changeAmt)
-              case (None, None) => true
-              case (Some(_), None) =>
-                logger.error(
-                  "Incorrect state, expecting change when having no change address")
-                false
-              case (None, Some(_)) =>
-                logger.error(
-                  "Incorrect state, has change address when expecting no change")
-                false
+          lazy val changeOutputOpt =
+            state.initDetails.changeSpkOpt.flatMap { changeSpk =>
+              tx.outputs.find(_.scriptPubKey == changeSpk)
             }
 
           lazy val targetOutput =
@@ -580,11 +568,10 @@ case class VortexClient[+T <: VortexWalletApi](
             if (unsigned.inputMaps.forall(_.witnessUTXOOpt.isDefined)) {
               val inputAmt = unsigned.inputMaps
                 .flatMap(_.witnessUTXOOpt)
-                .map { utxo =>
-                  utxo.witnessUTXO.value
-                }
+                .map(_.witnessUTXO.value)
                 .sum
 
+              // fixme do we need to add fake sigs here?
               val feeRate =
                 SatoshisPerVirtualByte.calc(inputAmt, unsigned.transaction)
 
@@ -599,10 +586,10 @@ case class VortexClient[+T <: VortexWalletApi](
           } else if (!targetOutput) {
             Future.failed(new InvalidTargetOutputException(
               s"Missing expected target output ${state.initDetails.targetOutput}"))
-          } else if (!hasCorrectChange) {
-            Future.failed(
-              new InvalidChangeOutputException(
-                s"Missing expected change output of $expectedAmtBackOpt"))
+          } else if (changeOutputOpt.forall(_.value >= expectedAmtBack)) {
+            Future.failed(new InvalidChangeOutputException(
+              s"Missing expected change output of $expectedAmtBack, got ${changeOutputOpt
+                .map(_.value)}"))
           } else if (missingInputs.nonEmpty) {
             Future.failed(new MissingInputsException(
               s"Missing inputs from transaction: ${missingInputs.mkString(",")}"))
