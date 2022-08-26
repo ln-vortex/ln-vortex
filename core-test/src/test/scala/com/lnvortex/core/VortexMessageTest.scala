@@ -9,8 +9,8 @@ import org.bitcoins.testkitcore.util.BitcoinSUnitTest
 
 class VortexMessageTest extends BitcoinSUnitTest {
 
-  val roundId: DoubleSha256Digest =
-    CryptoUtil.doubleSHA256(ECPrivateKey.freshPrivateKey.bytes)
+  val roundId: DoubleSha256Digest = DoubleSha256Digest(
+    CryptoUtil.randomBytes(32))
 
   val privKey: ECPrivateKey = ECPrivateKey.freshPrivateKey
   val pubKey: SchnorrPublicKey = privKey.schnorrPublicKey

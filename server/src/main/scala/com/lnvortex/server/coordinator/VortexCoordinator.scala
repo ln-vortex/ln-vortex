@@ -1059,8 +1059,7 @@ object VortexCoordinator extends Logging {
       val feeRateF = config.fetchFeeRate()
       old.stop()
       // generate new round id
-      val roundId =
-        CryptoUtil.doubleSHA256(ECPrivateKey.freshPrivateKey.bytes)
+      val roundId = DoubleSha256Digest(CryptoUtil.randomBytes(32))
       logger.info(s"Creating new Round! ${roundId.hex}")
 
       val roundStartTime =

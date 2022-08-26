@@ -54,7 +54,7 @@ case class LndChannelOpener(lndRpcClient: LndRpcClient)(implicit
     logger.trace("lnd calling openchannel")
 
     // generate random channel id
-    val chanId = ECPrivateKey.freshPrivateKey.bytes
+    val chanId = CryptoUtil.randomBytes(32)
     val shim = PsbtShim(pendingChanId = chanId, noPublish = true)
     val fundingShim = FundingShim(FundingPsbtShim(shim))
 
