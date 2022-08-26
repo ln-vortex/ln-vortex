@@ -18,6 +18,7 @@ object Deps {
     val microPickleV = "1.3.8"
 
     val grizzledSlf4jV = "1.3.4"
+    val slf4V = "1.7.36"
   }
 
   object Compile {
@@ -48,6 +49,12 @@ object Deps {
 
     val grizzledSlf4j =
       "org.clapper" %% "grizzled-slf4j" % V.grizzledSlf4jV withSources () withJavadoc ()
+
+    val slf4jSApi =
+      "org.slf4j" % "slf4j-api" % V.slf4V withSources () withJavadoc ()
+
+    val slf4jSimple =
+      "org.slf4j" % "slf4j-simple" % V.slf4V withSources () withJavadoc ()
 
     val bitcoinsCore =
       "org.bitcoin-s" %% "bitcoin-s-core" % V.bitcoinsV withSources () withJavadoc ()
@@ -89,10 +96,8 @@ object Deps {
     Compile.sttp,
     Compile.micoPickle,
     Compile.scopt,
-    //we can remove this dependency when this is fixed
-    //https://github.com/oracle/graal/issues/1943
-    //see https://github.com/bitcoin-s/bitcoin-s/issues/1100
-    Compile.codehaus
+    Compile.slf4jSApi,
+    Compile.slf4jSimple
   )
 
   val rpcServer: List[ModuleID] =
