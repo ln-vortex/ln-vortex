@@ -42,8 +42,50 @@ class VortexMessageTest extends BitcoinSUnitTest {
     }
   }
 
+  it must "correctly verify a taproot Bob message" in {
+    forAll(ScriptGenerators.witnessScriptPubKeyV1.map(_._1)) { spk =>
+      val output = TransactionOutput(amount, spk)
+      val hash = RegisterOutput.calculateChallenge(output, roundId)
+
+      val challenge =
+        BlindSchnorrUtil.generateChallenge(pubKey, nonce, tweaks, hash)
+
+      val blindSig = BlindSchnorrUtil.generateBlindSig(privKey, kVal, challenge)
+
+      val sig =
+        BlindSchnorrUtil.unblindSignature(blindSig, pubKey, nonce, tweaks, hash)
+
+      val bobMsg = RegisterOutput(sig, output)
+
+      val verify = bobMsg.verifySig(pubKey, roundId)
+
+      assert(verify)
+    }
+  }
+
   it must "fail to verify a Bob message with different tweaks sig" in {
     forAll(ScriptGenerators.p2wshSPKV0.map(_._1)) { spk =>
+      val output = TransactionOutput(amount, spk)
+      val hash = RegisterOutput.calculateChallenge(output, roundId)
+
+      val challenge =
+        BlindSchnorrUtil.generateChallenge(pubKey, nonce, tweaks, hash)
+
+      val blindSig = BlindSchnorrUtil.generateBlindSig(privKey, kVal, challenge)
+
+      val newTweaks = BlindingTweaks.freshBlindingTweaks(pubKey, nonce)
+
+      assertThrows[IllegalArgumentException](
+        BlindSchnorrUtil.unblindSignature(blindSig = blindSig,
+                                          signerPubKey = pubKey,
+                                          signerNonce = nonce,
+                                          blindingTweaks = newTweaks,
+                                          message = hash))
+    }
+  }
+
+  it must "fail to verify a taproot Bob message with different tweaks sig" in {
+    forAll(ScriptGenerators.witnessScriptPubKeyV1.map(_._1)) { spk =>
       val output = TransactionOutput(amount, spk)
       val hash = RegisterOutput.calculateChallenge(output, roundId)
 
@@ -84,4 +126,24 @@ class VortexMessageTest extends BitcoinSUnitTest {
     }
   }
 
+  it must "fail to verify a taproot Bob message with wrong keys" in {
+    forAll(ScriptGenerators.witnessScriptPubKeyV1.map(_._1)) { spk =>
+      val output = TransactionOutput(amount, spk)
+      val hash = RegisterOutput.calculateChallenge(output, roundId)
+
+      val challenge =
+        BlindSchnorrUtil.generateChallenge(pubKey, nonce, tweaks, hash)
+
+      val blindSig = BlindSchnorrUtil.generateBlindSig(privKey, kVal, challenge)
+
+      val sig =
+        BlindSchnorrUtil.unblindSignature(blindSig, pubKey, nonce, tweaks, hash)
+
+      val bobMsg = RegisterOutput(sig, output)
+
+      val verify = bobMsg.verifySig(kVal.schnorrPublicKey, roundId)
+
+      assert(!verify)
+    }
+  }
 }
