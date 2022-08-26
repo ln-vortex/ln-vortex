@@ -3,17 +3,17 @@ package com.lnvortex.testkit
 import akka.actor.ActorSystem
 import com.lnvortex.client.config.VortexAppConfig
 import com.lnvortex.server.config.VortexCoordinatorAppConfig
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config._
 import org.bitcoins.rpc.util.RpcUtil
-import org.bitcoins.testkit.BitcoinSTestAppConfig.{
-  configWithEmbeddedDb,
-  ProjectType
-}
+import org.bitcoins.testkit.BitcoinSTestAppConfig._
 import org.bitcoins.testkit.EmbeddedPg
 import org.bitcoins.testkit.util.FileUtil
+import org.bitcoins.testkitcore.Implicits.GeneratorOps
+import org.bitcoins.testkitcore.gen.NumberGenerator
 
 import java.io.File
 import java.nio.file.Path
+import java.util.UUID
 import scala.util.Properties
 
 trait LnVortexTestUtils { self: EmbeddedPg =>
@@ -24,6 +24,21 @@ trait LnVortexTestUtils { self: EmbeddedPg =>
   val torEnabled: Boolean = Properties
     .envOrNone("TOR")
     .isDefined
+
+  def genCoordinatorNameConf: Config = {
+    val nameOpt = if (NumberGenerator.bool.sampleSome) {
+      Some(UUID.randomUUID().toString.replace("-", ""))
+    } else None
+
+    nameOpt match {
+      case Some(name) =>
+        ConfigFactory.parseString(
+          s"coordinator.name = $name"
+        )
+
+      case None => ConfigFactory.empty()
+    }
+  }
 
   def getTestConfigs(config: Vector[Config] = Vector.empty)(implicit
       system: ActorSystem): (VortexAppConfig, VortexCoordinatorAppConfig) = {
@@ -62,9 +77,11 @@ trait LnVortexTestUtils { self: EmbeddedPg =>
     val clientConf =
       VortexAppConfig(dir, Vector(clientPg, serverPg, overrideConf) ++ config)
     val serverConf =
-      VortexCoordinatorAppConfig(
-        dir,
-        Vector(clientPg, serverPg, overrideConf) ++ config)
+      VortexCoordinatorAppConfig(dir,
+                                 Vector(clientPg,
+                                        serverPg,
+                                        overrideConf,
+                                        genCoordinatorNameConf) ++ config)
 
     (clientConf, serverConf)
   }
