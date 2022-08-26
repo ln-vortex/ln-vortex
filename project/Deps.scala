@@ -15,7 +15,7 @@ object Deps {
 
     val codehausV = "3.1.7"
 
-    val microPickleV = "1.3.8"
+    val microPickleV = "1.3.15"
 
     val grizzledSlf4jV = "1.3.4"
     val slf4V = "1.7.36"
