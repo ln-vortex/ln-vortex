@@ -4,20 +4,23 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server._
 import com.lnvortex.server.coordinator.VortexCoordinator
+import com.lnvortex.server.networking.VortexHttpServer
 import ujson._
 
 import scala.concurrent._
 
-case class LnVortexRoutes(coordinator: VortexCoordinator)(implicit
+case class LnVortexRoutes(server: VortexHttpServer)(implicit
     system: ActorSystem)
     extends ServerRoute {
   implicit val ec: ExecutionContext = system.dispatcher
+
+  private def coordinator: VortexCoordinator = server.currentCoordinator
 
   override def handleCommand: PartialFunction[ServerCommand, Route] = {
     case ServerCommand("getinfo", _) =>
       complete {
         for {
-          addr <- coordinator.getHostAddress
+          addr <- server.getHostAddress
         } yield {
           val obj = Obj(
             ("publicKey", Str(coordinator.publicKey.hex)),

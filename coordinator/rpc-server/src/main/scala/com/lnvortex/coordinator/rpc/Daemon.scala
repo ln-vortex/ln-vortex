@@ -48,7 +48,7 @@ object Daemon extends App with Logging {
     httpServer = new VortexHttpServer(coordinator)
     _ <- httpServer.start()
 
-    routes = LnVortexRoutes(coordinator)
+    routes = LnVortexRoutes(httpServer)
     server = RpcServer(
       handlers = Vector(routes),
       rpcBindOpt = serverConfig.rpcBind,
