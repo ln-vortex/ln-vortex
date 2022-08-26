@@ -4,7 +4,6 @@ import grizzled.slf4j.Logging
 import org.bitcoins.commons.serializers.JsonSerializers._
 import org.bitcoins.commons.serializers.JsonWriters._
 import org.bitcoins.commons.serializers.JsonReaders._
-import org.bitcoins.commons.serializers.SerializerUtil
 import org.bitcoins.core.currency._
 import org.bitcoins.core.protocol.script._
 import org.bitcoins.core.protocol.transaction._
@@ -45,20 +44,6 @@ object VortexMessage extends Logging {
 sealed abstract class ServerAnnouncementMessage extends ServerVortexMessage
 
 object ServerAnnouncementMessage {
-
-  // todo remove after https://github.com/bitcoin-s/bitcoin-s/pull/4672/ is merged
-
-  implicit object SatoshisPerVByteReads extends Reads[SatoshisPerVirtualByte] {
-
-    override def reads(json: JsValue): JsResult[SatoshisPerVirtualByte] =
-      SerializerUtil.processJsNumberBigInt[SatoshisPerVirtualByte](num =>
-        SatoshisPerVirtualByte.fromLong(num.toLong))(json)
-  }
-
-  implicit object SatoshisPerVByteWrites
-      extends Writes[SatoshisPerVirtualByte] {
-    override def writes(o: SatoshisPerVirtualByte): JsValue = JsNumber(o.toLong)
-  }
 
   implicit val serverAnnouncementMessageReads: Reads[
     ServerAnnouncementMessage] = Reads { json =>
@@ -105,8 +90,6 @@ case class RoundParameters(
 
 object RoundParameters {
 
-  import ServerAnnouncementMessage._
-
   implicit val RoundParametersReads: Reads[RoundParameters] =
     Json.reads[RoundParameters]
 
@@ -119,7 +102,6 @@ case class FeeRateHint(feeRate: SatoshisPerVirtualByte)
     extends ServerAnnouncementMessage
 
 object FeeRateHint {
-  import ServerAnnouncementMessage._
 
   implicit val FeeRateHintReads: Reads[FeeRateHint] = Json.reads[FeeRateHint]
 
