@@ -9,7 +9,7 @@ object Deps {
 
     val bitcoinsV = "1.9.2-187-02f525fd-SNAPSHOT"
 
-    val scoptV = "4.0.1"
+    val scoptV = "4.1.0"
 
     val sttpV = "1.7.2"
 

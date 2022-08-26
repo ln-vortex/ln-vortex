@@ -53,7 +53,7 @@ object ConsoleCli {
       note(sys.props("line.separator") + "Commands:"),
       cmd("getinfo")
         .action((_, conf) => conf.copy(command = GetInfo))
-        .text(s"Returns basic info about the oracle"),
+        .text(s"Returns basic info about the wallet"),
       cmd("getstatuses")
         .action((_, conf) => conf.copy(command = GetStatuses))
         .text(s"Get current status of the current round of all coordinators"),
