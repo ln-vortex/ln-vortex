@@ -978,7 +978,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
   it must "construct the unsigned tx" in { coordinator =>
     val peerIds =
       0.to(5)
-        .map(_ => CryptoUtil.sha256(ECPrivateKey.freshPrivateKey.bytes))
+        .map(_ => Sha256Digest(CryptoUtil.randomBytes(32)))
         .toVector
 
     val aliceDbFs = peerIds.map(peerId =>
@@ -1000,9 +1000,9 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
       _ <- coordinator.beginOutputRegistration()
 
       inputDbs = peerIds.map { id =>
-        val outPoint = TransactionOutPoint(
-          CryptoUtil.doubleSHA256(ECPrivateKey.freshPrivateKey.bytes),
-          UInt32.zero)
+        val txid = DoubleSha256Digest(CryptoUtil.randomBytes(32))
+        val outPoint =
+          TransactionOutPoint(txId = txid, vout = UInt32.zero)
         val spk = P2WPKHWitnessSPKV0(ECPublicKey.freshPublicKey)
         val output = TransactionOutput(Bitcoins(1), spk)
         RegisteredInputDb(outPoint = outPoint,

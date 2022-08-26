@@ -150,7 +150,7 @@ class CoordinatorRoutes(var coordinator: VortexCoordinator)(implicit
 
   private val registerWebsocketRoute =
     path("register" / Segment) { seg =>
-      val peerId = CryptoUtil.sha256(ECPrivateKey.freshPrivateKey.bytes)
+      val peerId = Sha256Digest(CryptoUtil.randomBytes(32))
       val roundId = DoubleSha256Digest(seg)
 
       extractWebSocketUpgrade { ws =>

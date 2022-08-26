@@ -28,8 +28,7 @@ class RemixTest
     .toMat(BroadcastHub.sink)(Keep.left)
     .run()
 
-  def peerId: Sha256Digest =
-    CryptoUtil.sha256(ECPrivateKey.freshPrivateKey.bytes)
+  def peerId: Sha256Digest = Sha256Digest(CryptoUtil.randomBytes(32))
 
   it must "complete the remix" in { case (clientA, clientB, coordinator) =>
     for {
