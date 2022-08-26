@@ -10,18 +10,21 @@ import org.bitcoins.core.config._
 import org.bitcoins.core.currency.Satoshis
 import org.bitcoins.core.hd.HDPurposes
 import org.bitcoins.core.script.ScriptType
-import org.bitcoins.core.util.FutureUtil
+import org.bitcoins.core.util._
 import org.bitcoins.core.wallet.fee._
 import org.bitcoins.core.wallet.keymanagement.KeyManagerParams
 import org.bitcoins.crypto._
+import org.bitcoins.db.DatabaseDriver._
 import org.bitcoins.db._
 import org.bitcoins.feeprovider.MempoolSpaceTarget._
 import org.bitcoins.feeprovider._
 import org.bitcoins.keymanager.bip39.BIP39KeyManager
 import org.bitcoins.keymanager.config.KeyManagerAppConfig
+import org.bitcoins.keymanager.config.KeyManagerAppConfig.DEFAULT_WALLET_NAME
 import org.bitcoins.tor.TorParams
 import org.bitcoins.tor.config.TorAppConfig
 
+import java.io.File
 import java.net.{InetSocketAddress, URI}
 import java.nio.file.{Files, Path, Paths}
 import scala.concurrent._
@@ -74,7 +77,27 @@ case class VortexCoordinatorAppConfig(
   lazy val kmConf: KeyManagerAppConfig =
     KeyManagerAppConfig(directory, configOverrides)
 
-  lazy val torParams: Option[TorParams] = torConf.torParams
+  lazy val torParams: Option[TorParams] = {
+    torConf.torParams.map { params =>
+      val privKeyPath =
+        config.getStringOrNone("bitcoin-s.tor.privateKeyPath") match {
+          case Some(path) => new File(path).toPath
+          case None =>
+            val fileName = {
+              val prefix =
+                if (coordinatorName == DEFAULT_WALLET_NAME) ""
+                else s"${coordinatorName}_"
+
+              s"$prefix${network}_tor_priv_key"
+            }
+            baseDatadir.resolve("torKeys").resolve(fileName)
+        }
+
+      params.copy(privateKeyPath = privKeyPath)
+    }
+  }
+
+  torParams.map(_.privateKeyPath)
 
   lazy val listenAddress: InetSocketAddress = {
     val str = config.getString(s"$moduleName.listen")
@@ -161,6 +184,31 @@ case class VortexCoordinatorAppConfig(
     FiniteDuration(dur.getSeconds, SECONDS)
   }
 
+  lazy val coordinatorName: String = {
+    config.getStringOrElse(s"$moduleName.name", DEFAULT_WALLET_NAME)
+  }
+
+  override lazy val dbPath: Path = {
+    val pathStrOpt =
+      config.getStringOrNone(s"bitcoin-s.$moduleName.db.path")
+    pathStrOpt match {
+      case Some(pathStr) =>
+        Paths.get(pathStr).resolve(coordinatorName)
+      case None =>
+        sys.error(s"Could not find dbPath for $moduleName.db.path")
+    }
+  }
+
+  override lazy val schemaName: Option[String] = {
+    driver match {
+      case PostgreSQL =>
+        val schema = PostgresUtil.getSchemaName(moduleName = moduleName,
+                                                walletName = coordinatorName)
+        Some(schema)
+      case SQLite => None
+    }
+  }
+
   private val feeProvider: MempoolSpaceProvider =
     MempoolSpaceProvider(FastestFeeTarget, network, None)
 
@@ -192,6 +240,7 @@ case class VortexCoordinatorAppConfig(
   }
 
   def initialize(): Unit = {
+    // initialize seed
     if (!kmConf.seedExists()) {
       BIP39KeyManager.initialize(aesPasswordOpt = aesPasswordOpt,
                                  kmParams = kmParams,
@@ -201,6 +250,18 @@ case class VortexCoordinatorAppConfig(
           logger.info("Successfully generated a seed and key manager")
       }
     }
+
+    // initialize tor keys
+    if (
+      torConf.enabled && !torParams
+        .map(_.privateKeyPath)
+        .exists(Files.exists(_))
+    ) {
+      val path = torParams.map(_.privateKeyPath).get
+      Files.createDirectories(path.getParent)
+    }
+
+    ()
   }
 
   override lazy val allTables: List[TableQuery[Table[_]]] = {
