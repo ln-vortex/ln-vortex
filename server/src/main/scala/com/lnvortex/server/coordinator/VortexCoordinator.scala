@@ -30,7 +30,6 @@ import org.bitcoins.rpc.client.common.BitcoindRpcClient
 import play.api.libs.json.Json
 import slick.dbio._
 
-import java.net.InetSocketAddress
 import java.time.Instant
 import scala.collection.mutable
 import scala.concurrent._
@@ -964,9 +963,6 @@ class VortexCoordinator private (
 
   // -- Server startup logic --
 
-  private val hostAddressP: Promise[InetSocketAddress] =
-    Promise[InetSocketAddress]()
-
   override def start(): Unit = {
     if (
       roundStartTime == 0 ||
@@ -1014,10 +1010,6 @@ class VortexCoordinator private (
     sendPSBTCancellable.foreach(_.cancel())
 
     ()
-  }
-
-  def getHostAddress: Future[InetSocketAddress] = {
-    hostAddressP.future
   }
 }
 

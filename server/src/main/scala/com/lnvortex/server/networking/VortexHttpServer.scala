@@ -7,6 +7,7 @@ import grizzled.slf4j.Logging
 import org.bitcoins.core.util.StartStopAsync
 import org.bitcoins.tor.TorController
 
+import java.net.InetSocketAddress
 import scala.concurrent._
 
 class VortexHttpServer(coordinator: VortexCoordinator)(implicit
@@ -19,6 +20,17 @@ class VortexHttpServer(coordinator: VortexCoordinator)(implicit
     Promise[Http.ServerBinding]()
 
   def getBinding: Future[Http.ServerBinding] = bindingP.future
+
+  private val hostAddressP: Promise[InetSocketAddress] =
+    Promise[InetSocketAddress]()
+
+  def getHostAddress: Future[InetSocketAddress] = {
+    hostAddressP.future
+  }
+
+  private val routes = new CoordinatorRoutes(coordinator)
+
+  def currentCoordinator: VortexCoordinator = routes.coordinator
 
   override def start(): Future[Unit] = {
     if (bindingP.isCompleted) {
@@ -38,13 +50,13 @@ class VortexHttpServer(coordinator: VortexCoordinator)(implicit
               .map(Some(_))
           case None => Future.successful(None)
         }
-        routes = new CoordinatorRoutes(coordinator).topLevelRoute
         bind <- Http()
           .newServerAt(bindAddress.getHostName, bindAddress.getPort)
-          .bind(routes)
+          .bind(routes.topLevelRoute)
       } yield {
         val addr = onionAddress.getOrElse(bind.localAddress)
         bindingP.success(bind)
+        hostAddressP.success(addr)
         logger.info(s"Coordinator bound to $addr")
       }
     }
