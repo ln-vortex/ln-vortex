@@ -63,7 +63,9 @@ case class LnVortexRoutes(clientManager: VortexClientManager[VortexWalletApi])(
     case ServerCommand(id, "getstatuses", _) =>
       complete {
         val allDetails =
-          clientManager.clients.values.map(_.getCurrentRoundDetails)
+          clientManager.clients.map { case (coordinator, client) =>
+            coordinator -> client.getCurrentRoundDetails
+          }
         RpcServer.httpSuccess(id, allDetails)
       }
 
