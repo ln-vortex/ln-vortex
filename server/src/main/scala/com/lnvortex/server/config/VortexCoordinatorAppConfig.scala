@@ -4,6 +4,7 @@ import akka.actor.ActorSystem
 import com.lnvortex.server.models._
 import com.typesafe.config.Config
 import grizzled.slf4j.Logging
+import monix.execution.atomic.AtomicInt
 import org.bitcoins.commons.config._
 import org.bitcoins.core.config._
 import org.bitcoins.core.currency.Satoshis
@@ -14,8 +15,8 @@ import org.bitcoins.core.wallet.fee._
 import org.bitcoins.core.wallet.keymanagement.KeyManagerParams
 import org.bitcoins.crypto._
 import org.bitcoins.db._
-import org.bitcoins.feeprovider._
 import org.bitcoins.feeprovider.MempoolSpaceTarget._
+import org.bitcoins.feeprovider._
 import org.bitcoins.keymanager.bip39.BIP39KeyManager
 import org.bitcoins.keymanager.config.KeyManagerAppConfig
 import org.bitcoins.tor.TorParams
@@ -166,18 +167,27 @@ case class VortexCoordinatorAppConfig(
   private val feeProviderBackup: BitcoinerLiveFeeRateProvider =
     BitcoinerLiveFeeRateProvider(30, None)
 
-  private val random = new Random(System.currentTimeMillis())
+  private lazy val random = new Random(System.currentTimeMillis())
+  private lazy val prevFeeRate = AtomicInt(0)
 
   def fetchFeeRate(): Future[SatoshisPerVirtualByte] = {
     network match {
       case MainNet | TestNet3 | SigNet =>
+        logger.trace("Fetching fee rate")
         feeProvider.getFeeRate().recoverWith { case _: Throwable =>
+          logger.trace("Fetching fee rate from backup provider")
           feeProviderBackup.getFeeRate()
         }
       case RegTest =>
         val rand = random.nextInt() % 50
-        val max = Math.max(Math.abs(rand), 1)
-        Future.successful(SatoshisPerVirtualByte.fromLong(max))
+        val floor = Math.max(Math.abs(rand), 1)
+        logger.trace(s"Generated random fee rate $floor")
+        if (prevFeeRate.get() == floor) {
+          fetchFeeRate()
+        } else {
+          prevFeeRate.set(floor)
+          Future.successful(SatoshisPerVirtualByte.fromLong(floor))
+        }
     }
   }
 

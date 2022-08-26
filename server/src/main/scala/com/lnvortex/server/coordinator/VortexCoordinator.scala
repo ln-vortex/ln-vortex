@@ -16,9 +16,7 @@ import org.bitcoins.commons.jsonmodels.bitcoind.RpcOpts.AddressType
 import org.bitcoins.core.config._
 import org.bitcoins.core.currency._
 import org.bitcoins.core.number._
-import org.bitcoins.core.policy.Policy
 import org.bitcoins.core.protocol.BitcoinAddress
-import org.bitcoins.core.protocol.script._
 import org.bitcoins.core.protocol.transaction._
 import org.bitcoins.core.psbt.PSBT
 import org.bitcoins.core.script.ScriptType
@@ -34,13 +32,14 @@ import java.net.InetSocketAddress
 import java.time.Instant
 import scala.collection.mutable
 import scala.concurrent._
-import scala.concurrent.duration.DurationInt
+import scala.concurrent.duration._
 import scala.util._
 
 class VortexCoordinator private (
     private[coordinator] val km: CoordinatorKeyManager,
     val bitcoind: BitcoindRpcClient,
     val roundId: DoubleSha256Digest,
+    var currentFeeRate: SatoshisPerVirtualByte,
     roundStartTime: Long)(implicit
     system: ActorSystem,
     val config: VortexCoordinatorAppConfig)
@@ -96,6 +95,42 @@ class VortexCoordinator private (
     FeeCalculator.changeOutputFee(feeRate, config.changeScriptType)
   }
 
+  private[server] def sendUpdatedFeeRate(): Future[SatoshisPerVirtualByte] = {
+    config.fetchFeeRate().map { feeRate =>
+      if (feeRate != currentFeeRate) {
+        currentFeeRate = feeRate
+        logger.info(s"Updated fee rate to $feeRate")
+        logger.debug(s"Announcing fee rate to peers")
+        roundSubscribers.foreach { queue =>
+          queue
+            .offer(TextMessage(Json.toJson(FeeRateHint(feeRate)).toString))
+            .map(_ => logger.trace(s"Announced fee rate to peer"))
+            .recover { _ =>
+              roundSubscribers -= queue
+              ()
+            }
+        }
+
+        feeRate
+      } else currentFeeRate
+    }
+  }
+
+  private lazy val feeRateHintsCancellable: Cancellable = {
+    if (roundStartTime != 0L) {
+      val interval = (config.roundInterval.toSeconds / 10).seconds
+      system.scheduler.scheduleAtFixedRate(interval, interval) { () =>
+        // once round has started, we don't need to update the fee rate hints
+        if (!beginInputRegistrationCancellable.isCancelled) {
+          val _ = sendUpdatedFeeRate()
+        }
+      }
+    } else {
+      throw new RuntimeException(
+        "Attempt to start input coordinator with invalid params")
+    }
+  }
+
   // switch to input registration at correct time
   private lazy val beginInputRegistrationCancellable: Cancellable = {
     if (roundStartTime != 0L)
@@ -119,7 +154,7 @@ class VortexCoordinator private (
   private var sendPSBTCancellable: Option[Cancellable] =
     None
 
-  val roundParams: RoundParameters =
+  def roundParams: RoundParameters =
     RoundParameters(
       version = version,
       roundId = roundId,
@@ -127,11 +162,13 @@ class VortexCoordinator private (
       coordinatorFee = config.coordinatorFee,
       publicKey = publicKey,
       time = roundStartTime,
+      minPeers = config.minPeers,
       maxPeers = config.maxPeers,
       inputType = config.inputScriptType,
       outputType = config.outputScriptType,
       changeType = config.changeScriptType,
-      status = config.statusString
+      status = config.statusString,
+      feeRate = currentFeeRate
     )
 
   private[lnvortex] val roundSubscribers =
@@ -192,8 +229,12 @@ class VortexCoordinator private (
   }
 
   private[lnvortex] def beginInputRegistration(): Future[AskInputs] = {
-    if (beginInputRegistrationCancellable.cancel()) {
+    if (
+      !beginInputRegistrationCancellable.isCancelled &&
+      beginInputRegistrationCancellable.cancel()
+    ) {
       logger.info("Starting input registration")
+      Try(feeRateHintsCancellable.cancel())
 
       val feeRateF = config.network match {
         case MainNet | TestNet3 | SigNet =>
@@ -206,6 +247,8 @@ class VortexCoordinator private (
       }
 
       feeRateF.flatMap { feeRate =>
+        currentFeeRate = feeRate
+
         val action = for {
           roundDb <- currentRoundAction()
           updated = roundDb.copy(status = RegisterAlices,
@@ -234,6 +277,7 @@ class VortexCoordinator private (
             val parallelism = FutureUtil.getParallelism
             Source(connectionHandlerMap.toVector)
               .mapAsync(parallelism = parallelism) { case (id, peer) =>
+                logger.trace(s"Sending AskInputs to peer ${id.hex}")
                 peer
                   .offer(TextMessage(Json.toJson(msg).toString))
                   .recover { ex =>
@@ -253,8 +297,9 @@ class VortexCoordinator private (
           }
         }
       }
-    } else
+    } else {
       Future.failed(new RuntimeException("Input registration already started"))
+    }
   }
 
   private[lnvortex] def beginOutputRegistration(): Future[Unit] = {
@@ -337,6 +382,7 @@ class VortexCoordinator private (
 
       msg = TextMessage(Json.toJson(UnsignedPsbtMessage(psbt)).toString)
       sendFs = connectionHandlerMap.map { case (id, peer) =>
+        logger.trace(s"Sending UnsignedPsbtMessage to peer ${id.hex}")
         peer.offer(msg).map(_ => ()).recover { ex =>
           logger.error(s"Failed to send unsigned psbt to ${id.hex}: ", ex)
         }
@@ -377,6 +423,7 @@ class VortexCoordinator private (
 
       // Announce to peers
       sendFs = connectionHandlerMap.map { case (peerId, peer) =>
+        logger.trace(s"Sending SignedTxMessage to peer ${peerId.hex}")
         peer
           .offer(TextMessage(Json.toJson(msg).toString))
           .recover { e =>
@@ -534,7 +581,8 @@ class VortexCoordinator private (
     val f = for {
       (roundDb, aliceDbOpt, otherInputDbs, isRemix) <- dbF
       validInputs <- validInputsF
-      isMinimal = registerInputs.isMinimal(roundParams.getTargetAmount(isRemix))
+      isMinimal = registerInputs.isMinimal(
+        roundParams.getTargetAmount(isRemix, registerInputs.inputs.size))
       isMinimalErr =
         if (isMinimal) None
         else
@@ -546,7 +594,7 @@ class VortexCoordinator private (
     f.flatMap {
       case (isRemix, aliceDbOpt, inputsErrorOpt, otherInputDbs, roundDb) =>
         lazy val changeErrorOpt =
-          validateAliceChange(isRemix, roundDb, registerInputs, otherInputDbs)
+          validateAliceChange(isRemix, registerInputs, otherInputDbs)
 
         // condense to one error option
         val errorOpt: Option[VortexServerException] =
@@ -666,43 +714,6 @@ class VortexCoordinator private (
     }
   }
 
-  private[server] def calculateChangeOutput(
-      roundDb: RoundDb,
-      isRemix: Boolean,
-      numInputs: Int,
-      numRemixes: Int,
-      numNewEntrants: Int,
-      inputAmount: CurrencyUnit,
-      changeSpkOpt: Option[ScriptPubKey]): Either[
-    CurrencyUnit,
-    TransactionOutput] = {
-    if (isRemix) Left(Satoshis.zero)
-    else {
-      val feeRate = roundDb.feeRate.get
-      val inputFee = this.inputFee(feeRate)
-      val updatedOutputFee = outputFee(feeRate, Some(numNewEntrants))
-      val totalNewEntrantFee =
-        Satoshis(numRemixes) * (inputFee + outputFee(feeRate, None))
-      val newEntrantFee = totalNewEntrantFee / Satoshis(numNewEntrants)
-      val excess =
-        inputAmount - roundDb.amount - roundDb.coordinatorFee - (Satoshis(
-          numInputs) * inputFee) - updatedOutputFee - newEntrantFee
-
-      changeSpkOpt match {
-        case Some(changeSpk) =>
-          val dummy = TransactionOutput(Satoshis.zero, changeSpk)
-          val changeCost = feeRate * dummy.byteSize
-
-          val excessAfterChange = excess - changeCost
-
-          if (excessAfterChange >= Policy.dustThreshold)
-            Right(TransactionOutput(excessAfterChange, changeSpk))
-          else Left(excess)
-        case None => Left(excess)
-      }
-    }
-  }
-
   private[coordinator] def constructUnsignedPSBT(
       feeAddr: BitcoinAddress): Future[PSBT] = {
     logger.info(s"Constructing unsigned PSBT")
@@ -737,8 +748,8 @@ class VortexCoordinator private (
           }
 
           val changeOutputResults = aliceDbs.map { db =>
-            calculateChangeOutput(
-              roundDb = roundDb,
+            FeeCalculator.calculateChangeOutput(
+              roundParams = roundParams,
               isRemix = db.isRemix,
               numInputs = db.numInputs,
               numNewEntrants = numNewEntrants,
@@ -970,7 +981,8 @@ class VortexCoordinator private (
   override def start(): Unit = {
     if (
       roundStartTime == 0 ||
-      roundId == DoubleSha256Digest.empty
+      roundId == DoubleSha256Digest.empty ||
+      currentFeeRate == SatoshisPerVirtualByte.zero
     ) {
       throw new IllegalStateException(
         "Cannot start server with invalid round parameters")
@@ -1001,8 +1013,9 @@ class VortexCoordinator private (
         reconcileRound().map(_ => ())
       }
 
-    // call it so it is no longer lazy and starts
+    // call these so they is no longer lazy and start running
     beginInputRegistrationCancellable
+    feeRateHintsCancellable
     ()
   }
 
@@ -1010,6 +1023,7 @@ class VortexCoordinator private (
     // wrap in try because this could fail
     // from invalid params for dummy coordinators
     Try(beginInputRegistrationCancellable.cancel())
+    Try(feeRateHintsCancellable.cancel())
     beginOutputRegistrationCancellable.foreach(_.cancel())
     sendPSBTCancellable.foreach(_.cancel())
 
@@ -1033,7 +1047,11 @@ object VortexCoordinator extends Logging {
       .flatMap { _ =>
         val km = new CoordinatorKeyManager()
         val dummyOld =
-          new VortexCoordinator(km, bitcoind, DoubleSha256Digest.empty, 0)
+          new VortexCoordinator(km = km,
+                                bitcoind = bitcoind,
+                                roundId = DoubleSha256Digest.empty,
+                                currentFeeRate = SatoshisPerVirtualByte.zero,
+                                roundStartTime = 0)
 
         nextRound(dummyOld)
       }
@@ -1045,6 +1063,8 @@ object VortexCoordinator extends Logging {
       ec: ExecutionContext): Future[VortexCoordinator] = {
     if (!old.nextCoordinatorP.isCompleted) {
       implicit val config: VortexCoordinatorAppConfig = old.config
+
+      val feeRateF = config.fetchFeeRate()
       old.stop()
       // generate new round id
       val roundId =
@@ -1069,10 +1089,12 @@ object VortexCoordinator extends Logging {
 
       for {
         _ <- old.roundDAO.create(roundDb)
+        feeRate <- feeRateF
 
         newCoordinator = new VortexCoordinator(old.km,
                                                old.bitcoind,
                                                roundId,
+                                               feeRate,
                                                roundStartTime)
 
         _ = {

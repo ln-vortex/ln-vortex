@@ -8,6 +8,7 @@ import org.bitcoins.core.protocol.ln.node.NodeId
 import org.bitcoins.core.protocol.script.ScriptPubKey
 import org.bitcoins.core.protocol.transaction._
 import org.bitcoins.core.psbt.PSBT
+import org.bitcoins.core.wallet.fee.SatoshisPerVirtualByte
 import org.bitcoins.crypto.{SchnorrNonce, StringFactory}
 
 import java.net.InetSocketAddress
@@ -15,6 +16,12 @@ import java.net.InetSocketAddress
 sealed trait RoundDetails {
   def order: Int = status.order
   def status: ClientStatus
+}
+
+sealed trait PendingRoundDetails extends RoundDetails {
+  def round: RoundParameters
+
+  def updateFeeRate(feeRate: SatoshisPerVirtualByte): PendingRoundDetails
 }
 
 case object NoDetails extends RoundDetails {
@@ -25,15 +32,19 @@ case object NoDetails extends RoundDetails {
   }
 }
 
-case class KnownRound(round: RoundParameters) extends RoundDetails {
+case class KnownRound(round: RoundParameters) extends PendingRoundDetails {
   override val status: ClientStatus = ClientStatus.KnownRound
 
   def nextStage(nonce: SchnorrNonce): ReceivedNonce =
     ReceivedNonce(round, nonce)
+
+  override def updateFeeRate(feeRate: SatoshisPerVirtualByte): KnownRound = {
+    copy(round = round.copy(feeRate = feeRate))
+  }
 }
 
 case class ReceivedNonce(round: RoundParameters, nonce: SchnorrNonce)
-    extends RoundDetails {
+    extends PendingRoundDetails {
   override val status: ClientStatus = ClientStatus.ReceivedNonce
 
   def nextStage(
@@ -42,6 +53,10 @@ case class ReceivedNonce(round: RoundParameters, nonce: SchnorrNonce)
       nodeIdOpt: Option[NodeId],
       peerAddrOpt: Option[InetSocketAddress]): InputsScheduled =
     InputsScheduled(round, nonce, inputs, addressOpt, nodeIdOpt, peerAddrOpt)
+
+  override def updateFeeRate(feeRate: SatoshisPerVirtualByte): ReceivedNonce = {
+    copy(round = round.copy(feeRate = feeRate))
+  }
 }
 
 case class InputsScheduled(
@@ -51,7 +66,7 @@ case class InputsScheduled(
     addressOpt: Option[BitcoinAddress],
     nodeIdOpt: Option[NodeId],
     peerAddrOpt: Option[InetSocketAddress])
-    extends RoundDetails {
+    extends PendingRoundDetails {
   override val status: ClientStatus = ClientStatus.InputsScheduled
 
   def nextStage(
@@ -65,6 +80,11 @@ case class InputsScheduled(
                      changeOutputFee = changeOutputFee,
                      nonce = nonce,
                      initDetails = initDetails)
+
+  override def updateFeeRate(
+      feeRate: SatoshisPerVirtualByte): InputsScheduled = {
+    copy(round = round.copy(feeRate = feeRate))
+  }
 }
 
 sealed trait InitializedRound extends RoundDetails {

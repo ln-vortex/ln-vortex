@@ -77,6 +77,24 @@ case class VortexClient[+T <: VortexWalletApi](
     }
   }
 
+  protected def updateFeeRate(feeRate: SatoshisPerVirtualByte): Unit = {
+    roundDetails match {
+      case details: PendingRoundDetails =>
+        roundDetails = details.updateFeeRate(feeRate)
+        details match {
+          case _: KnownRound | _: ReceivedNonce =>
+          // Do nothing
+          case _: InputsScheduled =>
+            // todo verify inputs are okay
+            ()
+        }
+      case state @ (NoDetails | _: InitializedRound) =>
+        logger.debug(
+          s"Received new fee rate, but cannot update at state $state")
+        ()
+    }
+  }
+
   override def start(): Future[Unit] = {
     for {
       _ <- subscribeRounds(vortexWallet.network)
@@ -272,7 +290,7 @@ case class VortexClient[+T <: VortexWalletApi](
 
         val isRemix =
           outputRefs.size == 1 && outputRefs.head.output.value == round.amount
-        val target = round.getTargetAmount(isRemix)
+        val target = round.getTargetAmount(isRemix, outputRefs.size)
 
         logger.info(
           s"Queueing ${outputRefs.size} coins to open a channel to $nodeId")
@@ -328,7 +346,7 @@ case class VortexClient[+T <: VortexWalletApi](
 
         val isRemix =
           outputRefs.size == 1 && outputRefs.head.output.value == round.amount
-        val target = round.getTargetAmount(isRemix)
+        val target = round.getTargetAmount(isRemix, outputRefs.size)
 
         logger.info(
           s"Queueing ${outputRefs.size} coins for collaborative transaction")

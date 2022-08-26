@@ -12,6 +12,7 @@ import org.bitcoins.core.protocol.transaction._
 import org.bitcoins.core.psbt.PSBT
 import org.bitcoins.core.script.ScriptType
 import org.bitcoins.core.util.TimeUtil
+import org.bitcoins.core.wallet.fee.SatoshisPerVirtualByte
 import org.bitcoins.crypto._
 import org.bitcoins.testkitcore.gen.NumberGenerator
 
@@ -28,8 +29,10 @@ class VortexClientTest extends VortexClientFixture {
     inputType = ScriptType.WITNESS_V0_KEYHASH,
     outputType = ScriptType.WITNESS_V0_KEYHASH,
     changeType = ScriptType.WITNESS_V0_KEYHASH,
+    minPeers = 3,
     maxPeers = 5,
-    status = "hello world"
+    status = "hello world",
+    feeRate = SatoshisPerVirtualByte.one
   )
 
   val nonce: SchnorrNonce = ECPublicKey.freshPublicKey.schnorrNonce
