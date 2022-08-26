@@ -1,5 +1,6 @@
 package com.lnvortex.server
 
+import com.lnvortex.core.RoundDetails.getRoundParamsOpt
 import com.lnvortex.testkit._
 import org.bitcoins.core.script.ScriptType
 import org.bitcoins.core.script.ScriptType._
@@ -34,6 +35,23 @@ class ClientServerPairNetworkingTest
         _ <- client.cancelRegistration()
         _ <- client.askNonce()
       } yield succeed
+  }
+
+  it must "get an updated fee rate" in { case (client, coordinator, _) =>
+    val starting = getRoundParamsOpt(client.getCurrentRoundDetails).get.feeRate
+    for {
+      sent <- coordinator.sendUpdatedFeeRate()
+      _ <- TestAsyncUtil.awaitCondition(
+        () =>
+          getRoundParamsOpt(
+            client.getCurrentRoundDetails).get.feeRate != starting,
+        interval = interval)
+    } yield {
+      val newFeeRate =
+        getRoundParamsOpt(client.getCurrentRoundDetails).get.feeRate
+      assert(newFeeRate == sent)
+      assert(starting != newFeeRate)
+    }
   }
 
   it must "open a channel" in { case (client, coordinator, peerLnd) =>

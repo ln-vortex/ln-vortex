@@ -251,13 +251,21 @@ trait VortexHttpClient[+V <: VortexWalletApi] { self: VortexClient[V] =>
     Flow[Message].mapAsync(FutureUtil.getParallelism) {
       case tm: TextMessage =>
         tm.toStrict(10.seconds).flatMap { msg =>
-          val round = Try {
-            Json.parse(msg.text).as[RoundParameters]
+          val announcement = Try {
+            Json.parse(msg.text).as[ServerAnnouncementMessage]
           }.getOrElse {
             throw new RuntimeException(s"Could not parse json: ${msg.text}")
           }
-          logger.info(s"Received round details ${round.roundId.hex}")
-          setRound(round)
+
+          announcement match {
+            case round: RoundParameters =>
+              logger.info(s"Received round details ${round.roundId.hex}")
+              setRound(round)
+            case FeeRateHint(feeRate) =>
+              logger.info(s"Received fee rate hint $feeRate")
+              updateFeeRate(feeRate)
+              Future.unit
+          }
         }
       case bm: BinaryMessage =>
         // ignore binary messages but drain content to avoid the stream being clogged
@@ -273,6 +281,10 @@ trait VortexHttpClient[+V <: VortexWalletApi] { self: VortexClient[V] =>
       case adv: RoundParameters =>
         logger.info(s"Received round details ${adv.roundId.hex}")
         setRound(adv)
+      case FeeRateHint(feeRate) =>
+        logger.info(s"Received fee rate hint $feeRate")
+        updateFeeRate(feeRate)
+        Future.unit
       case NonceMessage(schnorrNonce) =>
         storeNonce(schnorrNonce)
         Future.unit

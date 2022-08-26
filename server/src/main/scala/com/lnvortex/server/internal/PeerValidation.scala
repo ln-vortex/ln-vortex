@@ -90,7 +90,6 @@ trait PeerValidation extends Logging { self: VortexCoordinator =>
 
   def validateAliceChange(
       isRemix: Boolean,
-      roundDb: RoundDb,
       registerInputs: RegisterInputs,
       otherInputs: Vector[RegisteredInputDb]): Option[VortexServerException] = {
     if (isRemix) {
@@ -109,8 +108,8 @@ trait PeerValidation extends Logging { self: VortexCoordinator =>
         _.scriptType == config.changeScriptType) && uniqueChangeSpk
 
       val inputAmt = registerInputs.inputs.map(_.output.value).sum
-      val changeE = calculateChangeOutput(
-        roundDb = roundDb,
+      val changeE = FeeCalculator.calculateChangeOutput(
+        roundParams = roundParams,
         isRemix = isRemix,
         numInputs = registerInputs.inputs.size,
         numRemixes = 0,

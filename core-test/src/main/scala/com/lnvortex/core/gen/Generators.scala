@@ -50,7 +50,11 @@ object Generators {
       outputType <- validScriptType
       changeType <- validScriptType
       maxPeers <- NumberGenerator.uInt16.map(_.toInt)
+      minPeers <- NumberGenerator.uInt16
+        .map(_.toInt)
+        .suchThat(min => min <= maxPeers)
       status <- StringGenerators.genString
+      feeRate <- FeeUnitGen.satsPerVirtualByte
     } yield {
       RoundParameters(
         version = version,
@@ -62,8 +66,10 @@ object Generators {
         inputType = inputType,
         outputType = outputType,
         changeType = changeType,
+        minPeers = minPeers,
         maxPeers = maxPeers,
-        status = status
+        status = status,
+        feeRate = feeRate
       )
     }
   }

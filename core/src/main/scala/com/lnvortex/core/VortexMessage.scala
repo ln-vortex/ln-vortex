@@ -4,11 +4,13 @@ import grizzled.slf4j.Logging
 import org.bitcoins.commons.serializers.JsonSerializers._
 import org.bitcoins.commons.serializers.JsonWriters._
 import org.bitcoins.commons.serializers.JsonReaders._
+import org.bitcoins.commons.serializers.SerializerUtil
 import org.bitcoins.core.currency._
 import org.bitcoins.core.protocol.script._
 import org.bitcoins.core.protocol.transaction._
 import org.bitcoins.core.psbt.PSBT
 import org.bitcoins.core.script.ScriptType
+import org.bitcoins.core.wallet.fee.SatoshisPerVirtualByte
 import org.bitcoins.crypto._
 import play.api.libs.json._
 import scodec.bits.ByteVector
@@ -26,6 +28,7 @@ object VortexMessage extends Logging {
   implicit val vortexMessageReads: Reads[VortexMessage] = Reads { json =>
     json
       .validate[RoundParameters]
+      .orElse(json.validate[FeeRateHint])
       .orElse(json.validate[NonceMessage])
       .orElse(json.validate[AskInputs])
       .orElse(json.validate[RegisterInputs])
@@ -39,6 +42,32 @@ object VortexMessage extends Logging {
   }
 }
 
+sealed abstract class ServerAnnouncementMessage extends ServerVortexMessage
+
+object ServerAnnouncementMessage {
+
+  // todo remove after https://github.com/bitcoin-s/bitcoin-s/pull/4672/ is merged
+
+  implicit object SatoshisPerVByteReads extends Reads[SatoshisPerVirtualByte] {
+
+    override def reads(json: JsValue): JsResult[SatoshisPerVirtualByte] =
+      SerializerUtil.processJsNumberBigInt[SatoshisPerVirtualByte](num =>
+        SatoshisPerVirtualByte.fromLong(num.toLong))(json)
+  }
+
+  implicit object SatoshisPerVByteWrites
+      extends Writes[SatoshisPerVirtualByte] {
+    override def writes(o: SatoshisPerVirtualByte): JsValue = JsNumber(o.toLong)
+  }
+
+  implicit val serverAnnouncementMessageReads: Reads[
+    ServerAnnouncementMessage] = Reads { json =>
+    json
+      .validate[RoundParameters]
+      .orElse(json.validate[FeeRateHint])
+  }
+}
+
 case class RoundParameters(
     version: Int,
     roundId: DoubleSha256Digest,
@@ -49,22 +78,53 @@ case class RoundParameters(
     inputType: ScriptType,
     outputType: ScriptType,
     changeType: ScriptType,
+    minPeers: Int,
     maxPeers: Int,
-    status: String)
-    extends ServerVortexMessage {
+    status: String,
+    feeRate: SatoshisPerVirtualByte)
+    extends ServerAnnouncementMessage {
 
-  def getTargetAmount(isRemix: Boolean): CurrencyUnit = {
-    if (isRemix) amount else amount + coordinatorFee
+  def getTargetAmount(isRemix: Boolean, numInputs: Int): CurrencyUnit = {
+    if (isRemix) amount
+    else {
+      // this will cancel out and make this only give us the on-chain fees
+      val inputAmt = amount - coordinatorFee
+      val Left(onChainFees) = FeeCalculator.calculateChangeOutput(
+        roundParams = this,
+        isRemix = isRemix,
+        numInputs = numInputs,
+        numRemixes = 0,
+        numNewEntrants = 1,
+        inputAmount = inputAmt,
+        changeSpkOpt = None)
+
+      amount + coordinatorFee + onChainFees
+    }
   }
 }
 
 object RoundParameters {
+
+  import ServerAnnouncementMessage._
 
   implicit val RoundParametersReads: Reads[RoundParameters] =
     Json.reads[RoundParameters]
 
   implicit val RoundParametersWrites: OWrites[RoundParameters] =
     Json.writes[RoundParameters]
+
+}
+
+case class FeeRateHint(feeRate: SatoshisPerVirtualByte)
+    extends ServerAnnouncementMessage
+
+object FeeRateHint {
+  import ServerAnnouncementMessage._
+
+  implicit val FeeRateHintReads: Reads[FeeRateHint] = Json.reads[FeeRateHint]
+
+  implicit val FeeRateHintWrites: OWrites[FeeRateHint] =
+    Json.writes[FeeRateHint]
 
 }
 

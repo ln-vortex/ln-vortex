@@ -1,6 +1,9 @@
 package com.lnvortex.core
 
-import org.bitcoins.core.currency.CurrencyUnit
+import org.bitcoins.core.currency.{CurrencyUnit, Satoshis}
+import org.bitcoins.core.policy.Policy
+import org.bitcoins.core.protocol.script.ScriptPubKey
+import org.bitcoins.core.protocol.transaction.TransactionOutput
 import org.bitcoins.core.script.ScriptType
 import org.bitcoins.core.wallet.fee._
 
@@ -77,6 +80,49 @@ trait FeeCalculator {
       case ScriptType.WITNESS_V0_KEYHASH    => 31
       case ScriptType.WITNESS_V0_SCRIPTHASH => 43
       case ScriptType.WITNESS_V1_TAPROOT    => 43
+    }
+  }
+
+  def calculateChangeOutput(
+      roundParams: RoundParameters,
+      isRemix: Boolean,
+      numInputs: Int,
+      numRemixes: Int,
+      numNewEntrants: Int,
+      inputAmount: CurrencyUnit,
+      changeSpkOpt: Option[ScriptPubKey]): Either[
+    CurrencyUnit,
+    TransactionOutput] = {
+    if (isRemix) Left(Satoshis.zero)
+    else {
+      val feeRate = roundParams.feeRate
+      val inputFee = this.inputFee(feeRate, roundParams.inputType)
+      val updatedOutputFee = outputFee(feeRate,
+                                       roundParams.outputType,
+                                       roundParams.changeType,
+                                       Some(numNewEntrants))
+      val totalNewEntrantFee =
+        Satoshis(numRemixes) * (inputFee + outputFee(feeRate,
+                                                     roundParams.outputType,
+                                                     roundParams.changeType,
+                                                     None))
+      val newEntrantFee = totalNewEntrantFee / Satoshis(numNewEntrants)
+      val excess =
+        inputAmount - roundParams.amount - roundParams.coordinatorFee - (Satoshis(
+          numInputs) * inputFee) - updatedOutputFee - newEntrantFee
+
+      changeSpkOpt match {
+        case Some(changeSpk) =>
+          val dummy = TransactionOutput(Satoshis.zero, changeSpk)
+          val changeCost = feeRate * dummy.byteSize
+
+          val excessAfterChange = excess - changeCost
+
+          if (excessAfterChange >= Policy.dustThreshold)
+            Right(TransactionOutput(excessAfterChange, changeSpk))
+          else Left(excess)
+        case None => Left(excess)
+      }
     }
   }
 }
