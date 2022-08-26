@@ -1,6 +1,7 @@
 package com.lnvortex.server.config
 
 import akka.actor.ActorSystem
+import com.lnvortex.core.VortexUtils.DEFAULT_PORT
 import com.lnvortex.server.models._
 import com.typesafe.config.Config
 import grizzled.slf4j.Logging
@@ -25,7 +26,7 @@ import org.bitcoins.tor.TorParams
 import org.bitcoins.tor.config.TorAppConfig
 
 import java.io.File
-import java.net.{InetSocketAddress, URI}
+import java.net.InetSocketAddress
 import java.nio.file.{Files, Path, Paths}
 import scala.concurrent._
 import scala.concurrent.duration._
@@ -101,8 +102,7 @@ case class VortexCoordinatorAppConfig(
 
   lazy val listenAddress: InetSocketAddress = {
     val str = config.getString(s"$moduleName.listen")
-    val uri = new URI("tcp://" + str)
-    new InetSocketAddress(uri.getHost, uri.getPort)
+    NetworkUtil.parseInetSocketAddress(str, DEFAULT_PORT)
   }
 
   lazy val kmParams: KeyManagerParams =

@@ -2,6 +2,7 @@ package com.lnvortex.server.networking
 
 import akka.actor._
 import akka.http.scaladsl.Http
+import com.lnvortex.core.VortexUtils.DEFAULT_PORT
 import com.lnvortex.server.coordinator.VortexCoordinator
 import grizzled.slf4j.Logging
 import org.bitcoins.core.util.StartStopAsync
@@ -45,7 +46,8 @@ class VortexHttpServer(coordinator: VortexCoordinator)(implicit
                 params.controlAddress,
                 params.authentication,
                 params.privateKeyPath,
-                bindAddress.getPort
+                DEFAULT_PORT,
+                targets = Seq(s"127.0.0.1:${bindAddress.getPort}")
               )
               .map(Some(_))
           case None => Future.successful(None)

@@ -21,6 +21,8 @@ trait VortexUtils {
 
     !outputRefs.exists(o => total - o.output.value >= target)
   }
+
+  final val DEFAULT_PORT = 12523
 }
 
 object VortexUtils extends VortexUtils
