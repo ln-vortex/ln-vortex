@@ -1,4 +1,4 @@
-package com.lnvortex.client.config
+package com.lnvortex.core.api
 
 import org.bitcoins.core.config._
 

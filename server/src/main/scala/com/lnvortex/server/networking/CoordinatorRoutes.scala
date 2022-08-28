@@ -11,6 +11,8 @@ import akka.http.scaladsl.server._
 import akka.stream._
 import akka.stream.scaladsl._
 import com.lnvortex.core._
+import com.lnvortex.core.api.CoordinatorAddress
+import com.lnvortex.server.config._
 import org.bitcoins.core.config._
 import org.bitcoins.crypto._
 import play.api.libs.json._
@@ -22,6 +24,8 @@ class CoordinatorRoutes(var coordinator: VortexCoordinator)(implicit
     system: ActorSystem)
     extends Logging {
   implicit val ec: ExecutionContext = system.dispatcher
+
+  implicit val config: VortexCoordinatorAppConfig = coordinator.config
 
   // Need to switch coordinator when given a new one
   def prepareNextCoordinator(): Unit = {
@@ -58,6 +62,33 @@ class CoordinatorRoutes(var coordinator: VortexCoordinator)(implicit
         case Failure(ex) =>
           val rejection = ValidationRejection(
             s"Could not parse to network from hash ${hash.hex}, currentNetwork: ${currentNetwork.name}",
+            Some(ex))
+          reject(rejection)
+      }
+    }
+  }
+
+  private val coordinatorsRoute = path("coordinators" / Segment) { seg =>
+    get {
+      val hash = DoubleSha256DigestBE(seg)
+      Try(Networks.fromChainHash(hash)) match {
+        case Success(network) =>
+          val bitcoinNetwork = network match {
+            case network: BitcoinNetwork => network
+          }
+
+          Try(config.coordinatorAddresses(bitcoinNetwork)) match {
+            case Success(addresses) =>
+              complete(jsonResponse(addresses))
+            case Failure(ex) =>
+              val rejection = ValidationRejection(
+                s"Could not get coordinator addresses for network ${bitcoinNetwork.name}",
+                Some(ex))
+              reject(rejection)
+          }
+        case Failure(ex) =>
+          val rejection = ValidationRejection(
+            s"Could not parse to network from hash ${hash.hex}",
             Some(ex))
           reject(rejection)
       }
@@ -161,7 +192,7 @@ class CoordinatorRoutes(var coordinator: VortexCoordinator)(implicit
           .toMat(BroadcastHub.sink)(Keep.both)
           .run()
 
-        val parallelism = coordinator.config.maxPeers * 2
+        val parallelism = config.maxPeers * 2
         val sink = Sink.foreachAsync[Message](parallelism) {
           case TextMessage.Strict("goodbye") =>
             queue.complete()
@@ -263,6 +294,7 @@ class CoordinatorRoutes(var coordinator: VortexCoordinator)(implicit
     concat(
       pingRoute,
       paramsRoute,
+      coordinatorsRoute,
       outputRoute,
       cancelRoute,
       roundStatusWebsocketRoute,
@@ -275,5 +307,14 @@ class CoordinatorRoutes(var coordinator: VortexCoordinator)(implicit
       `application/json`,
       writes.writes(body).toString
     )
+  }
+
+  implicit val coordinatorAddressWrites: OWrites[CoordinatorAddress] = OWrites {
+    c =>
+      Json.obj(
+        "name" -> c.name,
+        "network" -> c.network.name,
+        "address" -> s"${c.address.getHostString}:${c.address.getPort}"
+      )
   }
 }

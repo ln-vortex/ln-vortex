@@ -2,7 +2,7 @@ package com.lnvortex.client
 
 import akka.actor.ActorSystem
 import com.lnvortex.client.VortexClientException._
-import com.lnvortex.client.config.{CoordinatorAddress, VortexAppConfig}
+import com.lnvortex.client.config.VortexAppConfig
 import com.lnvortex.client.db._
 import com.lnvortex.client.networking._
 import com.lnvortex.core.RoundDetails.{getNonceOpt, getRoundParamsOpt}

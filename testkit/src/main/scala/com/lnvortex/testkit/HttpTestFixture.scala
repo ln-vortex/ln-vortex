@@ -2,7 +2,7 @@ package com.lnvortex.testkit
 
 import com.lnvortex.bitcoind.BitcoindVortexWallet
 import com.lnvortex.client.VortexClient
-import com.lnvortex.client.config.CoordinatorAddress
+import com.lnvortex.core.api.CoordinatorAddress
 import com.lnvortex.server.coordinator.VortexCoordinator
 import com.lnvortex.server.networking.VortexHttpServer
 import org.bitcoins.core.config.RegTest

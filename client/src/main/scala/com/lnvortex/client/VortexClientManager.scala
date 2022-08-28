@@ -1,10 +1,14 @@
 package com.lnvortex.client
 
 import akka.actor.ActorSystem
-import com.lnvortex.client.config.{CoordinatorAddress, VortexAppConfig}
+import com.lnvortex.client.config.VortexAppConfig
 import com.lnvortex.client.db.UTXODAO
 import com.lnvortex.core._
-import com.lnvortex.core.api.{ChannelDetails, VortexWalletApi}
+import com.lnvortex.core.api.{
+  ChannelDetails,
+  CoordinatorAddress,
+  VortexWalletApi
+}
 import grizzled.slf4j.Logging
 import org.bitcoins.core.util.StartStopAsync
 

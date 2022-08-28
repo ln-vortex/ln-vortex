@@ -2,6 +2,7 @@ package com.lnvortex.client.config
 
 import akka.actor.ActorSystem
 import com.lnvortex.client.db.UTXODAO
+import com.lnvortex.core.api.CoordinatorAddress
 import com.typesafe.config.Config
 import grizzled.slf4j.Logging
 import org.bitcoins.commons.config._
