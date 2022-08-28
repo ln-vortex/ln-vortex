@@ -1,7 +1,8 @@
 package com.lnvortex.testkit
 
 import com.lnvortex.client.VortexClient
-import com.lnvortex.client.config.{CoordinatorAddress, VortexAppConfig}
+import com.lnvortex.client.config.VortexAppConfig
+import com.lnvortex.core.api.CoordinatorAddress
 import com.lnvortex.lnd.LndVortexWallet
 import org.bitcoins.core.currency.Bitcoins
 import org.bitcoins.core.number.UInt32

@@ -10,7 +10,8 @@ import akka.stream.scaladsl._
 import akka.util.ByteString
 import com.lnvortex.client.VortexClient
 import com.lnvortex.core._
-import com.lnvortex.core.api.VortexWalletApi
+import org.bitcoins.commons.serializers.JsonReaders._
+import com.lnvortex.core.api.{CoordinatorAddress, VortexWalletApi}
 import org.bitcoins.asyncutil.AsyncUtil
 import org.bitcoins.core.config.BitcoinNetwork
 import org.bitcoins.core.util.FutureUtil
@@ -91,6 +92,15 @@ trait VortexHttpClient[+V <: VortexWalletApi] { self: VortexClient[V] =>
       "http://" + baseUrl + "/params/" + network.chainParams.genesisBlock.blockHeader.hashBE.hex)
 
     sendRequestAndParse[RoundParameters](request, newConnection = false)
+  }
+
+  def getCoordinators(
+      network: BitcoinNetwork): Future[Vector[CoordinatorAddress]] = {
+    val request = Get(
+      "http://" + baseUrl + "/coordinators/" + network.chainParams.genesisBlock.blockHeader.hashBE.hex)
+
+    sendRequestAndParse[Vector[CoordinatorAddress]](request,
+                                                    newConnection = false)
   }
 
   protected def subscribeRounds(network: BitcoinNetwork): Future[Unit] = {
@@ -317,4 +327,7 @@ trait VortexHttpClient[+V <: VortexWalletApi] { self: VortexClient[V] =>
         Future.unit
     }
   }
+
+  implicit val coordinatorAddressReads: Reads[CoordinatorAddress] =
+    Json.reads[CoordinatorAddress]
 }

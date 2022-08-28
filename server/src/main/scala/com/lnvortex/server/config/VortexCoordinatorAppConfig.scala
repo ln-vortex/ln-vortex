@@ -1,7 +1,8 @@
 package com.lnvortex.server.config
 
 import akka.actor.ActorSystem
-import com.lnvortex.core.VortexUtils.DEFAULT_PORT
+import com.lnvortex.core.VortexUtils
+import com.lnvortex.core.api.CoordinatorAddress
 import com.lnvortex.server.models._
 import com.typesafe.config.Config
 import grizzled.slf4j.Logging
@@ -21,16 +22,17 @@ import org.bitcoins.feeprovider.MempoolSpaceTarget._
 import org.bitcoins.feeprovider._
 import org.bitcoins.keymanager.bip39.BIP39KeyManager
 import org.bitcoins.keymanager.config.KeyManagerAppConfig
-import org.bitcoins.keymanager.config.KeyManagerAppConfig.DEFAULT_WALLET_NAME
+import org.bitcoins.keymanager.config.KeyManagerAppConfig._
 import org.bitcoins.tor.TorParams
 import org.bitcoins.tor.config.TorAppConfig
 
 import java.io.File
 import java.net.InetSocketAddress
-import java.nio.file.{Files, Path, Paths}
+import java.nio.file._
 import scala.concurrent._
 import scala.concurrent.duration._
-import scala.util.{Properties, Random}
+import scala.jdk.CollectionConverters._
+import scala.util._
 
 /** Configuration for Ln Vortex
   *
@@ -43,6 +45,7 @@ case class VortexCoordinatorAppConfig(
     extends DbAppConfig
     with JdbcProfileComponent[VortexCoordinatorAppConfig]
     with DbManagement
+    with VortexUtils
     with Logging {
   import system.dispatcher
 
@@ -262,6 +265,25 @@ case class VortexCoordinatorAppConfig(
     }
 
     ()
+  }
+
+  lazy val coordinatorAddresses: Map[
+    BitcoinNetwork,
+    Vector[CoordinatorAddress]] = {
+    val coordinators =
+      config.getConfigList(s"vortex.coordinators").asScala.toList
+
+    val list = for {
+      coordinatorConfig <- coordinators
+      name = coordinatorConfig.getString("name")
+      networkStr = coordinatorConfig.getString("network")
+      address = coordinatorConfig.getString("address")
+    } yield CoordinatorAddress(
+      name,
+      BitcoinNetworks.fromString(networkStr),
+      NetworkUtil.parseInetSocketAddress(address, 12523))
+
+    list.toVector.groupBy(_.network)
   }
 
   override lazy val allTables: List[TableQuery[Table[_]]] = {
