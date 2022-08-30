@@ -23,9 +23,8 @@ trait HttpTestFixture
     (VortexClient[BitcoindVortexWallet], VortexCoordinator)
 
   override def withFixture(test: OneArgAsyncTest): FutureOutcome = {
-    makeDependentFixture[(
-        VortexClient[BitcoindVortexWallet],
-        VortexCoordinator)](
+    makeDependentFixture[(VortexClient[BitcoindVortexWallet],
+                          VortexCoordinator)](
       () => {
         implicit val (clientConfig, serverConf) = getTestConfigs()
 

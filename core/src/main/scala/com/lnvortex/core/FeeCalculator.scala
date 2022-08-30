@@ -41,7 +41,8 @@ trait FeeCalculator {
 
   /** Returns the expected size of an input for the script type in vbytes
     *
-    * @see https://twitter.com/murchandamus/status/1262062602298916865/photo/1
+    * @see
+    *   https://twitter.com/murchandamus/status/1262062602298916865/photo/1
     */
   def getScriptTypeInputSize(scriptType: ScriptType): Int = {
     scriptType match {
@@ -63,7 +64,8 @@ trait FeeCalculator {
 
   /** Returns the expected size of an output for the script type in vbytes
     *
-    * @see https://twitter.com/murchandamus/status/1262062602298916865/photo/1
+    * @see
+    *   https://twitter.com/murchandamus/status/1262062602298916865/photo/1
     */
   def getScriptTypeOutputSize(scriptType: ScriptType): Int = {
     scriptType match {
@@ -90,9 +92,8 @@ trait FeeCalculator {
       numRemixes: Int,
       numNewEntrants: Int,
       inputAmount: CurrencyUnit,
-      changeSpkOpt: Option[ScriptPubKey]): Either[
-    CurrencyUnit,
-    TransactionOutput] = {
+      changeSpkOpt: Option[ScriptPubKey]): Either[CurrencyUnit,
+                                                  TransactionOutput] = {
     if (isRemix) Left(Satoshis.zero)
     else {
       val feeRate = roundParams.feeRate

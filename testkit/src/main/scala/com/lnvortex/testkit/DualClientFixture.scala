@@ -25,20 +25,18 @@ trait DualClientFixture
     with EmbeddedPg {
   def isNetworkingTest: Boolean
 
-  override type FixtureParam = (
-      VortexClient[LndVortexWallet],
-      VortexClient[LndVortexWallet],
-      VortexCoordinator)
+  override type FixtureParam = (VortexClient[LndVortexWallet],
+                                VortexClient[LndVortexWallet],
+                                VortexCoordinator)
 
   def outputScriptType: ScriptType
   def changeScriptType: ScriptType
   def inputScriptType: ScriptType
 
   override def withFixture(test: OneArgAsyncTest): FutureOutcome = {
-    makeDependentFixture[(
-        VortexClient[LndVortexWallet],
-        VortexClient[LndVortexWallet],
-        VortexCoordinator)](
+    makeDependentFixture[(VortexClient[LndVortexWallet],
+                          VortexClient[LndVortexWallet],
+                          VortexCoordinator)](
       () => {
         val scriptTypeConfig =
           ConfigFactory

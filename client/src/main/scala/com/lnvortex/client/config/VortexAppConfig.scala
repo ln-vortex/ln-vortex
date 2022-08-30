@@ -19,8 +19,10 @@ import scala.util.Properties
 
 /** Configuration for Ln Vortex
   *
-  * @param baseDatadir The data directory of the wallet
-  * @param configOverrides Optional sequence of configuration overrides
+  * @param baseDatadir
+  *   The data directory of the wallet
+  * @param configOverrides
+  *   Optional sequence of configuration overrides
   */
 case class VortexAppConfig(baseDatadir: Path, configOverrides: Vector[Config])(
     implicit system: ActorSystem)
@@ -28,6 +30,7 @@ case class VortexAppConfig(baseDatadir: Path, configOverrides: Vector[Config])(
     with JdbcProfileComponent[VortexAppConfig]
     with DbManagement
     with Logging {
+
   import profile.api._
   import system.dispatcher
 
@@ -57,9 +60,8 @@ case class VortexAppConfig(baseDatadir: Path, configOverrides: Vector[Config])(
     torConf.socks5ProxyParams
   }
 
-  lazy val coordinatorAddresses: Map[
-    BitcoinNetwork,
-    Vector[CoordinatorAddress]] = {
+  lazy val coordinatorAddresses: Map[BitcoinNetwork,
+                                     Vector[CoordinatorAddress]] = {
     val coordinators =
       config.getConfigList(s"$moduleName.coordinators").asScala.toList
 

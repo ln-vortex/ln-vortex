@@ -46,10 +46,9 @@ case class UTXODAO()(implicit
     safeDatabase.runVec(findByPrimaryKeys(outPoints).result)
   }
 
-  def findBySPKsAction(spks: Vector[ScriptPubKey]): DBIOAction[
-    Vector[UTXODb],
-    NoStream,
-    Effect.Read] = {
+  def findBySPKsAction(spks: Vector[ScriptPubKey]): DBIOAction[Vector[UTXODb],
+                                                               NoStream,
+                                                               Effect.Read] = {
     table.filter(_.spk.inSet(spks)).result.map(_.toVector)
   }
 

@@ -60,7 +60,7 @@ object BlindingTweaks {
 
     tweaksOpt match {
       case Some(tweaks) => tweaks
-      case None         => freshBlindingTweaksWithKeyTweak(signerPubKey, signerNonce)
+      case None => freshBlindingTweaksWithKeyTweak(signerPubKey, signerNonce)
     }
   }
 }

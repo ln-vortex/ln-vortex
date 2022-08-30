@@ -39,6 +39,7 @@ case class QueueCoins(
     address: Option[BitcoinAddress],
     nodeId: Option[NodeId],
     peerAddr: Option[InetSocketAddress]) {
+
   require(!(address.isDefined && nodeId.isDefined),
           "Cannot have nodeId and address set")
 }

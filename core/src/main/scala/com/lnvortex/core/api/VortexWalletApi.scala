@@ -31,9 +31,12 @@ abstract class VortexWalletApi extends StartStopAsync[Unit] {
 
   /** Creates a proof of ownership for the input and then locks it
     *
-    * @param nonce     Round Nonce for the peer
-    * @param outputRef OutputReference for the input
-    * @return Signed ScriptWitness
+    * @param nonce
+    *   Round Nonce for the peer
+    * @param outputRef
+    *   OutputReference for the input
+    * @return
+    *   Signed ScriptWitness
     */
   def createInputProof(
       nonce: SchnorrNonce,

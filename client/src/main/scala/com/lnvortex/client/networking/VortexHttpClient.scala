@@ -33,8 +33,8 @@ trait VortexHttpClient[+V <: VortexWalletApi] { self: VortexClient[V] =>
 
   private val http = Http()
 
-  private var registrationQueue: Option[
-    (SourceQueueWithComplete[Message], Promise[Unit])] = None
+  private var registrationQueue: Option[(SourceQueueWithComplete[Message],
+                                         Promise[Unit])] = None
 
   private var roundsSubscription: Option[Promise[Option[Nothing]]] = None
 

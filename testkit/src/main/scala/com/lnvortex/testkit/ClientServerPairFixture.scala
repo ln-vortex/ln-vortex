@@ -34,10 +34,9 @@ trait ClientServerPairFixture
   def inputScriptType: ScriptType
 
   override def withFixture(test: OneArgAsyncTest): FutureOutcome = {
-    makeDependentFixture[(
-        VortexClient[LndVortexWallet],
-        VortexCoordinator,
-        LndRpcClient)](
+    makeDependentFixture[(VortexClient[LndVortexWallet],
+                          VortexCoordinator,
+                          LndRpcClient)](
       () => {
         val scriptTypeConfig =
           ConfigFactory

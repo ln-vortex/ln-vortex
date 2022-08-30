@@ -6,8 +6,8 @@ import com.lnvortex.cli.ConsoleCli.serverConfig
 import com.lnvortex.config.VortexPicklers._
 import com.lnvortex.config._
 import org.bitcoins.commons.serializers.Picklers.{
-  transactionOutPointPickler => _,
   inetSocketAddress => _,
+  transactionOutPointPickler => _,
   _
 }
 import org.bitcoins.core.protocol.BitcoinAddress
@@ -225,16 +225,15 @@ object ConsoleCli {
             Success(_),
             _ => error(s"Response was not a JSON object! Got: $rawBody"))
 
-      /** Gets the given key from jsObj if it exists
-        * and is not null
+      /** Gets the given key from jsObj if it exists and is not null
         */
       def getKey(key: String): Option[ujson.Value] = {
         jsObjT.toOption.flatMap(_.get(key).flatMap(result =>
           if (result.isNull) None else Some(result)))
       }
 
-      /** Converts a `ujson.Value` to String, making an
-        * effort to avoid preceding and trailing `"`s
+      /** Converts a `ujson.Value` to String, making an effort to avoid
+        * preceding and trailing `"`s
         */
       def jsValueToString(value: ujson.Value) =
         value match {

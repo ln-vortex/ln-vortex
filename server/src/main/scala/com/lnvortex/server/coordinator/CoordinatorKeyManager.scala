@@ -35,10 +35,9 @@ class CoordinatorKeyManager()(implicit
   private val pubKeyPath = BIP32Path.fromHardenedString(
     s"m/${CoordinatorKeyManager.PURPOSE.constant}'/${coinType.toInt}'/0'")
 
-  private lazy val nonceCounter: DBIOAction[
-    AtomicInteger,
-    NoStream,
-    Effect.Read] = {
+  private lazy val nonceCounter: DBIOAction[AtomicInteger,
+                                            NoStream,
+                                            Effect.Read] = {
     aliceDAO.nextNonceIndexAction().map { index =>
       new AtomicInteger(index)
     }
@@ -59,10 +58,9 @@ class CoordinatorKeyManager()(implicit
     }
   }
 
-  final private[server] def nextNonce(): DBIOAction[
-    (SchnorrNonce, BIP32Path),
-    NoStream,
-    Effect.Read] = {
+  final private[server] def nextNonce(): DBIOAction[(SchnorrNonce, BIP32Path),
+                                                    NoStream,
+                                                    Effect.Read] = {
     nextNoncePath().map { path =>
       val nonce = extPrivateKey.deriveChildPrivKey(path).key.schnorrNonce
 

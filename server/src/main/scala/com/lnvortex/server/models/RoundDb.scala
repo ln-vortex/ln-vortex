@@ -22,6 +22,7 @@ case class RoundDb(
     txIdOpt: Option[DoubleSha256DigestBE],
     profitOpt: Option[CurrencyUnit]
 ) {
+
   // verify correct txid
   transactionOpt match {
     case Some(tx) =>
