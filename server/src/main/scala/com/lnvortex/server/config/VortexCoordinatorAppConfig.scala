@@ -36,8 +36,10 @@ import scala.util._
 
 /** Configuration for Ln Vortex
   *
-  * @param directory The data directory of the wallet
-  * @param configOverrides Optional sequence of configuration overrides
+  * @param directory
+  *   The data directory of the wallet
+  * @param configOverrides
+  *   Optional sequence of configuration overrides
   */
 case class VortexCoordinatorAppConfig(
     private val directory: Path,
@@ -267,9 +269,8 @@ case class VortexCoordinatorAppConfig(
     ()
   }
 
-  lazy val coordinatorAddresses: Map[
-    BitcoinNetwork,
-    Vector[CoordinatorAddress]] = {
+  lazy val coordinatorAddresses: Map[BitcoinNetwork,
+                                     Vector[CoordinatorAddress]] = {
     val coordinators =
       config.getConfigList(s"vortex.coordinators").asScala.toList
 

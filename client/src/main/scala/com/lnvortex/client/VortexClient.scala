@@ -610,7 +610,7 @@ case class VortexClient[+T <: VortexWalletApi](
           ) {
             Future.failed(new InvalidChangeOutputException(
               s"Missing expected change output of $expectedAmtBack, got ${changeOutputOpt
-                .map(_.value)}"))
+                  .map(_.value)}"))
           } else if (missingInputs.nonEmpty) {
             Future.failed(new MissingInputsException(
               s"Missing inputs from transaction: ${missingInputs.mkString(",")}"))

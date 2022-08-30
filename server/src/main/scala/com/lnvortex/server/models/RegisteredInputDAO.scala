@@ -37,22 +37,21 @@ case class RegisteredInputDAO()(implicit
     createAllNoAutoInc(ts, safeDatabase)
 
   override protected def findByPrimaryKeys(
-      ids: Vector[TransactionOutPoint]): Query[
-    RegisteredInputsTable,
-    RegisteredInputDb,
-    Seq] =
+      ids: Vector[TransactionOutPoint]): Query[RegisteredInputsTable,
+                                               RegisteredInputDb,
+                                               Seq] =
     table.filter(_.outPoint.inSet(ids))
 
-  override protected def findAll(ts: Vector[RegisteredInputDb]): Query[
-    RegisteredInputsTable,
-    RegisteredInputDb,
-    Seq] =
+  override protected def findAll(
+      ts: Vector[RegisteredInputDb]): Query[RegisteredInputsTable,
+                                            RegisteredInputDb,
+                                            Seq] =
     findByPrimaryKeys(ts.map(_.outPoint))
 
-  def findByRoundIdAction(roundId: DoubleSha256Digest): DBIOAction[
-    Vector[RegisteredInputDb],
-    NoStream,
-    Effect.Read] = {
+  def findByRoundIdAction(
+      roundId: DoubleSha256Digest): DBIOAction[Vector[RegisteredInputDb],
+                                               NoStream,
+                                               Effect.Read] = {
     table.filter(_.roundId === roundId).result.map(_.toVector)
   }
 
@@ -63,10 +62,9 @@ case class RegisteredInputDAO()(implicit
 
   def findByPeerIdAction(
       peerId: Sha256Digest,
-      roundId: DoubleSha256Digest): DBIOAction[
-    Vector[RegisteredInputDb],
-    NoStream,
-    Effect.Read] = {
+      roundId: DoubleSha256Digest): DBIOAction[Vector[RegisteredInputDb],
+                                               NoStream,
+                                               Effect.Read] = {
     table
       .filter(t => t.peerId === peerId && t.roundId === roundId)
       .result
@@ -81,10 +79,9 @@ case class RegisteredInputDAO()(implicit
 
   def findByPeerIdsAction(
       peerIds: Vector[Sha256Digest],
-      roundId: DoubleSha256Digest): DBIOAction[
-    Vector[RegisteredInputDb],
-    NoStream,
-    Effect.Read] = {
+      roundId: DoubleSha256Digest): DBIOAction[Vector[RegisteredInputDb],
+                                               NoStream,
+                                               Effect.Read] = {
     table
       .filter(t => t.peerId.inSet(peerIds) && t.roundId === roundId)
       .result

@@ -36,10 +36,9 @@ case class AliceDAO()(implicit
     findByPrimaryKeys(ts.map(_.peerId))
 
   def findByEitherAction(
-      either: Either[SchnorrNonce, Sha256Digest]): DBIOAction[
-    Option[AliceDb],
-    NoStream,
-    Effect.Read] = {
+      either: Either[SchnorrNonce, Sha256Digest]): DBIOAction[Option[AliceDb],
+                                                              NoStream,
+                                                              Effect.Read] = {
     either match {
       case Left(nonce) =>
         table.filter(_.nonce === nonce).result.headOption
@@ -48,10 +47,9 @@ case class AliceDAO()(implicit
     }
   }
 
-  def findByNonceAction(nonce: SchnorrNonce): DBIOAction[
-    Option[AliceDb],
-    NoStream,
-    Effect.Read] = {
+  def findByNonceAction(nonce: SchnorrNonce): DBIOAction[Option[AliceDb],
+                                                         NoStream,
+                                                         Effect.Read] = {
     table.filter(_.nonce === nonce).result.map(_.headOption)
   }
 
@@ -59,10 +57,10 @@ case class AliceDAO()(implicit
     safeDatabase.run(findByNonceAction(nonce))
   }
 
-  def findByRoundIdAction(roundId: DoubleSha256Digest): DBIOAction[
-    Vector[AliceDb],
-    NoStream,
-    Effect.Read] = {
+  def findByRoundIdAction(
+      roundId: DoubleSha256Digest): DBIOAction[Vector[AliceDb],
+                                               NoStream,
+                                               Effect.Read] = {
     table.filter(_.roundId === roundId).result.map(_.toVector)
   }
 
@@ -70,10 +68,10 @@ case class AliceDAO()(implicit
     safeDatabase.run(findByRoundIdAction(roundId))
   }
 
-  def findRegisteredForRoundAction(roundId: DoubleSha256Digest): DBIOAction[
-    Vector[AliceDb],
-    NoStream,
-    Effect.Read] = {
+  def findRegisteredForRoundAction(
+      roundId: DoubleSha256Digest): DBIOAction[Vector[AliceDb],
+                                               NoStream,
+                                               Effect.Read] = {
     table
       .filter(t => t.roundId === roundId && t.blindOutputSigOpt.isDefined)
       .result
@@ -85,10 +83,10 @@ case class AliceDAO()(implicit
     safeDatabase.run(findRegisteredForRoundAction(roundId))
   }
 
-  def numRegisteredForRoundAction(roundId: DoubleSha256Digest): DBIOAction[
-    Int,
-    profile.api.NoStream,
-    Effect.Read] = {
+  def numRegisteredForRoundAction(
+      roundId: DoubleSha256Digest): DBIOAction[Int,
+                                               profile.api.NoStream,
+                                               Effect.Read] = {
     table
       .filter(t => t.roundId === roundId && t.blindOutputSigOpt.isDefined)
       .map(_.peerId)
@@ -103,10 +101,11 @@ case class AliceDAO()(implicit
     safeDatabase.run(action)
   }
 
-  def getPeerIdSigMapAction(roundId: DoubleSha256Digest): DBIOAction[
-    Vector[(Sha256Digest, FieldElement)],
-    NoStream,
-    Effect.Read] = {
+  def getPeerIdSigMapAction(
+      roundId: DoubleSha256Digest): DBIOAction[Vector[(Sha256Digest,
+                                                       FieldElement)],
+                                               NoStream,
+                                               Effect.Read] = {
     table
       .filter(t => t.roundId === roundId && t.blindOutputSigOpt.isDefined)
       .map(t => (t.peerId, t.blindOutputSigOpt.get))
@@ -114,10 +113,10 @@ case class AliceDAO()(implicit
       .map(_.toVector)
   }
 
-  def findSignedForRoundAction(roundId: DoubleSha256Digest): DBIOAction[
-    Vector[AliceDb],
-    NoStream,
-    Effect.Read] = {
+  def findSignedForRoundAction(
+      roundId: DoubleSha256Digest): DBIOAction[Vector[AliceDb],
+                                               NoStream,
+                                               Effect.Read] = {
     table
       .filter(t => t.roundId === roundId && t.signedPSBT.isDefined)
       .result

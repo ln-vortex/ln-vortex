@@ -245,32 +245,30 @@ object ClientStatus extends StringFactory[ClientStatus] {
   /** The client has received the details of the round */
   case object KnownRound extends ClientStatus(1)
 
-  /** Intermediate step during queueing coins.
-    * This nonce will be unique to the user and used for blind signing
+  /** Intermediate step during queueing coins. This nonce will be unique to the
+    * user and used for blind signing
     */
   case object ReceivedNonce extends ClientStatus(2)
 
-  /** The user has scheduled inputs to be registered.
-    * Once the coordinator sends the [[AskInputs]] message it register them.
+  /** The user has scheduled inputs to be registered. Once the coordinator sends
+    * the [[AskInputs]] message it register them.
     */
   case object InputsScheduled extends ClientStatus(3)
 
   /** After the [[AskInputs]] message has been received and the client sends its
-    * inputs to the coordinator its inputs will be registered.
-    * This is the first state when the round begins.
+    * inputs to the coordinator its inputs will be registered. This is the first
+    * state when the round begins.
     */
   case object InputsRegistered extends ClientStatus(4)
 
-  /** Intermediate step during the round.
-    * The client has registered its output with unblinded signature
-    * under its alternate Bob identity
+  /** Intermediate step during the round. The client has registered its output
+    * with unblinded signature under its alternate Bob identity
     */
   case object OutputRegistered extends ClientStatus(5)
 
-  /** Final stage during the round.
-    * The client has received the PSBT and signed it.
-    * It will send it back to the coordinator to
-    * complete the transaction and broadcast
+  /** Final stage during the round. The client has received the PSBT and signed
+    * it. It will send it back to the coordinator to complete the transaction
+    * and broadcast
     */
   case object PSBTSigned extends ClientStatus(6)
 

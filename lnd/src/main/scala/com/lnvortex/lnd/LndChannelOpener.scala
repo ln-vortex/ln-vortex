@@ -40,11 +40,16 @@ case class LndChannelOpener(lndRpcClient: LndRpcClient)(implicit
   }
 
   /** Connects to the peer and starts the process of opening a channel
-    * @param nodeId NodeId of who to open the channel to
-    * @param peerAddrOpt Node's socket address, None if already connected
-    * @param fundingAmount Size of channel
-    * @param privateChannel If the channel should be a private channel
-    * @return Details needed to complete the opening of the channel
+    * @param nodeId
+    *   NodeId of who to open the channel to
+    * @param peerAddrOpt
+    *   Node's socket address, None if already connected
+    * @param fundingAmount
+    *   Size of channel
+    * @param privateChannel
+    *   If the channel should be a private channel
+    * @return
+    *   Details needed to complete the opening of the channel
     */
   def initPSBTChannelOpen(
       nodeId: NodeId,
@@ -105,9 +110,10 @@ case class LndChannelOpener(lndRpcClient: LndRpcClient)(implicit
     fundF
   }
 
-  /** This should be called to cancel the channel if fundPendingChannel
-    * has not been called
-    * @param chanId Temporary id given to the channel
+  /** This should be called to cancel the channel if fundPendingChannel has not
+    * been called
+    * @param chanId
+    *   Temporary id given to the channel
     * @return
     */
   def cancelPendingChannel(chanId: ByteVector): Future[Unit] = {
@@ -124,9 +130,10 @@ case class LndChannelOpener(lndRpcClient: LndRpcClient)(implicit
     fundF
   }
 
-  /** This should be called to cancel the channel if fundPendingChannel
-    * has been called
-    * @param chanOutPoint TransactionOutPoint of the resulting channel
+  /** This should be called to cancel the channel if fundPendingChannel has been
+    * called
+    * @param chanOutPoint
+    *   TransactionOutPoint of the resulting channel
     * @return
     */
   def cancelChannel(chanOutPoint: TransactionOutPoint): Future[Unit] = {

@@ -35,16 +35,16 @@ case class RegisteredOutputDAO()(implicit
     TransactionOutput]): Query[RegisteredOutputTable, RegisteredOutputDb, Seq] =
     table.filter(_.output.inSet(ids))
 
-  override protected def findAll(ts: Vector[RegisteredOutputDb]): Query[
-    RegisteredOutputTable,
-    RegisteredOutputDb,
-    Seq] =
+  override protected def findAll(
+      ts: Vector[RegisteredOutputDb]): Query[RegisteredOutputTable,
+                                             RegisteredOutputDb,
+                                             Seq] =
     findByPrimaryKeys(ts.map(_.output))
 
-  def findByRoundIdAction(roundId: DoubleSha256Digest): DBIOAction[
-    Vector[RegisteredOutputDb],
-    NoStream,
-    Effect.Read] = {
+  def findByRoundIdAction(
+      roundId: DoubleSha256Digest): DBIOAction[Vector[RegisteredOutputDb],
+                                               NoStream,
+                                               Effect.Read] = {
     table.filter(_.roundId === roundId).result.map(_.toVector)
   }
 

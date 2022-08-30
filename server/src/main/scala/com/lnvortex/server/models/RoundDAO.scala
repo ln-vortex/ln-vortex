@@ -50,10 +50,9 @@ case class RoundDAO()(implicit
       ts: Vector[RoundDb]): Query[RoundTable, RoundDb, Seq] =
     findByPrimaryKeys(ts.map(_.roundId))
 
-  def hasTxIdAction(txId: DoubleSha256DigestBE): DBIOAction[
-    Boolean,
-    NoStream,
-    Effect.Read] = {
+  def hasTxIdAction(txId: DoubleSha256DigestBE): DBIOAction[Boolean,
+                                                            NoStream,
+                                                            Effect.Read] = {
     table.filter(_.txIdOpt === txId).result.map(_.nonEmpty)
   }
 

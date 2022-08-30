@@ -215,10 +215,9 @@ class VortexCoordinator private (
     getRoundAction(roundId)
   }
 
-  def getRoundAction(roundId: DoubleSha256Digest): DBIOAction[
-    RoundDb,
-    NoStream,
-    Effect.Read] = {
+  def getRoundAction(roundId: DoubleSha256Digest): DBIOAction[RoundDb,
+                                                              NoStream,
+                                                              Effect.Read] = {
     roundDAO.findByPrimaryKeyAction(roundId).map {
       case Some(db) => db
       case None =>
@@ -458,10 +457,10 @@ class VortexCoordinator private (
 
   private def getNonceAction(
       peerId: Sha256Digest,
-      peerRoundId: DoubleSha256Digest): DBIOAction[
-    AliceDb,
-    NoStream,
-    Effect.Read with Effect.Write] = {
+      peerRoundId: DoubleSha256Digest): DBIOAction[AliceDb,
+                                                   NoStream,
+                                                   Effect.Read
+                                                     with Effect.Write] = {
     logger.info(s"Alice ${peerId.hex} asked for a nonce")
     require(
       peerRoundId == getCurrentRoundId,

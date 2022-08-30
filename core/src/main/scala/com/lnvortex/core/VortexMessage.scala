@@ -136,9 +136,13 @@ object AskInputs {
 }
 
 /** First message from client to server
-  * @param inputs inputs Alice is spending in the coin join
-  * @param blindedOutput Response from BlindingTweaks.freshBlindingTweaks & BlindingTweaks.generateChallenge
-  * @param changeSpkOpt Optional SPK Alice should receive change for
+  * @param inputs
+  *   inputs Alice is spending in the coin join
+  * @param blindedOutput
+  *   Response from BlindingTweaks.freshBlindingTweaks &
+  *   BlindingTweaks.generateChallenge
+  * @param changeSpkOpt
+  *   Optional SPK Alice should receive change for
   */
 case class RegisterInputs(
     inputs: Vector[InputReference],
@@ -162,7 +166,8 @@ object RegisterInputs {
 }
 
 /** Response from coordinator to Alice's first message
-  * @param blindOutputSig Response from BlindingTweaks.generateBlindSig
+  * @param blindOutputSig
+  *   Response from BlindingTweaks.generateBlindSig
   */
 case class BlindedSig(blindOutputSig: FieldElement) extends ServerVortexMessage
 
@@ -174,8 +179,10 @@ object BlindedSig {
     Json.writes[BlindedSig]
 }
 
-/** @param sig Response from BlindingTweaks.unblindSignature
-  * @param output Output they are registering
+/** @param sig
+  *   Response from BlindingTweaks.unblindSignature
+  * @param output
+  *   Output they are registering
   */
 case class RegisterOutput(
     sig: SchnorrDigitalSignature,
@@ -205,7 +212,8 @@ object RegisterOutput {
   }
 }
 
-/** @param psbt Unsigned PSBT of the transaction
+/** @param psbt
+  *   Unsigned PSBT of the transaction
   */
 case class UnsignedPsbtMessage(psbt: PSBT) extends ServerVortexMessage
 
@@ -231,7 +239,8 @@ object SignedPsbtMessage {
 
 }
 
-/** @param transaction Full signed transaction
+/** @param transaction
+  *   Full signed transaction
   */
 case class SignedTxMessage(transaction: Transaction) extends ServerVortexMessage
 

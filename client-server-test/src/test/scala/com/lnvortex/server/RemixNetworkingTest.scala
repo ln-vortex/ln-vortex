@@ -63,7 +63,7 @@ class RemixNetworkingTest
       _ <- TestAsyncUtil.awaitCondition(
         () => {
           clientA.getCurrentRoundDetails.order == KnownRound.order &&
-            clientB.getCurrentRoundDetails.order == KnownRound.order
+          clientB.getCurrentRoundDetails.order == KnownRound.order
         },
         interval = interval,
         maxTries = maxTries
