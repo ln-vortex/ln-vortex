@@ -49,6 +49,8 @@ trait LndVortexWalletFixture extends BitcoinSFixture with CachedBitcoindV23 {
           _ <- TestAsyncUtil.awaitConditionF(() =>
             lnd.listUnspent.map(_.size == 3))
 
+          wallet = LndVortexWallet(lnd)
+          _ <- wallet.start()
         } yield LndVortexWallet(lnd)
       },
       { lnd =>

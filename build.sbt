@@ -236,20 +236,6 @@ lazy val testkit = project
   .dependsOn(core, client, server, coreTest, lnd, clightning, bitcoind)
 
 TaskKeys.downloadLnd := {
-  implicit val ec: ExecutionContextExecutor =
-    scala.concurrent.ExecutionContext.global
-  // copy of FutureUtil.makeAsync
-  def makeAsync(func: () => Unit): Future[Unit] = {
-    val resultP = Promise[Unit]()
-
-    ec.execute { () =>
-      val result: Unit = func()
-      resultP.success(result)
-    }
-
-    resultP.future
-  }
-
   val logger = streams.value.log
   import scala.sys.process._
 
@@ -260,83 +246,60 @@ TaskKeys.downloadLnd := {
     Files.createDirectories(binaryDir)
   }
 
-  val experimentalVersion = "20220628-01"
-  val versions = List("0.15.0-beta", experimentalVersion)
+  val version = "0.15.1-beta"
 
-  val downloads = versions.map { version =>
-    val (platform, suffix) =
-      if (Properties.isLinux) ("linux-amd64", "tar.gz")
-      else if (Properties.isMac) ("darwin-amd64", "tar.gz")
-      else if (Properties.isWin) ("windows-amd64", "zip")
+  val (platform, suffix) =
+    if (Properties.isLinux) ("linux-amd64", "tar.gz")
+    else if (Properties.isMac) ("darwin-amd64", "tar.gz")
+    else if (Properties.isWin) ("windows-amd64", "zip")
+    else sys.error(s"Unsupported OS: ${Properties.osName}")
+
+  logger.debug(s"(Maybe) downloading lnd binaries for version: $version")
+
+  val versionDir = binaryDir resolve s"lnd-$platform-v$version"
+  val location =
+    s"https://github.com/lightningnetwork/lnd/releases/download/v$version/lnd-$platform-v$version.$suffix"
+
+  if (Files.exists(versionDir)) {
+    logger.debug(
+      s"Directory $versionDir already exists, skipping download of lnd $version")
+  } else {
+    val archiveLocation = binaryDir resolve s"$version.$suffix"
+    logger.info(s"Downloading lnd version $version from location: $location")
+    logger.info(s"Placing the file in $archiveLocation")
+    val downloadCommand = url(location) #> archiveLocation.toFile
+    downloadCommand.!!
+
+    val bytes = Files.readAllBytes(archiveLocation)
+    val hash = MessageDigest
+      .getInstance("SHA-256")
+      .digest(bytes)
+      .map("%02x" format _)
+      .mkString
+
+    val expectedHash =
+      if (Properties.isLinux)
+        "0673768e657ac004367d07c20395d544a3d1df926be1a1990a17e23a8a91d4fb"
+      else if (Properties.isMac)
+        "7863c1f5374c854536ea6803baa46faeb4a09f1df5836746d1232c37b0fd9cf9"
+      else if (Properties.isWin)
+        "07d4a5147ec56a3775ecc8d3486f8bc3c04b53b47ef48e8258b4e6f8def06edf"
       else sys.error(s"Unsupported OS: ${Properties.osName}")
 
-    logger.debug(s"(Maybe) downloading lnd binaries for version: $version")
+    if (hash.equalsIgnoreCase(expectedHash)) {
+      logger.info(s"Download complete and verified, unzipping result")
 
-    val versionDir = binaryDir resolve s"lnd-$platform-v$version"
-    val location =
-      if (version == experimentalVersion) {
-        s"https://benthecarman-public.s3.us-east-2.amazonaws.com/lnd-$version/lnd-$platform-$version.$suffix"
-      } else {
-        s"https://github.com/lightningnetwork/lnd/releases/download/v$version/lnd-$platform-v$version.$suffix"
-      }
+      val extractCommand = s"tar -xzf $archiveLocation --directory $binaryDir"
+      logger.info(s"Extracting archive with command: $extractCommand")
+      extractCommand.!!
+    } else {
+      logger.error(
+        s"Downloaded invalid version of lnd, got $hash, expected $expectedHash")
+    }
 
-    if (Files.exists(versionDir)) {
-      logger.debug(
-        s"Directory $versionDir already exists, skipping download of lnd $version")
-      Future.unit
-    } else
-      makeAsync { () =>
-        val archiveLocation = binaryDir resolve s"$version.$suffix"
-        logger.info(
-          s"Downloading lnd version $version from location: $location")
-        logger.info(s"Placing the file in $archiveLocation")
-        val downloadCommand = url(location) #> archiveLocation.toFile
-        downloadCommand.!!
-
-        val bytes = Files.readAllBytes(archiveLocation)
-        val hash = MessageDigest
-          .getInstance("SHA-256")
-          .digest(bytes)
-          .map("%02x" format _)
-          .mkString
-
-        val expectedHash =
-          if (Properties.isLinux)
-            Map(
-              "0.15.0-beta" -> "60511b4717a82c303e164f7d1048fd52f965c5fcb7aefaa11678be48e81a9dcc",
-              experimentalVersion -> "c0dc66d58cc1e120c1f75371240361c96df3ae6a500729f93017c46c7fa63ed3"
-            )
-          else if (Properties.isMac)
-            Map(
-              "0.15.0-beta" -> "eacf6e8f19de942fb23f481c85541342d3248bd545616822a172da3d23c03c9d",
-              experimentalVersion -> "694e707592f8a654ae87b06ac71f62f6119c31e89e7cfdd0fffb48ff9adf2b1f"
-            )
-          else if (Properties.isWin)
-            Map(
-              "0.15.0-beta" -> "74c16854292ca27b335309d7b37a44baec4df402e16b203df393ebece6570ad3",
-              experimentalVersion -> "897e35d3bb1e8c0127357c8f1087477fad57fb19895bfcf1e6f5b909daab8d01"
-            )
-          else sys.error(s"Unsupported OS: ${Properties.osName}")
-
-        if (hash.equalsIgnoreCase(expectedHash(version))) {
-          logger.info(s"Download complete and verified, unzipping result")
-
-          val extractCommand =
-            s"tar -xzf $archiveLocation --directory $binaryDir"
-          logger.info(s"Extracting archive with command: $extractCommand")
-          extractCommand.!!
-        } else {
-          logger.error(
-            s"Downloaded invalid version of lnd, got $hash, expected $expectedHash")
-        }
-
-        logger.info(s"Deleting archive")
-        Files.delete(archiveLocation)
-      }
+    logger.info(s"Deleting archive")
+    Files.delete(archiveLocation)
   }
-
-  //timeout if we cannot download in 5 minutes
-  Await.result(Future.sequence(downloads), 5.minutes)
 }
 
 TaskKeys.downloadBitcoind := {
@@ -479,7 +442,7 @@ TaskKeys.downloadBitcoind := {
     }
   }
 
-  //timeout if we cannot download in 5 minutes
+  // timeout if we cannot download in 5 minutes
   Await.result(Future.sequence(downloads), 5.minutes)
 }
 

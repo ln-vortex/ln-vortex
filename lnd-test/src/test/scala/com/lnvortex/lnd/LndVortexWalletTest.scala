@@ -2,6 +2,7 @@ package com.lnvortex.lnd
 
 import com.lnvortex.core._
 import com.lnvortex.testkit.LndVortexWalletFixture
+import org.bitcoins.core.config.RegTest
 import org.bitcoins.core.currency._
 import org.bitcoins.core.number._
 import org.bitcoins.core.protocol.script._
@@ -15,6 +16,10 @@ import scala.concurrent.duration.DurationInt
 import scala.util.{Failure, Success}
 
 class LndVortexWalletTest extends LndVortexWalletFixture {
+
+  it must "get network" in { wallet =>
+    assert(wallet.network == RegTest)
+  }
 
   it must "correctly sign a psbt with segwitV0 inputs" in { wallet =>
     for {

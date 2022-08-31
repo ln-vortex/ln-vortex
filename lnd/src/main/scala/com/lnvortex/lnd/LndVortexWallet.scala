@@ -171,7 +171,21 @@ case class LndVortexWallet(lndRpcClient: LndRpcClient)(implicit
     channelOpener.cancelPendingChannel(chanId)
   }
 
-  override def start(): Future[Unit] = Future.unit
+  override def start(): Future[Unit] = {
+    for {
+      version <- lndRpcClient.getVersion()
+    } yield {
+      if (version.version < LndVortexWallet.MIN_LND_VERSION) {
+        throw new RuntimeException(
+          s"LND version ${version.version} is too old. " +
+            s"Minimum version is ${LndVortexWallet.MIN_LND_VERSION}")
+      }
+      if (!version.buildTags.contains("signrpc")) {
+        throw new RuntimeException(
+          s"LND must have signrpc build tag to use Vortex")
+      }
+    }
+  }
 
   override def stop(): Future[Unit] = lndRpcClient.stop().map(_ => ())
 
@@ -252,6 +266,8 @@ case class LndVortexWallet(lndRpcClient: LndRpcClient)(implicit
 }
 
 object LndVortexWallet {
+
+  final val MIN_LND_VERSION = "0.15.1"
 
   def addressTypeFromScriptType(scriptType: ScriptType): AddressType = {
     scriptType match {

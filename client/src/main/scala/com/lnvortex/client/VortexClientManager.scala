@@ -43,6 +43,7 @@ class VortexClientManager[+T <: VortexWalletApi](val vortexWallet: T)(implicit
 
   override def start(): Future[Unit] = {
     for {
+      _ <- vortexWallet.start()
       coins <- vortexWallet.listCoins()
       _ <- utxoDAO.createMissing(coins)
 
