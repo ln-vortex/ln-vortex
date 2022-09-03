@@ -105,7 +105,6 @@ case class ServerArgParser(commandLineArgs: Vector[String]) {
       case None => s""
     }
 
-    // omitting configOpt as i don't know if we can do anything with that?
     val concat =
       rpcPortString +
         rpcBindString +
@@ -113,11 +112,27 @@ case class ServerArgParser(commandLineArgs: Vector[String]) {
 
     val all = ConfigFactory.parseString(concat)
 
+    val datadirPath: Path = datadirOpt match {
+      case Some(datadir) => datadir
+      case None          => LnVortexAppConfig.DEFAULT_DATADIR
+    }
+
+    val datadirConfig: Config =
+      ConfigFactory.parseString(
+        s"bitcoin-s.datadir = ${AppConfig.safePathToString(datadirPath)}")
+
     configOpt match {
-      case Some(file) =>
-        val fromFile = ConfigFactory.parseFile(file.toFile)
-        all.withFallback(fromFile)
-      case None => all
+      case Some(config) =>
+        val conf = ConfigFactory
+          .parseFile(config.toFile)
+          .withFallback(datadirConfig)
+          .resolve()
+        all.withFallback(conf)
+      case None =>
+        AppConfig
+          .getBaseConfig(datadirPath, Vector(all))
+          .withFallback(datadirConfig)
+          .resolve()
     }
   }
 

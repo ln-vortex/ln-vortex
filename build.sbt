@@ -119,10 +119,19 @@ lazy val cli = project
 
 lazy val rpcServer = project
   .in(file("app/rpc-server"))
-  .settings(CommonSettings.prodSettings: _*)
+  .settings(CommonSettings.appSettings: _*)
+  .settings(CommonSettings.dockerSettings: _*)
+  .settings(CommonSettings.dockerBuildxSettings: _*)
   .settings(libraryDependencies ++= Deps.rpcServer)
   .settings(name := "vortexd")
   .dependsOn(client, lnd, clightning, config)
+  .enablePlugins(
+    JavaAppPackaging,
+    DockerPlugin,
+//                 JlinkPlugin,
+    // needed for windows, else we have the 'The input line is too long` on windows OS
+    LauncherJarPlugin
+  )
 
 lazy val coordinatorConfig = project
   .in(file("coordinator/config"))
@@ -141,9 +150,18 @@ lazy val coordinatorCli = project
 lazy val coordinatorRpc = project
   .in(file("coordinator/rpc-server"))
   .settings(CommonSettings.prodSettings: _*)
+  .settings(CommonSettings.appSettings: _*)
+  .settings(CommonSettings.dockerSettings: _*)
+  .settings(CommonSettings.dockerBuildxSettings: _*)
   .settings(libraryDependencies ++= Deps.rpcServer)
-  .settings(name := "coordinator-rpc-server")
   .dependsOn(server, coordinatorConfig)
+  .enablePlugins(
+    JavaAppPackaging,
+    DockerPlugin,
+    //                 JlinkPlugin,
+    // needed for windows, else we have the 'The input line is too long` on windows OS
+    LauncherJarPlugin
+  )
 
 lazy val lnd = project
   .in(file("lnd"))
