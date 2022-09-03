@@ -16,6 +16,12 @@ object VortexClientException {
   class InvalidChangeOutputException(private val reason: String)
       extends VortexClientException(reason)
 
+  class InvalidInputTypeException(private val reason: String)
+      extends VortexClientException(reason)
+
+  class InvalidOutputTypeException(private val reason: String)
+      extends VortexClientException(reason)
+
   class MissingInputsException(private val reason: String)
       extends VortexClientException(reason)
 

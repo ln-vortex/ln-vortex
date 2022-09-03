@@ -11,6 +11,7 @@ import org.bitcoins.core.protocol.script._
 import org.bitcoins.core.protocol.transaction._
 import org.bitcoins.core.psbt.PSBT
 import org.bitcoins.core.script.ScriptType
+import org.bitcoins.core.script.ScriptType.SCRIPTHASH
 import org.bitcoins.core.util.TimeUtil
 import org.bitcoins.core.wallet.fee.SatoshisPerVirtualByte
 import org.bitcoins.crypto._
@@ -26,7 +27,7 @@ class VortexClientTest extends VortexClientFixture {
     coordinatorFee = Satoshis.zero,
     publicKey = ECPublicKey.freshPublicKey.schnorrPublicKey,
     time = TimeUtil.currentEpochSecond,
-    inputType = ScriptType.WITNESS_V0_KEYHASH,
+    inputType = ScriptType.WITNESS_V1_TAPROOT,
     outputType = ScriptType.WITNESS_V0_KEYHASH,
     changeType = ScriptType.WITNESS_V0_KEYHASH,
     minPeers = 3,
@@ -101,7 +102,7 @@ class VortexClientTest extends VortexClientFixture {
         .map(TransactionInput(_, EmptyScriptSignature, UInt32.max))
       outputs = Vector(change, targetOutput)
       tx = BaseTransaction(Int32.two, inputs, outputs, UInt32.zero)
-      res <- recoverToSucceededIf[TooLowOfFeeException](
+      res <- recoverToSucceededIf[InvalidInputTypeException](
         vortexClient.validateAndSignPsbt(PSBT.fromUnsignedTx(tx)))
     } yield res
   }
@@ -147,6 +148,57 @@ class VortexClientTest extends VortexClientFixture {
         res <- recoverToSucceededIf[InvalidTargetOutputException](
           vortexClient.validateAndSignPsbt(psbt))
       } yield res
+  }
+
+  it must "fail to sign a psbt with invalid output types" in { vortexClient =>
+    val lnd = vortexClient.vortexWallet
+
+    for {
+      nodeId <- lnd.lndRpcClient.nodeId
+      utxos <- lnd.listCoins()
+      refs = utxos.map(_.outputReference)
+
+      addrA <- lnd.getNewAddress(roundParams.changeType)
+      addrB <- lnd.getNewAddress(SCRIPTHASH)
+      change = TransactionOutput(Satoshis(599800000), addrA.scriptPubKey)
+      target = TransactionOutput(Satoshis(200000), addrB.scriptPubKey)
+
+      testDetails = InitDetails(
+        inputs = refs,
+        addressOpt = None,
+        nodeIdOpt = Some(nodeId),
+        peerAddrOpt = None,
+        changeSpkOpt = Some(change.scriptPubKey),
+        chanId = Sha256Digest.empty.bytes,
+        targetOutput = target,
+        tweaks = dummyTweaks
+      )
+      testState = OutputRegistered(roundParams,
+                                   Satoshis.zero,
+                                   Satoshis.zero,
+                                   Satoshis.zero,
+                                   nonce,
+                                   testDetails)
+      _ = vortexClient.setRoundDetails(testState)
+
+      inputs = refs
+        .map(_.outPoint)
+        .map(TransactionInput(_, EmptyScriptSignature, UInt32.max))
+      outputs = Vector(change, target)
+      tx = BaseTransaction(Int32.two, inputs, outputs, UInt32.zero)
+
+      psbt = PSBT.fromUnsignedTx(tx)
+      withUtxos = psbt.inputMaps.zipWithIndex.foldLeft(psbt) {
+        case (psbt, (_, index)) =>
+          val input = psbt.transaction.inputs(index)
+          val utxo = utxos.find(_.outPoint == input.previousOutput).get
+
+          psbt.addWitnessUTXOToInput(utxo.output, index)
+      }
+
+      res <- recoverToSucceededIf[InvalidOutputTypeException](
+        vortexClient.validateAndSignPsbt(withUtxos))
+    } yield res
   }
 
   it must "fail to sign a psbt with a missing change output" in {
