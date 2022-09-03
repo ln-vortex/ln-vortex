@@ -247,8 +247,7 @@ case class LndVortexWallet(lndRpcClient: LndRpcClient)(implicit
                 alias = alias,
                 outPoint = outPoint,
                 remotePubkey = NodeId(channel.remoteNodePub),
-                shortChannelId =
-                  ShortChannelId(UInt64.zero), // fixme make optional?
+                shortChannelId = ShortChannelId(UInt64.zero),
                 public = !channel.`private`,
                 amount = Satoshis(channel.capacity),
                 active = false,

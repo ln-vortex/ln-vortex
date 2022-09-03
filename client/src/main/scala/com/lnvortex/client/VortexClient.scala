@@ -1,6 +1,7 @@
 package com.lnvortex.client
 
 import akka.actor.ActorSystem
+import com.lnvortex.client.VortexClient.getDummyWitness
 import com.lnvortex.client.VortexClientException._
 import com.lnvortex.client.config.VortexAppConfig
 import com.lnvortex.client.db._
@@ -17,6 +18,7 @@ import org.bitcoins.core.policy.Policy
 import org.bitcoins.core.protocol.ln.node.NodeId
 import org.bitcoins.core.protocol.transaction._
 import org.bitcoins.core.protocol._
+import org.bitcoins.core.protocol.script._
 import org.bitcoins.core.psbt.PSBT
 import org.bitcoins.core.script.ScriptType
 import org.bitcoins.core.util._
@@ -556,6 +558,19 @@ case class VortexClient[+T <: VortexWalletApi](
           // should we care if they don't have our inputs?
           lazy val missingInputs = myOutpoints.filterNot(txOutpoints.contains)
 
+          lazy val correctInputTypes =
+            if (unsigned.inputMaps.forall(_.witnessUTXOOpt.isDefined)) {
+              unsigned.inputMaps.flatMap(_.witnessUTXOOpt).forall { txOut =>
+                txOut.witnessUTXO.scriptPubKey.scriptType == state.round.inputType
+              }
+            } else false
+
+          lazy val correctOutputTypes =
+            unsigned.transaction.outputs.forall { txOut =>
+              val scriptType = txOut.scriptPubKey.scriptType
+              scriptType == state.round.outputType || scriptType == state.round.changeType
+            }
+
           // make sure this can be broadcast now
           val goodLockTime = BlockStamp(tx.lockTime) match {
             case BlockStamp.BlockHeight(lockHeight) =>
@@ -583,18 +598,35 @@ case class VortexClient[+T <: VortexWalletApi](
           lazy val noDust = tx.outputs.forall(_.value >= Policy.dustThreshold)
 
           lazy val goodFeeRate = {
-            if (unsigned.inputMaps.forall(_.witnessUTXOOpt.isDefined)) {
-              val inputAmt = unsigned.inputMaps
-                .flatMap(_.witnessUTXOOpt)
-                .map(_.witnessUTXO.value)
-                .sum
+            val inputAmt = unsigned.inputMaps
+              .flatMap(_.witnessUTXOOpt)
+              .map(_.witnessUTXO.value)
+              .sum
 
-              // fixme do we need to add fake sigs here?
-              val feeRate =
-                SatoshisPerVirtualByte.calc(inputAmt, unsigned.transaction)
+            // add fake signatures so we can correctly estimate the size
+            val signedPsbt =
+              unsigned.inputMaps.zipWithIndex.foldLeft(unsigned) {
+                case (psbt, (_, index)) =>
+                  val (scriptSig, witOpt) =
+                    getDummyWitness(state.round.inputType)
+                  witOpt match {
+                    case Some(witness) =>
+                      psbt.addFinalizedScriptWitnessToInput(scriptSig,
+                                                            witness,
+                                                            index)
+                    case None =>
+                      psbt.addFinalizedScriptWitnessToInput(scriptSig,
+                                                            EmptyScriptWitness,
+                                                            index)
+                  }
+              }
 
-              feeRate.toLong >= 1
-            } else false
+            val dummySigned = signedPsbt.extractTransaction
+
+            val feeRate =
+              SatoshisPerVirtualByte.calc(inputAmt, dummySigned)
+
+            feeRate.toLong >= 1
           }
 
           if (!goodLockTime) {
@@ -617,6 +649,13 @@ case class VortexClient[+T <: VortexWalletApi](
           } else if (!noDust) {
             Future.failed(
               new DustOutputsException("Transaction contains dust outputs"))
+          } else if (!correctInputTypes) {
+            Future.failed(
+              new InvalidInputTypeException(
+                s"Expected input type ${state.round.inputType}"))
+          } else if (!correctOutputTypes) {
+            Future.failed(new InvalidOutputTypeException(
+              s"Expected output type ${state.round.outputType} & ${state.round.changeType}"))
           } else if (!goodFeeRate) {
             Future.failed(
               new TooLowOfFeeException("Transaction has a too low fee"))
@@ -695,4 +734,42 @@ case class VortexClient[+T <: VortexWalletApi](
 
 object VortexClient {
   val knownVersions: Vector[Int] = Vector(0)
+
+  def getDummyWitness(
+      scriptType: ScriptType): (ScriptSignature, Option[ScriptWitness]) = {
+    scriptType match {
+      case tpe @ (ScriptType.NONSTANDARD | ScriptType.MULTISIG |
+          ScriptType.CLTV | ScriptType.CSV |
+          ScriptType.NONSTANDARD_IF_CONDITIONAL |
+          ScriptType.NOT_IF_CONDITIONAL | ScriptType.MULTISIG_WITH_TIMEOUT |
+          ScriptType.PUBKEY_WITH_TIMEOUT | ScriptType.NULLDATA |
+          ScriptType.WITNESS_UNKNOWN | ScriptType.WITNESS_COMMITMENT |
+          ScriptType.WITNESS_V0_SCRIPTHASH) =>
+        throw new IllegalArgumentException(s"Unknown address type $tpe")
+      case ScriptType.PUBKEY =>
+        val sig = DummyECDigitalSignature
+        (P2PKScriptSignature(sig), None)
+      case ScriptType.PUBKEYHASH =>
+        val sig = DummyECDigitalSignature
+        (P2PKHScriptSignature(sig, ECPublicKey.freshPublicKey), None)
+      case ScriptType.SCRIPTHASH =>
+        val key = ECPublicKey.freshPublicKey
+        val dummySpk = P2WPKHWitnessSPKV0(key)
+        val dummyScriptSig = P2SHScriptSignature(dummySpk)
+        val dummyWit = P2WPKHWitnessV0(key, DummyECDigitalSignature)
+
+        (dummyScriptSig, Some(dummyWit))
+      case ScriptType.WITNESS_V0_KEYHASH =>
+        val scriptSig = EmptyScriptSignature
+        val key = ECPublicKey.freshPublicKey
+        val dummyWit = P2WPKHWitnessV0(key, DummyECDigitalSignature)
+
+        (scriptSig, Some(dummyWit))
+      case ScriptType.WITNESS_V1_TAPROOT =>
+        val scriptSig = EmptyScriptSignature
+        val dummyWit = TaprootKeyPath(SchnorrDigitalSignature.dummy)
+
+        (scriptSig, Some(dummyWit))
+    }
+  }
 }
