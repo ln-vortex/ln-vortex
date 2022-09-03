@@ -37,7 +37,7 @@ object TransactionType extends StringFactory[TransactionType] {
       case (ScriptType.WITNESS_V1_TAPROOT, ScriptType.WITNESS_V0_KEYHASH) =>
         Vector(OnChain)
       case (ScriptType.WITNESS_V1_TAPROOT, ScriptType.WITNESS_V0_SCRIPTHASH) =>
-        Vector(ChannelOpen, OnChain)
+        Vector(ChannelOpen)
       case (ScriptType.PUBKEYHASH, ScriptType.PUBKEYHASH) => Vector(OnChain)
       case (ScriptType.PUBKEYHASH, ScriptType.WITNESS_V0_SCRIPTHASH) =>
         Vector(OnChain, ChannelOpen)
@@ -45,30 +45,30 @@ object TransactionType extends StringFactory[TransactionType] {
         Vector(OnChain)
       case (ScriptType.SCRIPTHASH, ScriptType.PUBKEYHASH) => Vector(OnChain)
       case (ScriptType.SCRIPTHASH, ScriptType.WITNESS_V0_SCRIPTHASH) =>
-        Vector(OnChain, ChannelOpen)
+        Vector(ChannelOpen)
       case (ScriptType.SCRIPTHASH, ScriptType.WITNESS_V0_KEYHASH) =>
         Vector(OnChain)
       case (ScriptType.WITNESS_V0_SCRIPTHASH, ScriptType.PUBKEYHASH) =>
         Vector(OnChain)
       case (ScriptType.WITNESS_V0_SCRIPTHASH,
             ScriptType.WITNESS_V0_SCRIPTHASH) =>
-        Vector(OnChain, ChannelOpen)
+        Vector(ChannelOpen)
       case (ScriptType.WITNESS_V0_SCRIPTHASH, ScriptType.WITNESS_V0_KEYHASH) =>
         Vector(OnChain)
       case (ScriptType.WITNESS_V0_KEYHASH, ScriptType.PUBKEYHASH) =>
         Vector(OnChain)
       case (ScriptType.WITNESS_V0_KEYHASH, ScriptType.WITNESS_V0_SCRIPTHASH) =>
-        Vector(OnChain, ChannelOpen)
+        Vector(ChannelOpen)
       case (ScriptType.WITNESS_V0_KEYHASH, ScriptType.WITNESS_V0_KEYHASH) =>
         Vector(OnChain)
       case (ScriptType.MULTISIG, ScriptType.PUBKEYHASH) => Vector(OnChain)
       case (ScriptType.MULTISIG, ScriptType.WITNESS_V0_SCRIPTHASH) =>
-        Vector(OnChain, ChannelOpen)
+        Vector(ChannelOpen)
       case (ScriptType.MULTISIG, ScriptType.WITNESS_V0_KEYHASH) =>
         Vector(OnChain)
       case (ScriptType.NONSTANDARD, ScriptType.PUBKEYHASH) => Vector(OnChain)
       case (ScriptType.NONSTANDARD, ScriptType.WITNESS_V0_SCRIPTHASH) =>
-        Vector(OnChain, ChannelOpen)
+        Vector(ChannelOpen)
       case (ScriptType.NONSTANDARD, ScriptType.WITNESS_V0_KEYHASH) =>
         Vector(OnChain)
       case (ScriptType.NONSTANDARD, ScriptType.NONSTANDARD) => Vector(OnChain)
