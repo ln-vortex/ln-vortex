@@ -127,18 +127,10 @@ object RpcServer {
       case Right(value) => JsNumber(value.toDouble)
     }
 
-    def toJsObject: JsObject = JsObject(
-      Vector(
-        "id" -> idJs,
-        "result" -> (result match {
-          case None      => JsNull
-          case Some(res) => res
-        }),
-        "error" -> (error match {
-          case None      => JsNull
-          case Some(err) => JsString(err)
-        })
-      )
+    def toJsObject: JsObject = Json.obj(
+      "id" -> idJs,
+      "result" -> result,
+      "error" -> error
     )
   }
 
