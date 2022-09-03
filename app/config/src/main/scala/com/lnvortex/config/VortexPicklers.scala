@@ -111,6 +111,18 @@ object VortexPicklers {
   implicit val OutputReferenceWrites: Writes[OutputReference] =
     Json.writes[OutputReference]
 
+  implicit val TransactionTypeWrites: Writes[TransactionType] =
+    (t: TransactionType) => JsString(t.toString)
+
+  implicit val TransactionTypeReads: Reads[TransactionType] = (js: JsValue) =>
+    SerializerUtil.processJsStringOpt(n => TransactionType.fromStringOpt(n))(js)
+
+  implicit val TransactionTypeRW: ReadWriter[TransactionType] =
+    readwriter[String].bimap[TransactionType](
+      t => t.toString,
+      str => TransactionType.fromString(str)
+    )
+
   implicit val UTXOWarningWrites: Writes[UTXOWarning] =
     (out: UTXOWarning) => JsString(out.warning)
 
@@ -186,8 +198,10 @@ object VortexPicklers {
         case ps: PSBTSigned       => Json.writes[PSBTSigned].writes(ps)
       }
 
-      val extra = JsObject(
-        Vector("status" -> JsString(details.status.toString)))
+      val extra = Json.obj(
+        "status" -> details.status.toString,
+        "transactionTypes" -> details.transactionTypes
+      )
 
       original ++ extra
     }

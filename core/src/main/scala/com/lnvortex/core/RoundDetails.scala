@@ -1,5 +1,6 @@
 package com.lnvortex.core
 
+import com.lnvortex.core.api.TransactionType
 import org.bitcoins.core.currency.{CurrencyUnit, Satoshis}
 import org.bitcoins.core.number.UInt32
 import org.bitcoins.core.policy.Policy
@@ -16,16 +17,22 @@ import java.net.InetSocketAddress
 sealed trait RoundDetails {
   def order: Int = status.order
   def status: ClientStatus
+  def transactionTypes: Vector[TransactionType]
 }
 
 sealed trait PendingRoundDetails extends RoundDetails {
   def round: RoundParameters
+
+  override def transactionTypes: Vector[TransactionType] = {
+    TransactionType.calculate(round.inputType, round.outputType)
+  }
 
   def updateFeeRate(feeRate: SatoshisPerVirtualByte): PendingRoundDetails
 }
 
 case object NoDetails extends RoundDetails {
   override val status: ClientStatus = ClientStatus.NoDetails
+  override val transactionTypes: Vector[TransactionType] = Vector.empty
 
   def nextStage(round: RoundParameters): KnownRound = {
     KnownRound(round)
@@ -95,6 +102,10 @@ sealed trait InitializedRound extends RoundDetails {
   def changeOutputFee: CurrencyUnit
   def nonce: SchnorrNonce
   def initDetails: InitDetails
+
+  override def transactionTypes: Vector[TransactionType] = {
+    TransactionType.calculate(round.inputType, round.outputType)
+  }
 
   // todo add tests
   def expectedAmtBack(numRemixes: Int, numNewEntrants: Int): CurrencyUnit = {
