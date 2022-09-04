@@ -4,8 +4,15 @@ import com.lnvortex.core._
 import org.bitcoins.core.protocol.ln.node._
 import com.lnvortex.core.api._
 import com.lnvortex.core.crypto.BlindingTweaks
-import org.bitcoins.commons.serializers.JsonSerializers._
-import org.bitcoins.commons.serializers.JsonWriters._
+import org.bitcoins.commons.serializers.JsonSerializers.{
+  transactionOutPointReads => _,
+  transactionOutPointWrites => _,
+  _
+}
+import org.bitcoins.commons.serializers.JsonWriters.{
+  TransactionOutPointWrites => _,
+  _
+}
 import org.bitcoins.commons.serializers.JsonReaders._
 import org.bitcoins.commons.serializers.Picklers.{
   transactionOutPointPickler => _,
