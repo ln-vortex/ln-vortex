@@ -71,7 +71,6 @@ case class RpcServer(
   }
 
   val route: Route =
-    // TODO implement better logging
     DebuggingDirectives.logRequestResult(
       ("http-rpc-server", Logging.DebugLevel)) {
       authenticateBasic("auth", authenticator) { _ =>
@@ -110,7 +109,6 @@ case class RpcServer(
 
 object RpcServer {
 
-  // TODO id parameter
   case class Response(
       result: Option[ujson.Value] = None,
       error: Option[String] = None) {

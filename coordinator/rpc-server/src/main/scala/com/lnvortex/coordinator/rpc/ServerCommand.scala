@@ -3,7 +3,6 @@ package com.lnvortex.coordinator.rpc
 import ujson._
 import upickle.default._
 
-// TODO ID?
 case class ServerCommand(method: String, params: ujson.Arr)
 
 object ServerCommand {
