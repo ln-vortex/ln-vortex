@@ -7,7 +7,7 @@ import grizzled.slf4j.Logging
 import scala.concurrent._
 import scala.util.Random
 
-object Daemon extends App with Logging {
+object Vortexd extends App with Logging {
 
   val serverArgParser = new ServerArgParser(args.toVector)
 

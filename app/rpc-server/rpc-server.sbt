@@ -13,7 +13,7 @@ assembly / assemblyMergeStrategy := {
 
 run / fork := true
 
-mainClass := Some("com.lnvortex.rpc.Daemon")
+mainClass := Some("com.lnvortex.rpc.Vortexd")
 
 enablePlugins(DebianPlugin, JavaAppPackaging, NativeImagePlugin, DockerPlugin)
 
