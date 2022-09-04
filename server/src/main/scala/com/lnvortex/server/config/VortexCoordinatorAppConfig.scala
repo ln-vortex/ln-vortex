@@ -278,11 +278,10 @@ case class VortexCoordinatorAppConfig(
       coordinatorConfig <- coordinators
       name = coordinatorConfig.getString("name")
       networkStr = coordinatorConfig.getString("network")
-      address = coordinatorConfig.getString("address")
-    } yield CoordinatorAddress(
-      name,
-      BitcoinNetworks.fromString(networkStr),
-      NetworkUtil.parseInetSocketAddress(address, 12523))
+      onion = coordinatorConfig.getString("onion")
+    } yield CoordinatorAddress(name,
+                               BitcoinNetworks.fromString(networkStr),
+                               NetworkUtil.parseInetSocketAddress(onion, 12523))
 
     list.toVector.groupBy(_.network)
   }

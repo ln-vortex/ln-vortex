@@ -18,7 +18,7 @@ class ClientHttpTest extends HttpTestFixture {
           assert(taproot.name == "Taproot Testnet")
           assert(taproot.network == TestNet3)
           val address =
-            s"${taproot.address.getHostString}:${taproot.address.getPort}"
+            s"${taproot.onion.getHostString}:${taproot.onion.getPort}"
           assert(
             address == "qq3olsfzuzzwxq7276oa7tp5hpc7htcpjl3xe2e7c3nkoobnbfdbvuid.onion:12523")
         case None => fail("Could not find Taproot Testnet coordinator")

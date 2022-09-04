@@ -27,7 +27,7 @@ import scala.util.Try
 trait VortexHttpClient[+V <: VortexWalletApi] { self: VortexClient[V] =>
 
   private val baseUrl: String = {
-    val addr = coordinatorAddress.address
+    val addr = coordinatorAddress.onion
     s"${addr.getHostString}:${addr.getPort}"
   }
 

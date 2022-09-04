@@ -7,7 +7,7 @@ import java.net.InetSocketAddress
 case class CoordinatorAddress(
     name: String,
     network: BitcoinNetwork,
-    address: InetSocketAddress)
+    onion: InetSocketAddress)
 
 object CoordinatorAddress {
 
