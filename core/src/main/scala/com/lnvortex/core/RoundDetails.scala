@@ -107,7 +107,6 @@ sealed trait InitializedRound extends RoundDetails {
     TransactionType.calculate(round.inputType, round.outputType)
   }
 
-  // todo add tests
   def expectedAmtBack(numRemixes: Int, numNewEntrants: Int): CurrencyUnit = {
     initDetails.changeSpkOpt match {
       case Some(_) =>
