@@ -2,6 +2,7 @@ package com.lnvortex.coordinator.rpc
 
 import akka.actor.ActorSystem
 import com.lnvortex.coordinator.config.LnVortexRpcServerConfig
+import com.lnvortex.core.VortexUtils.CONFIG_FILE_NAME
 import com.lnvortex.server.config.VortexCoordinatorAppConfig
 import com.typesafe.config.Config
 import org.bitcoins.commons.config._
@@ -37,7 +38,7 @@ case class LnVortexAppConfig(
 
   override lazy val datadir: Path = baseDatadir
 
-  override def configFileName = "vortex.conf"
+  override def configFileName: String = CONFIG_FILE_NAME
 
   override def start(): Future[Unit] = coordinatorConfig.start()
   override def stop(): Future[Unit] = Future.unit

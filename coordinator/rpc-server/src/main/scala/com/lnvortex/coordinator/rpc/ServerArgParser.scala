@@ -1,6 +1,7 @@
 package com.lnvortex.coordinator.rpc
 
 import com.lnvortex.coordinator.config.LnVortexRpcServerConfig
+import com.lnvortex.core.VortexUtils.CONFIG_FILE_NAME
 import com.typesafe.config.{Config, ConfigFactory}
 import org.bitcoins.commons.config.AppConfig
 import org.bitcoins.core.config._
@@ -130,12 +131,11 @@ case class ServerArgParser(commandLineArgs: Vector[String]) {
         all.withFallback(conf)
       case None =>
         AppConfig
-          .getBaseConfig(datadirPath, "vortex.conf", Vector(all))
+          .getBaseConfig(datadirPath, CONFIG_FILE_NAME, Vector(all))
           .withFallback(datadirConfig)
           .resolve()
     }
   }
-
 }
 
 object ServerArgParser {

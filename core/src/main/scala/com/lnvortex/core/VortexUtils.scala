@@ -23,6 +23,8 @@ trait VortexUtils {
   }
 
   final val DEFAULT_PORT = 12523
+
+  final val CONFIG_FILE_NAME: String = "vortex.conf"
 }
 
 object VortexUtils extends VortexUtils
