@@ -11,7 +11,7 @@ import scala.concurrent._
 import scala.concurrent.duration.DurationInt
 import scala.util.Random
 
-object CoordindatorDaemon extends App with Logging {
+object Daemon extends App with Logging {
 
   val serverArgParser = new ServerArgParser(args.toVector)
 

@@ -15,7 +15,7 @@ assembly / assemblyMergeStrategy := {
 
 run / fork := true
 
-mainClass := Some("com.lnvortex.coordinator.rpc.CoordinatorDaemon")
+mainClass := Some("com.lnvortex.coordinator.rpc.Daemon")
 
 Universal / packageName := {
   val original = (Universal / packageName).value
