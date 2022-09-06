@@ -64,6 +64,8 @@ case class VortexCoordinatorAppConfig(
 
   override val baseDatadir: Path = directory
 
+  override def configFileName = "vortex.conf"
+
   override def start(): Future[Unit] = FutureUtil.makeAsync { () =>
     logger.info(s"Initializing coordinator")
 

@@ -37,6 +37,8 @@ case class LnVortexAppConfig(
 
   override lazy val datadir: Path = baseDatadir
 
+  override def configFileName = "vortex.conf"
+
   override def start(): Future[Unit] = coordinatorConfig.start()
   override def stop(): Future[Unit] = Future.unit
 

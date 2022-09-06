@@ -130,7 +130,7 @@ case class ServerArgParser(commandLineArgs: Vector[String]) {
         all.withFallback(conf)
       case None =>
         AppConfig
-          .getBaseConfig(datadirPath, Vector(all))
+          .getBaseConfig(datadirPath, "vortex.conf", Vector(all))
           .withFallback(datadirConfig)
           .resolve()
     }

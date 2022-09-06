@@ -37,6 +37,8 @@ case class VortexAppConfig(baseDatadir: Path, configOverrides: Vector[Config])(
   override val moduleName: String = VortexAppConfig.moduleName
   override type ConfigType = VortexAppConfig
 
+  override def configFileName = "vortex.conf"
+
   override def newConfigOfType(configs: Vector[Config]): VortexAppConfig =
     VortexAppConfig(baseDatadir, configs)
 
