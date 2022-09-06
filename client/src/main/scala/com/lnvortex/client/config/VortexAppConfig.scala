@@ -2,6 +2,7 @@ package com.lnvortex.client.config
 
 import akka.actor.ActorSystem
 import com.lnvortex.client.db.UTXODAO
+import com.lnvortex.core.VortexUtils.CONFIG_FILE_NAME
 import com.lnvortex.core.api.CoordinatorAddress
 import com.typesafe.config.Config
 import grizzled.slf4j.Logging
@@ -37,7 +38,7 @@ case class VortexAppConfig(baseDatadir: Path, configOverrides: Vector[Config])(
   override val moduleName: String = VortexAppConfig.moduleName
   override type ConfigType = VortexAppConfig
 
-  override def configFileName = "vortex.conf"
+  override def configFileName: String = CONFIG_FILE_NAME
 
   override def newConfigOfType(configs: Vector[Config]): VortexAppConfig =
     VortexAppConfig(baseDatadir, configs)

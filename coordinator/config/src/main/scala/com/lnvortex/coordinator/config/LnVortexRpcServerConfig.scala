@@ -1,5 +1,6 @@
 package com.lnvortex.coordinator.config
 
+import com.lnvortex.core.VortexUtils.CONFIG_FILE_NAME
 import com.typesafe.config.Config
 import org.bitcoins.commons.config._
 
@@ -24,7 +25,7 @@ case class LnVortexRpcServerConfig(
 
   override lazy val datadir: Path = baseDatadir
 
-  override def configFileName = "vortex.conf"
+  override def configFileName: String = CONFIG_FILE_NAME
 
   override def start(): Future[Unit] = Future.unit
   override def stop(): Future[Unit] = Future.unit
