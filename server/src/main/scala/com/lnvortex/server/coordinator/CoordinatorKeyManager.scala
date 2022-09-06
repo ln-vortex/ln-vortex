@@ -25,7 +25,7 @@ class CoordinatorKeyManager()(implicit
 
   /** The root private key for this coordinator */
   private[this] lazy val extPrivateKey: ExtPrivateKeyHardened =
-    WalletStorage.getPrivateKeyFromDisk(config.kmConf.seedPath,
+    WalletStorage.getPrivateKeyFromDisk(config.seedPath,
                                         SegWitMainNetPriv,
                                         config.aesPasswordOpt,
                                         config.bip39PasswordOpt)

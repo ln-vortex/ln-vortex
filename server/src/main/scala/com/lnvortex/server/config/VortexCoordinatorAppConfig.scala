@@ -20,6 +20,7 @@ import org.bitcoins.db.DatabaseDriver._
 import org.bitcoins.db._
 import org.bitcoins.feeprovider.MempoolSpaceTarget._
 import org.bitcoins.feeprovider._
+import org.bitcoins.keymanager.WalletStorage
 import org.bitcoins.keymanager.bip39.BIP39KeyManager
 import org.bitcoins.keymanager.config.KeyManagerAppConfig
 import org.bitcoins.keymanager.config.KeyManagerAppConfig._
@@ -112,8 +113,21 @@ case class VortexCoordinatorAppConfig(
     NetworkUtil.parseInetSocketAddress(str, DEFAULT_PORT)
   }
 
+  lazy val seedPath: Path = {
+    kmConf.seedFolder.resolve(seedFileName)
+  }
+
+  private val seedFileName: String = {
+    val prefix = if (coordinatorName == DEFAULT_WALLET_NAME) {
+      DEFAULT_WALLET_NAME
+    } else {
+      s"$coordinatorName-"
+    }
+    prefix + "seed.json"
+  }
+
   lazy val kmParams: KeyManagerParams =
-    KeyManagerParams(kmConf.seedPath, HDPurposes.SegWit, network)
+    KeyManagerParams(seedPath, HDPurposes.SegWit, network)
 
   lazy val aesPasswordOpt: Option[AesPassword] = kmConf.aesPasswordOpt
   lazy val bip39PasswordOpt: Option[String] = kmConf.bip39PasswordOpt
@@ -246,9 +260,13 @@ case class VortexCoordinatorAppConfig(
     }
   }
 
+  def seedExists(): Boolean = {
+    WalletStorage.seedExists(seedPath)
+  }
+
   def initialize(): Unit = {
     // initialize seed
-    if (!kmConf.seedExists()) {
+    if (!seedExists()) {
       BIP39KeyManager.initialize(aesPasswordOpt = aesPasswordOpt,
                                  kmParams = kmParams,
                                  bip39PasswordOpt = bip39PasswordOpt) match {
