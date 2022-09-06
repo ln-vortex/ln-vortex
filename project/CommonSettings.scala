@@ -17,7 +17,6 @@ import scala.util.Properties
 object CommonSettings {
 
   lazy val settings: Vector[Setting[_]] = Vector(
-    version := "0.1.0",
     scalaVersion := "2.13.8",
     organization := "com.lnvortex",
     homepage := Some(url("https://github.com/benthecarman/ln-vortex")),
@@ -227,6 +226,38 @@ object CommonSettings {
         )
         .value
     )
+  }
+
+  def buildPackageName(packageName: String): String = {
+    val osName = getSimpleOSName
+    val split = packageName.split("-")
+    val versionIdx = split.zipWithIndex.find(_._1.count(_ == '.') > 1).get._2
+    val insertedOSName = split.take(versionIdx) ++ Vector(osName)
+    if (isRelease) {
+      // bitcoin-s-server-linux-1.9.3-1-60bfd603-SNAPSHOT.zip -> bitcoin-s-server-linux-1.9.3.zip
+      insertedOSName.mkString("-") ++ "-" ++ split(versionIdx)
+    } else {
+      // bitcoin-s-server-1.9.2-1-59aaf330-20220616-1614-SNAPSHOT -> bitcoin-s-server-linux-1.9.2-1-59aaf330-20220616-1614-SNAPSHOT
+      // bitcoin-s-cli-1.9.2-1-59aaf330-20220616-1614-SNAPSHOT.zip -> bitcoin-s-cli-linux-1.9.2-1-59aaf330-20220616-1614-SNAPSHOT.zip
+      (insertedOSName ++ split.drop(versionIdx)).mkString("-")
+    }
+  }
+
+  /** @see https://github.com/sbt/sbt-dynver#detail */
+  def isRelease: Boolean = {
+    DynVer.isVersionStable && !DynVer.isSnapshot
+  }
+
+  private def getSimpleOSName: String = {
+    if (Properties.isWin) {
+      "windows"
+    } else if (Properties.isMac) {
+      "mac"
+    } else if (Properties.isLinux) {
+      "linux"
+    } else {
+      "unknown-os"
+    }
   }
 
   lazy val binariesPath: Path =

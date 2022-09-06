@@ -17,6 +17,11 @@ run / fork := true
 
 mainClass := Some("com.lnvortex.coordinator.rpc.CoordinatorDaemon")
 
+Universal / packageName := {
+  val original = (Universal / packageName).value
+  CommonSettings.buildPackageName(original)
+}
+
 enablePlugins(DebianPlugin, JavaAppPackaging, NativeImagePlugin, DockerPlugin)
 
 packageSummary := "Vortex Coordinator"

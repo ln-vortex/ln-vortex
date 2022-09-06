@@ -9,8 +9,6 @@ import scala.util.Properties
 
 name := "LnVortex"
 
-version := "1.0"
-
 scalaVersion := "2.13.8"
 
 resolvers ++= Resolver.sonatypeOssRepos("snapshots")
@@ -149,7 +147,6 @@ lazy val coordinatorCli = project
 
 lazy val coordinatorRpc = project
   .in(file("coordinator/rpc-server"))
-  .settings(CommonSettings.prodSettings: _*)
   .settings(CommonSettings.appSettings: _*)
   .settings(CommonSettings.dockerSettings: _*)
   .settings(CommonSettings.dockerBuildxSettings: _*)

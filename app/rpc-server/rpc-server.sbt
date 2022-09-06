@@ -15,6 +15,11 @@ run / fork := true
 
 mainClass := Some("com.lnvortex.rpc.Vortexd")
 
+Universal / packageName := {
+  val original = (Universal / packageName).value
+  CommonSettings.buildPackageName(original)
+}
+
 enablePlugins(DebianPlugin, JavaAppPackaging, NativeImagePlugin, DockerPlugin)
 
 packageSummary := "Vortex daemon"
