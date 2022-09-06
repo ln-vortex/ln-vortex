@@ -7,13 +7,14 @@ sealed abstract class LightningImplementation
 object LightningImplementation extends StringFactory[LightningImplementation] {
 
   case object LND extends LightningImplementation
-  case object CLightning extends LightningImplementation
+  case object CLN extends LightningImplementation
 
-  val all = Vector(LND, CLightning)
+  def all: Vector[LightningImplementation] = Vector(LND, CLN)
 
   override def fromStringOpt(
       string: String): Option[LightningImplementation] = {
-    all.find(_.toString.toLowerCase == string.toLowerCase)
+    val searchString = string.toUpperCase
+    all.find(_.toString.toUpperCase == searchString)
   }
 
   override def fromString(string: String): LightningImplementation = {

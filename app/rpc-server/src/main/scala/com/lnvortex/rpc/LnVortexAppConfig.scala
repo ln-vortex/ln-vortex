@@ -72,21 +72,21 @@ case class LnVortexAppConfig(
   lazy val lndRpcClient: LndRpcClient =
     new LndRpcClient(lndInstance, Try(lndBinary).toOption)
 
-  private lazy val clightningDataDir: Path =
-    Paths.get(config.getString(s"$moduleName.clightning.datadir"))
+  private lazy val clnDataDir: Path =
+    Paths.get(config.getString(s"$moduleName.cln.datadir"))
 
-  private lazy val clightningBinary: File =
-    Paths.get(config.getString(s"$moduleName.clightning.binary")).toFile
+  private lazy val clnBinary: File =
+    Paths.get(config.getString(s"$moduleName.cln.binary")).toFile
 
-  private lazy val clightningInstance: CLightningInstanceLocal =
-    CLightningInstanceLocal.fromDataDir(clightningDataDir.toFile)
+  private lazy val clnInstance: CLightningInstanceLocal =
+    CLightningInstanceLocal.fromDataDir(clnDataDir.toFile)
 
-  lazy val clightningClient: CLightningRpcClient =
-    new CLightningRpcClient(clightningInstance, clightningBinary)
+  lazy val clnClient: CLightningRpcClient =
+    new CLightningRpcClient(clnInstance, clnBinary)
 
   lazy val wallet: VortexWalletApi = lightningImplementation match {
-    case LND        => LndVortexWallet(lndRpcClient)
-    case CLightning => CLightningVortexWallet(clightningClient)
+    case LND => LndVortexWallet(lndRpcClient)
+    case CLN => CLightningVortexWallet(clnClient)
   }
 
   lazy val clientManager: VortexClientManager[VortexWalletApi] =
