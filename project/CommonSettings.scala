@@ -178,7 +178,7 @@ object CommonSettings {
       Docker / version := version.value,
       // add a default exposed volume of /ln-vortex so we can always write data here
       dockerExposedVolumes += "/ln-vortex",
-      dockerUpdateLatest := true
+      dockerUpdateLatest := isRelease
     )
   }
 
