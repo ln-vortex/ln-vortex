@@ -16,7 +16,7 @@ object Deps {
     val microPickleV = "1.3.8"
 
     val grizzledSlf4jV = "1.3.4"
-    val slf4V = "2.0.0"
+    val logback = "1.4.0"
   }
 
   object Compile {
@@ -45,11 +45,8 @@ object Deps {
     val grizzledSlf4j =
       "org.clapper" %% "grizzled-slf4j" % V.grizzledSlf4jV withSources () withJavadoc ()
 
-    val slf4jSApi =
-      "org.slf4j" % "slf4j-api" % V.slf4V withSources () withJavadoc ()
-
-    val slf4jSimple =
-      "org.slf4j" % "slf4j-simple" % V.slf4V withSources () withJavadoc ()
+    val logback =
+      "ch.qos.logback" % "logback-classic" % V.logback withSources () withJavadoc ()
 
     val bitcoinsCore =
       "org.bitcoin-s" %% "bitcoin-s-core" % V.bitcoinsV withSources () withJavadoc ()
@@ -91,8 +88,7 @@ object Deps {
     Compile.sttp,
     Compile.micoPickle,
     Compile.scopt,
-    Compile.slf4jSApi,
-    Compile.slf4jSimple
+    Compile.logback
   )
 
   val rpcServer: List[ModuleID] =
