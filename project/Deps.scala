@@ -3,22 +3,20 @@ import sbt._
 object Deps {
 
   object V {
-    val akkaV = "10.2.9"
-    val akkaStreamV = "2.6.19"
+    val akkaV = "10.2.10"
+    val akkaStreamV = "2.6.20"
     val akkaActorV: String = akkaStreamV
 
-    val bitcoinsV = "1.9.3-9-2cfd6f35-SNAPSHOT"
+    val bitcoinsV = "1.9.3-17-018a6e58-SNAPSHOT"
 
     val scoptV = "4.1.0"
 
     val sttpV = "1.7.2"
 
-    val codehausV = "3.1.7"
-
     val microPickleV = "1.3.8"
 
     val grizzledSlf4jV = "1.3.4"
-    val slf4V = "1.7.36"
+    val slf4V = "2.0.0"
   }
 
   object Compile {
@@ -43,9 +41,6 @@ object Deps {
 
     val scopt =
       "com.github.scopt" %% "scopt" % V.scoptV withSources () withJavadoc ()
-
-    val codehaus =
-      "org.codehaus.janino" % "janino" % V.codehausV withSources () withJavadoc ()
 
     val grizzledSlf4j =
       "org.clapper" %% "grizzled-slf4j" % V.grizzledSlf4jV withSources () withJavadoc ()
