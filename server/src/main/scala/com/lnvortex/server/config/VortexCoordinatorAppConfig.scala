@@ -278,7 +278,7 @@ case class VortexCoordinatorAppConfig(
 
     // initialize tor keys
     if (
-      torConf.enabled && !torParams
+      torParams.isDefined && !torParams
         .map(_.privateKeyPath)
         .exists(Files.exists(_))
     ) {
