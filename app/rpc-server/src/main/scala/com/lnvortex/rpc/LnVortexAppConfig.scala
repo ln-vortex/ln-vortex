@@ -16,6 +16,7 @@ import org.bitcoins.lnd.rpc.LndRpcClient
 import org.bitcoins.lnd.rpc.config._
 
 import java.io.File
+import java.net.URI
 import java.nio.file.{Path, Paths}
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Properties, Try}
@@ -55,6 +56,16 @@ case class LnVortexAppConfig(
   private lazy val lndDataDir: Path =
     Paths.get(config.getString(s"$moduleName.lnd.datadir"))
 
+  private lazy val lndRpcUri: Option[URI] = {
+    config.getStringOrNone(s"$moduleName.lnd.rpcUri").map { str =>
+      if (str.startsWith("http") || str.startsWith("https")) {
+        new URI(str)
+      } else {
+        new URI(s"http://$str")
+      }
+    }
+  }
+
   private lazy val lndBinary: File =
     Paths.get(config.getString(s"$moduleName.lnd.binary")).toFile
 
@@ -66,7 +77,12 @@ case class LnVortexAppConfig(
     val confFile = dir.toPath.resolve("lnd.conf").toFile
     val config = LndConfig(confFile, dir)
 
-    config.lndInstanceRemote
+    val remoteConfig = config.lndInstanceRemote
+
+    lndRpcUri match {
+      case Some(uri) => remoteConfig.copy(rpcUri = uri)
+      case None      => remoteConfig
+    }
   }
 
   lazy val lndRpcClient: LndRpcClient =
