@@ -22,7 +22,7 @@ services:
 #    depends_on:
 #      - walletserver
   vortexd:
-    image: lnvortex/vortexd:0.0.0-306-f9ea01ff-SNAPSHOT
+    image: lnvortex/vortexd:0.0.0-309-516ca4e3-SNAPSHOT
     entrypoint: ["/opt/docker/bin/vortexd", "--datadir", "/ln-vortex", "--conf", "/opt/docker/docker-application.conf"]
     user: 0:1000
     restart: on-failure
@@ -37,9 +37,13 @@ services:
       VORTEX_RPC_USER: "docker-auth"
       VORTEX_RPC_PASSWORD: $APP_PASSWORD
 
+      VORTEX_LND_RPC_URI: "$APP_LIGHTNING_NODE_IP:$APP_LIGHTNING_NODE_GRPC_PORT"
       VORTEX_LND_DATADIR: "/lnd/"
     ports:
       - "12521:12521"
+    # to connect to locally running lightning node
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       - tor
   tor:
