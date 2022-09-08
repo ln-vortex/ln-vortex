@@ -22,7 +22,7 @@ services:
 #    depends_on:
 #      - walletserver
   vortexd:
-    image: lnvortex/vortexd:0.0.0-309-516ca4e3-SNAPSHOT
+    image: lnvortex/vortexd:0.0.0-310-891b5315-SNAPSHOT@sha256:eef1aeec10cfe04eb9f185993fb2171d6f74aecd15e3572ace620e2b7264c028
     entrypoint: ["/opt/docker/bin/vortexd", "--datadir", "/ln-vortex", "--conf", "/opt/docker/docker-application.conf"]
     user: 0:1000
     restart: on-failure
