@@ -1,0 +1,48 @@
+version: "3.7"
+
+services:
+#  web:
+#    image: bitcoinscala/wallet-server-ui:latest
+#    user: 0:1000
+#    restart: on-failure
+#    stop_grace_period: 1m
+#    volumes:
+#      - ./data/wallet:/bitcoin-s
+#      - ./data/log:/log
+#    environment:
+#      LOG_PATH: "/log/"
+#      BITCOIN_S_HOME: "/bitcoin-s/"
+#      MEMPOOL_API_URL: "http://mempool.space/api"
+#      WALLET_SERVER_API_URL: "http://walletserver:9999/"
+#      WALLET_SERVER_WS: "ws://walletserver:19999/events"
+#      DEFAULT_UI_PASSWORD: $APP_PASSWORD
+#      BITCOIN_S_SERVER_RPC_PASSWORD: $APP_PASSWORD
+#    ports:
+#      - "3002:3002"
+#    depends_on:
+#      - walletserver
+  vortexd:
+    image: lnvortex/vortexd:0.0.0-306-f9ea01ff-SNAPSHOT
+    entrypoint: ["/opt/docker/bin/vortexd", "--datadir", "/ln-vortex", "--conf", "/opt/docker/docker-application.conf"]
+    user: 0:1000
+    restart: on-failure
+    volumes:
+      - ./data/wallet:/ln-vortex
+      - ${HOME}/.lnd:/lnd:ro
+    environment:
+      BITCOIN_S_TOR_PROVIDED: "true"
+      BITCOIN_S_PROXY_ENABLED: "false"
+      BITCOIN_S_TOR_ENABLED: "false"
+
+      VORTEX_RPC_USER: "docker-auth"
+      VORTEX_RPC_PASSWORD: $APP_PASSWORD
+
+      VORTEX_LND_DATADIR: "/lnd/"
+    ports:
+      - "12521:12521"
+    depends_on:
+      - tor
+  tor:
+    image:  bitcoinscala/tor:latest
+    entrypoint: ["/tor", "--ExitRelay", "0", "--BridgeRelay",  "0", "--SOCKSPort", "0.0.0.0:9050", "--ControlPort", "0.0.0.0:9051", "--HashedControlPassword", "16:EF3A794FD6F30EF76049147EF252111809E7D51C049FEB353B547C1553"]
+    restart: on-failure
