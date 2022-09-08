@@ -182,7 +182,7 @@ case class LndVortexWallet(lndRpcClient: LndRpcClient)(implicit
       }
       if (!version.buildTags.contains("signrpc")) {
         throw new RuntimeException(
-          s"LND must have signrpc build tag to use Vortex")
+          s"LND must have signrpc build tag to use Vortex, got tags: ${version.buildTags}")
       }
     }
   }
