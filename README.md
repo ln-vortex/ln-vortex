@@ -5,7 +5,7 @@ using [lnd](https://github.com/lightningnetwork/lnd) and [Core Lightning](https:
 
 ## Compatibility
 
-LnVortex is compatible with `lnd` version v0.15.0-beta and core lightning version v0.10.2.
+LnVortex is compatible with `lnd` version v0.15.1-beta and core lightning version v0.10.2.
 
 ## Building from source
 
