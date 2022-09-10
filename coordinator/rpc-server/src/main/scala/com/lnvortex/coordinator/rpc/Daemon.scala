@@ -2,6 +2,7 @@ package com.lnvortex.coordinator.rpc
 
 import akka.actor.ActorSystem
 import com.lnvortex.coordinator.config.LnVortexRpcServerConfig
+import com.lnvortex.core.config.ServerArgParser
 import com.lnvortex.server.config.VortexCoordinatorAppConfig
 import com.lnvortex.server.coordinator.VortexCoordinator
 import com.lnvortex.server.networking.VortexHttpServer
@@ -27,9 +28,12 @@ object Daemon extends App with Logging {
 
   implicit val config: LnVortexAppConfig = serverArgParser.datadirOpt match {
     case Some(datadir) =>
-      LnVortexAppConfig.fromDatadir(datadir, Vector(serverArgParser.toConfig))
+      LnVortexAppConfig.fromDatadir(
+        datadir,
+        Vector(serverArgParser.toConfig(VortexCoordinatorAppConfig.moduleName)))
     case None =>
-      LnVortexAppConfig.fromDefaultDatadir(Vector(serverArgParser.toConfig))
+      LnVortexAppConfig.fromDefaultDatadir(
+        Vector(serverArgParser.toConfig(VortexCoordinatorAppConfig.moduleName)))
   }
 
   implicit val serverConfig: LnVortexRpcServerConfig =
@@ -42,14 +46,13 @@ object Daemon extends App with Logging {
 
   val f = for {
     _ <- config.start()
-    _ <- serverConfig.start()
     coordinator <- VortexCoordinator.initialize(config.bitcoind)
 
     httpServer = new VortexHttpServer(coordinator)
     _ <- httpServer.start()
 
-    routes = LnVortexRoutes(httpServer)
-    server = RpcServer(
+    routes = VortexCoordinatorRpcRoutes(httpServer)
+    server = CoordinatorRpcServer(
       handlers = Vector(routes),
       rpcBindOpt = serverConfig.rpcBind,
       rpcPort = serverConfig.rpcPort,
@@ -59,7 +62,7 @@ object Daemon extends App with Logging {
 
     _ = logger.info("Starting rpc server")
     _ <- server.start()
-    _ = logger.info("Ln Vortex Coordinator started!")
+    _ = logger.info("Vortex Coordinator started!")
   } yield {
     sys.addShutdownHook {
       logger.info("Shutting down...")

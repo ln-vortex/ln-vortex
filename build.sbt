@@ -64,7 +64,8 @@ lazy val root = project
     lndTest,
     server,
     serverTest,
-    testkit
+    testkit,
+    develop
   )
   .dependsOn(
     coordinatorCli,
@@ -86,7 +87,8 @@ lazy val root = project
     lndTest,
     server,
     serverTest,
-    testkit
+    testkit,
+    develop
   )
   .settings(CommonSettings.settings: _*)
   .settings(
@@ -249,6 +251,12 @@ lazy val testkit = project
   .settings(CommonSettings.testSettings: _*)
   .settings(name := "testkit", libraryDependencies ++= Deps.testkit)
   .dependsOn(core, client, server, coreTest, lnd, clightning, bitcoind)
+
+lazy val develop = project
+  .in(file("develop"))
+  .settings(CommonSettings.prodSettings: _*)
+  .settings(name := "develop", libraryDependencies ++= Deps.develop)
+  .dependsOn(coordinatorRpc, rpcServer, testkit)
 
 TaskKeys.downloadLnd := {
   val logger = streams.value.log

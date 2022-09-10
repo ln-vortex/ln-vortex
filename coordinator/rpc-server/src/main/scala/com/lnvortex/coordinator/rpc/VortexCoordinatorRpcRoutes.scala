@@ -9,7 +9,7 @@ import ujson._
 
 import scala.concurrent._
 
-case class LnVortexRoutes(server: VortexHttpServer)(implicit
+case class VortexCoordinatorRpcRoutes(server: VortexHttpServer)(implicit
     system: ActorSystem)
     extends ServerRoute {
   implicit val ec: ExecutionContext = system.dispatcher
@@ -27,7 +27,7 @@ case class LnVortexRoutes(server: VortexHttpServer)(implicit
             ("onion", Str(addr.toString)),
             ("roundId", Str(coordinator.getCurrentRoundId.hex))
           )
-          RpcServer.httpSuccess(obj)
+          CoordinatorRpcServer.httpSuccess(obj)
         }
       }
   }

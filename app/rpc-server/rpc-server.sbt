@@ -26,7 +26,7 @@ packageSummary := "Vortex daemon"
 
 packageDescription := "Runs the Vortex daemon"
 
-dockerExposedPorts ++= Seq(12521)
+dockerExposedPorts ++= Seq(12524)
 
 dockerEntrypoint := Seq("/opt/docker/bin/vortexd")
 

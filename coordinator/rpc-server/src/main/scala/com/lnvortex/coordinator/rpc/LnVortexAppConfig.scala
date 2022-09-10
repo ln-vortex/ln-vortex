@@ -40,7 +40,13 @@ case class LnVortexAppConfig(
 
   override def configFileName: String = CONFIG_FILE_NAME
 
-  override def start(): Future[Unit] = coordinatorConfig.start()
+  override def start(): Future[Unit] = {
+    for {
+      _ <- coordinatorConfig.start()
+      _ <- rpcConfig.start()
+    } yield ()
+  }
+
   override def stop(): Future[Unit] = Future.unit
 
   implicit lazy val rpcConfig: LnVortexRpcServerConfig =

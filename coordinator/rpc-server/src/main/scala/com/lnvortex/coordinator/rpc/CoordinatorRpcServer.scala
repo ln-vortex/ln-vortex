@@ -14,7 +14,7 @@ import upickle.{default => up}
 
 import scala.concurrent.Future
 
-case class RpcServer(
+case class CoordinatorRpcServer(
     handlers: Seq[ServerRoute],
     rpcBindOpt: Option[String],
     rpcPort: Int,
@@ -46,7 +46,7 @@ case class RpcServer(
         .newBuilder()
         .handleNotFound {
           complete {
-            RpcServer.httpError(
+            CoordinatorRpcServer.httpError(
               """Resource not found. Hint: all RPC calls are made against root ('/')""",
               StatusCodes.BadRequest)
           }
@@ -56,11 +56,12 @@ case class RpcServer(
     val exceptionHandler = ExceptionHandler {
       case HttpError.MethodNotFound(method) =>
         complete(
-          RpcServer.httpError(s"'$method' is not a valid method",
-                              StatusCodes.BadRequest))
+          CoordinatorRpcServer.httpError(s"'$method' is not a valid method",
+                                         StatusCodes.BadRequest))
       case err: Throwable =>
         logger.info(s"Unhandled error in server:", err)
-        complete(RpcServer.httpError(s"Request failed: ${err.getMessage}"))
+        complete(
+          CoordinatorRpcServer.httpError(s"Request failed: ${err.getMessage}"))
     }
 
     handleRejections(rejectionHandler) {
@@ -107,7 +108,7 @@ case class RpcServer(
   }
 }
 
-object RpcServer {
+object CoordinatorRpcServer {
 
   case class Response(
       result: Option[ujson.Value] = None,
