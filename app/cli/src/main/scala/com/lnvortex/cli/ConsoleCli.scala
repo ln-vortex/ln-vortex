@@ -288,7 +288,7 @@ object CliConfig {
 }
 
 sealed abstract class CliCommand {
-  def defaultPort: Int = 12521
+  def defaultPort: Int = 12524
 }
 
 object CliCommand {

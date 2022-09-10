@@ -2,6 +2,7 @@ package com.lnvortex.rpc
 
 import akka.actor.ActorSystem
 import com.lnvortex.config.LnVortexRpcServerConfig
+import com.lnvortex.core.config.ServerArgParser
 import grizzled.slf4j.Logging
 
 import scala.concurrent._
@@ -23,9 +24,12 @@ object Daemon extends App with Logging {
 
   implicit val config: LnVortexAppConfig = serverArgParser.datadirOpt match {
     case Some(datadir) =>
-      LnVortexAppConfig.fromDatadir(datadir, Vector(serverArgParser.toConfig))
+      LnVortexAppConfig.fromDatadir(
+        datadir,
+        Vector(serverArgParser.toConfig(LnVortexAppConfig.moduleName)))
     case None =>
-      LnVortexAppConfig.fromDefaultDatadir(Vector(serverArgParser.toConfig))
+      LnVortexAppConfig.fromDefaultDatadir(
+        Vector(serverArgParser.toConfig(LnVortexAppConfig.moduleName)))
   }
 
   implicit val serverConfig: LnVortexRpcServerConfig =

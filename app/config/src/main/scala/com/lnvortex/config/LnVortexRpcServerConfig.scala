@@ -40,7 +40,7 @@ case class LnVortexRpcServerConfig(
     config.getStringOrNone(s"$moduleName.rpcBind")
 
   lazy val rpcPort: Int =
-    config.getIntOrElse(s"$moduleName.rpcPort", 12521)
+    config.getIntOrElse(s"$moduleName.rpcPort", 12524)
 }
 
 object LnVortexRpcServerConfig

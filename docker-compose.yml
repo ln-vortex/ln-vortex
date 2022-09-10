@@ -40,7 +40,7 @@ services:
       VORTEX_LND_RPC_URI: "$APP_LIGHTNING_NODE_IP:$APP_LIGHTNING_NODE_GRPC_PORT"
       VORTEX_LND_DATADIR: "/lnd/"
     ports:
-      - "12521:12521"
+      - "12524:12524"
     # to connect to locally running lightning node
     extra_hosts:
       - "host.docker.internal:host-gateway"

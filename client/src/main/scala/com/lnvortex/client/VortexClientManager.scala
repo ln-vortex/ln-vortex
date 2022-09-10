@@ -24,8 +24,9 @@ class VortexClientManager[+T <: VortexWalletApi](val vortexWallet: T)(implicit
 
   lazy val utxoDAO: UTXODAO = UTXODAO()
 
-  lazy val coordinators: Vector[CoordinatorAddress] =
+  lazy val coordinators: Vector[CoordinatorAddress] = {
     config.coordinatorAddresses(vortexWallet.network)
+  }
 
   lazy val clients: Map[String, VortexClient[VortexWalletApi]] = {
     coordinators.map { addr =>

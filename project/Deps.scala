@@ -144,4 +144,6 @@ object Deps {
 
   val testkit: List[ModuleID] =
     List(Compile.bitcoinsTestkit, Compile.bitcoinsBitcoindRpc)
+
+  val develop: List[ModuleID] = List(Compile.logback)
 }

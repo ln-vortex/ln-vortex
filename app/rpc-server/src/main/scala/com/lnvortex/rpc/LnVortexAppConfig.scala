@@ -12,6 +12,7 @@ import com.lnvortex.lnd._
 import com.lnvortex.rpc.LightningImplementation._
 import com.typesafe.config.Config
 import org.bitcoins.commons.config._
+import org.bitcoins.commons.util.NativeProcessFactory
 import org.bitcoins.lnd.rpc.LndRpcClient
 import org.bitcoins.lnd.rpc.config._
 
@@ -53,8 +54,12 @@ case class LnVortexAppConfig(
     LightningImplementation.fromString(str)
   }
 
-  private lazy val lndDataDir: Path =
-    Paths.get(config.getString(s"$moduleName.lnd.datadir"))
+  private lazy val lndDataDir: Path = {
+    config.getStringOrNone(s"$moduleName.lnd.datadir").map(Paths.get(_)) match {
+      case Some(path) => path
+      case None       => Paths.get(Properties.userHome, ".lnd")
+    }
+  }
 
   private lazy val lndRpcUri: Option[URI] = {
     config.getStringOrNone(s"$moduleName.lnd.rpcUri").map { str =>
@@ -66,8 +71,15 @@ case class LnVortexAppConfig(
     }
   }
 
-  private lazy val lndBinary: File =
-    Paths.get(config.getString(s"$moduleName.lnd.binary")).toFile
+  private lazy val lndBinary: File = {
+    config.getStringOrNone(s"$moduleName.lnd.binary").map(new File(_)) match {
+      case Some(file) => file
+      case None =>
+        NativeProcessFactory
+          .findExecutableOnPath("lnd")
+          .getOrElse(sys.error("Could not find lnd binary"))
+    }
+  }
 
   private lazy val lndInstance: LndInstance = {
     val dir = lndDataDir.toFile
@@ -88,11 +100,22 @@ case class LnVortexAppConfig(
   lazy val lndRpcClient: LndRpcClient =
     new LndRpcClient(lndInstance, Try(lndBinary).toOption)
 
-  private lazy val clnDataDir: Path =
-    Paths.get(config.getString(s"$moduleName.cln.datadir"))
+  private lazy val clnDataDir: Path = {
+    config.getStringOrNone(s"$moduleName.cln.datadir").map(Paths.get(_)) match {
+      case Some(path) => path
+      case None       => Paths.get(Properties.userHome, ".lightning")
+    }
+  }
 
-  private lazy val clnBinary: File =
-    Paths.get(config.getString(s"$moduleName.cln.binary")).toFile
+  private lazy val clnBinary: File = {
+    config.getStringOrNone(s"$moduleName.cln.binary").map(new File(_)) match {
+      case Some(file) => file
+      case None =>
+        NativeProcessFactory
+          .findExecutableOnPath("lightningd")
+          .getOrElse(sys.error("Could not find lightningd binary"))
+    }
+  }
 
   private lazy val clnInstance: CLightningInstanceLocal =
     CLightningInstanceLocal.fromDataDir(clnDataDir.toFile)

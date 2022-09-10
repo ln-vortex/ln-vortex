@@ -1,7 +1,5 @@
-package com.lnvortex.coordinator.rpc
+package com.lnvortex.core.config
 
-import com.lnvortex.coordinator.config.LnVortexRpcServerConfig
-import com.lnvortex.core.VortexUtils.CONFIG_FILE_NAME
 import com.typesafe.config.{Config, ConfigFactory}
 import org.bitcoins.commons.config.AppConfig
 import org.bitcoins.core.config._
@@ -33,8 +31,22 @@ case class ServerArgParser(commandLineArgs: Vector[String]) {
     }
   }
 
+  lazy val rpcUserOpt: Option[String] = {
+    val portOpt = argsWithIndex.find(_._1.toLowerCase == "--rpcuser")
+    portOpt.map { case (_, idx) =>
+      commandLineArgs(idx + 1)
+    }
+  }
+
+  lazy val rpcPasswordOpt: Option[String] = {
+    val portOpt = argsWithIndex.find(_._1.toLowerCase == "--rpcpassword")
+    portOpt.map { case (_, idx) =>
+      commandLineArgs(idx + 1)
+    }
+  }
+
   lazy val networkOpt: Option[BitcoinNetwork] = {
-    val netOpt = argsWithIndex.find(_._1.toLowerCase == "--network")
+    val netOpt = argsWithIndex.findLast(_._1.toLowerCase == "--network")
     netOpt.map { case (_, idx) =>
       val string = commandLineArgs(idx + 1)
       string.toLowerCase match {
@@ -67,6 +79,22 @@ case class ServerArgParser(commandLineArgs: Vector[String]) {
     Paths.get(usableStr)
   }
 
+  private lazy val listenIdxOpt: Option[(String, Int)] = {
+    argsWithIndex.find(_._1.toLowerCase == "--listen")
+  }
+
+  lazy val listenAddrOpt: Option[String] = listenIdxOpt.map { case (_, idx) =>
+    commandLineArgs(idx + 1)
+  }
+
+  private lazy val coordIdxOpt: Option[(String, Int)] = {
+    argsWithIndex.find(_._1.toLowerCase == "--coordinator")
+  }
+
+  lazy val coordOpt: Option[String] = coordIdxOpt.map { case (_, idx) =>
+    commandLineArgs(idx + 1)
+  }
+
   private lazy val configIndexOpt: Option[Int] = {
     argsWithIndex.find(_._1.toLowerCase == "--conf").map(_._2)
   }
@@ -86,56 +114,75 @@ case class ServerArgParser(commandLineArgs: Vector[String]) {
     * exclusion to this, we cannot write the --conf flag to the config file as
     * that is self referential
     */
-  def toConfig: Config = {
-    val moduleName = LnVortexRpcServerConfig.moduleName
+  def toConfig(moduleName: String): Config = {
+    val networkString = networkOpt match {
+      case Some(network) =>
+        s"bitcoin-s.network=$network\n"
+      case None => ""
+    }
+
+    val listenString = listenAddrOpt match {
+      case Some(addr) =>
+        s"coordinator.listen=\"$addr\"\n"
+      case None => ""
+    }
+
+    val coordinatorString = coordOpt match {
+      case Some(coord) =>
+        s"vortex.coordinators=$coord\n"
+      case None => ""
+    }
+
     val rpcPortString = rpcPortOpt match {
       case Some(rpcPort) =>
         s"$moduleName.rpcPort=$rpcPort\n"
-      case None => s""
+      case None => ""
+    }
+
+    val rpcUserString = rpcUserOpt match {
+      case Some(rpcUser) =>
+        s"$moduleName.rpcUser=$rpcUser\n"
+      case None => ""
+    }
+
+    val rpcPasswordString = rpcPasswordOpt match {
+      case Some(rpcPassword) =>
+        s"$moduleName.rpcPassword=$rpcPassword\n"
+      case None => ""
     }
 
     val rpcBindString = rpcBindOpt match {
       case Some(rpcbind) =>
-        s"$moduleName.rpcBind=$rpcbind\n"
-      case None => s""
+        s"$moduleName.rpcBind=\"$rpcbind\"\n"
+      case None => ""
     }
 
     val datadirString = datadirOpt match {
       case Some(datadir) =>
         s"bitcoin-s.datadir=" + AppConfig.safePathToString(datadir) + "\n"
-      case None => s""
+      case None => ""
     }
 
     val concat =
       rpcPortString +
         rpcBindString +
-        datadirString
+        rpcUserString +
+        rpcPasswordString +
+        datadirString +
+        networkString +
+        listenString +
+        coordinatorString
 
     val all = ConfigFactory.parseString(concat)
 
-    val datadirPath: Path = datadirOpt match {
-      case Some(datadir) => datadir
-      case None          => LnVortexAppConfig.DEFAULT_DATADIR
-    }
-
-    val datadirConfig: Config =
-      ConfigFactory.parseString(
-        s"bitcoin-s.datadir = ${AppConfig.safePathToString(datadirPath)}")
-
     configOpt match {
-      case Some(config) =>
-        val conf = ConfigFactory
-          .parseFile(config.toFile)
-          .withFallback(datadirConfig)
-          .resolve()
-        all.withFallback(conf)
-      case None =>
-        AppConfig
-          .getBaseConfig(datadirPath, CONFIG_FILE_NAME, Vector(all))
-          .withFallback(datadirConfig)
-          .resolve()
+      case Some(file) =>
+        val fromFile = ConfigFactory.parseFile(file.toFile)
+        all.withFallback(fromFile)
+      case None => all
     }
   }
+
 }
 
 object ServerArgParser {
