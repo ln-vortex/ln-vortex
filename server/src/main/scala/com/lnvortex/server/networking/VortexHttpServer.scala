@@ -2,7 +2,7 @@ package com.lnvortex.server.networking
 
 import akka.actor._
 import akka.http.scaladsl.Http
-import com.lnvortex.core.VortexUtils.DEFAULT_PORT
+import com.lnvortex.core.VortexUtils
 import com.lnvortex.server.coordinator.VortexCoordinator
 import grizzled.slf4j.Logging
 import org.bitcoins.core.util.StartStopAsync
@@ -35,19 +35,21 @@ class VortexHttpServer(coordinator: VortexCoordinator)(implicit
   def currentCoordinator: VortexCoordinator = routes.coordinator
 
   override def start(): Future[Unit] = {
+    val config = coordinator.config
+
     if (bindingP.isCompleted) {
       Future.successful(())
     } else {
-      val bindAddress = coordinator.config.listenAddress
+      val bindAddress = config.listenAddress
       for {
-        onionAddress <- coordinator.config.torParams match {
+        onionAddress <- config.torParams match {
           case Some(params) =>
             TorController
               .setUpHiddenService(
                 params.controlAddress,
                 params.authentication,
                 params.privateKeyPath,
-                DEFAULT_PORT,
+                VortexUtils.getDefaultPort(config.network),
                 targets = Seq(s"127.0.0.1:${bindAddress.getPort}")
               )
               .map(Some(_))

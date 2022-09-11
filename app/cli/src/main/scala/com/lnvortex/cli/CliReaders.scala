@@ -3,7 +3,7 @@ package com.lnvortex.cli
 import org.bitcoins.commons.jsonmodels.bitcoind.RpcOpts.LockUnspentOutputParameter
 import org.bitcoins.commons.serializers.Picklers
 import org.bitcoins.core.api.wallet.CoinSelectionAlgo
-import org.bitcoins.core.config.{NetworkParameters, Networks}
+import org.bitcoins.core.config._
 import org.bitcoins.core.crypto.{ExtPrivateKey, MnemonicCode}
 import org.bitcoins.core.currency._
 import org.bitcoins.core.hd.AddressType
@@ -47,22 +47,11 @@ object CliReaders {
       }
     }
 
-  implicit val npReads: Read[NetworkParameters] =
-    new Read[NetworkParameters] {
+  implicit val bitcoinNetReads: Read[BitcoinNetwork] =
+    new Read[BitcoinNetwork] {
       val arity: Int = 1
 
-      val reads: String => NetworkParameters = str =>
-        Networks.knownNetworks
-          .find(_.toString.toLowerCase == str.toLowerCase)
-          .getOrElse {
-            val networks =
-              Networks.knownNetworks
-                .map(_.toString.toLowerCase)
-                .mkString(", ")
-            val msg =
-              s"$str is not a valid network! Valid networks: $networks"
-            sys.error(msg)
-          }
+      val reads: String => BitcoinNetwork = BitcoinNetworks.fromString
     }
 
   implicit val byteVectorReads: Read[ByteVector] = new Read[ByteVector] {

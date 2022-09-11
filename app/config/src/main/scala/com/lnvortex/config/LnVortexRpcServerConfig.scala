@@ -1,5 +1,6 @@
 package com.lnvortex.config
 
+import com.lnvortex.core.VortexUtils
 import com.lnvortex.core.VortexUtils.CONFIG_FILE_NAME
 import com.typesafe.config.Config
 import org.bitcoins.commons.config._
@@ -40,7 +41,8 @@ case class LnVortexRpcServerConfig(
     config.getStringOrNone(s"$moduleName.rpcBind")
 
   lazy val rpcPort: Int =
-    config.getIntOrElse(s"$moduleName.rpcPort", 12524)
+    config.getIntOrElse(s"$moduleName.rpcPort",
+                        VortexUtils.getDefaultClientRpcPort(network))
 }
 
 object LnVortexRpcServerConfig

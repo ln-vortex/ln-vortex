@@ -110,7 +110,8 @@ case class VortexCoordinatorAppConfig(
 
   lazy val listenAddress: InetSocketAddress = {
     val str = config.getString(s"$moduleName.listen")
-    NetworkUtil.parseInetSocketAddress(str, DEFAULT_PORT)
+    val defaultPort = VortexUtils.getDefaultPort(network)
+    NetworkUtil.parseInetSocketAddress(str, defaultPort)
   }
 
   lazy val seedPath: Path = {

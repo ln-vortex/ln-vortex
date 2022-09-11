@@ -1,8 +1,11 @@
 package com.lnvortex.coordinator.cli
 
 import com.lnvortex.coordinator.cli.CliCommand._
+import com.lnvortex.coordinator.cli.CliReaders._
 import com.lnvortex.coordinator.cli.ConsoleCli.serverConfig
 import com.lnvortex.coordinator.config.LnVortexRpcServerConfig
+import com.lnvortex.core.VortexUtils
+import org.bitcoins.core.config.{BitcoinNetwork, MainNet}
 import scopt.OParser
 import ujson._
 import upickle.{default => up}
@@ -21,7 +24,7 @@ object ConsoleCli {
 
     import builder._
     OParser.sequence(
-      programName("bitcoin-s-cli"),
+      programName("coordinator-cli"),
       opt[Unit]("debug")
         .action((_, conf) => conf.copy(debug = true))
         .text("Print debugging information"),
@@ -34,6 +37,10 @@ object ConsoleCli {
       opt[String]("rpcpassword")
         .action((password, conf) => conf.copy(rpcPassword = password))
         .text(s"The password to send our rpc request to on the server"),
+      opt[BitcoinNetwork]('n', "network")
+        .action((network, conf) => conf.copy(network = network))
+        .text(
+          s"The network vortex is running on, e.g. mainnet, testnet, etc. (default: \"mainnet\")"),
       opt[Unit]("version")
         .action((_, conf) => conf.copy(command = GetVersion))
         .hidden(),
@@ -43,7 +50,7 @@ object ConsoleCli {
         .action((_, conf) => conf.copy(command = GetInfo))
         .text(s"Returns basic info about the coordinator"),
       checkConfig {
-        case CliConfig(NoCommand, _, _, _, _) =>
+        case CliConfig(NoCommand, _, _, _, _, _) =>
           failure("You need to provide a command!")
         case _ => success
       }
@@ -174,11 +181,12 @@ case class CliConfig(
     rpcUser: String = serverConfig.rpcUsername,
     rpcPassword: String = serverConfig.rpcUsername,
     debug: Boolean = false,
-    rpcPortOpt: Option[Int] = None) {
+    rpcPortOpt: Option[Int] = None,
+    network: BitcoinNetwork = MainNet) {
 
   val rpcPort: Int = rpcPortOpt match {
     case Some(port) => port
-    case None       => command.defaultPort
+    case None       => VortexUtils.getDefaultCoordinatorRpcPort(network)
   }
 }
 
@@ -186,9 +194,7 @@ object CliConfig {
   val empty: CliConfig = CliConfig()
 }
 
-sealed abstract class CliCommand {
-  def defaultPort: Int = 12522
-}
+sealed abstract class CliCommand
 
 object CliCommand {
 

@@ -5,11 +5,13 @@ import com.lnvortex.cli.CliReaders._
 import com.lnvortex.cli.ConsoleCli.serverConfig
 import com.lnvortex.config.VortexPicklers._
 import com.lnvortex.config._
+import com.lnvortex.core.VortexUtils
 import org.bitcoins.commons.serializers.Picklers.{
   inetSocketAddress => _,
   transactionOutPointPickler => _,
   _
 }
+import org.bitcoins.core.config._
 import org.bitcoins.core.protocol.BitcoinAddress
 import org.bitcoins.core.protocol.ln.node.NodeId
 import org.bitcoins.core.protocol.transaction._
@@ -17,11 +19,11 @@ import scopt.OParser
 import ujson._
 import upickle.{default => up}
 
+import java.lang.System.err.{println => printerr}
 import java.net.InetSocketAddress
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util._
-import System.err.{println => printerr}
 
 object ConsoleCli {
 
@@ -33,7 +35,7 @@ object ConsoleCli {
 
     import builder._
     OParser.sequence(
-      programName("bitcoin-s-cli"),
+      programName("vortex-cli"),
       opt[Unit]("debug")
         .action((_, conf) => conf.copy(debug = true))
         .text("Print debugging information"),
@@ -46,6 +48,10 @@ object ConsoleCli {
       opt[String]("rpcpassword")
         .action((password, conf) => conf.copy(rpcPassword = password))
         .text(s"The password to send our rpc request to on the server"),
+      opt[BitcoinNetwork]('n', "network")
+        .action((network, conf) => conf.copy(network = network))
+        .text(
+          s"The network vortex is running on, e.g. mainnet, testnet, etc. (default: \"mainnet\")"),
       opt[Unit]("version")
         .action((_, conf) => conf.copy(command = GetVersion))
         .hidden(),
@@ -137,7 +143,7 @@ object ConsoleCli {
               }))
         ),
       checkConfig {
-        case CliConfig(NoCommand, _, _, _, _) =>
+        case CliConfig(NoCommand, _, _, _, _, _) =>
           failure("You need to provide a command!")
         case _ => success
       }
@@ -275,21 +281,16 @@ case class CliConfig(
     rpcUser: String = serverConfig.rpcUsername,
     rpcPassword: String = serverConfig.rpcUsername,
     debug: Boolean = false,
-    rpcPortOpt: Option[Int] = None) {
+    rpcPortOpt: Option[Int] = None,
+    network: BitcoinNetwork = MainNet) {
 
   val rpcPort: Int = rpcPortOpt match {
     case Some(port) => port
-    case None       => command.defaultPort
+    case None       => VortexUtils.getDefaultClientRpcPort(network)
   }
 }
 
-object CliConfig {
-  val empty: CliConfig = CliConfig()
-}
-
-sealed abstract class CliCommand {
-  def defaultPort: Int = 12524
-}
+sealed abstract class CliCommand
 
 object CliCommand {
 

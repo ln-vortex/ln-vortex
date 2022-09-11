@@ -7,6 +7,7 @@ import com.lnvortex.client._
 import com.lnvortex.client.config.VortexAppConfig
 import com.lnvortex.clightning._
 import com.lnvortex.config.LnVortexRpcServerConfig
+import com.lnvortex.core.VortexUtils.CONFIG_FILE_NAME
 import com.lnvortex.core.api.VortexWalletApi
 import com.lnvortex.lnd._
 import com.lnvortex.rpc.LightningImplementation._
@@ -27,6 +28,8 @@ case class LnVortexAppConfig(
     override val configOverrides: Vector[Config])(implicit
     val system: ActorSystem)
     extends AppConfig {
+
+  override def configFileName: String = CONFIG_FILE_NAME
 
   implicit val ec: ExecutionContext = system.dispatcher
 
@@ -57,7 +60,7 @@ case class LnVortexAppConfig(
   private lazy val lndDataDir: Path = {
     config.getStringOrNone(s"$moduleName.lnd.datadir").map(Paths.get(_)) match {
       case Some(path) => path
-      case None       => Paths.get(Properties.userHome, ".lnd")
+      case None       => LndInstanceLocal.DEFAULT_DATADIR
     }
   }
 
@@ -83,10 +86,10 @@ case class LnVortexAppConfig(
 
   private lazy val lndInstance: LndInstance = {
     val dir = lndDataDir.toFile
-    require(dir.exists, s"${dir.getPath} does not exist!")
-    require(dir.isDirectory, s"${dir.getPath} is not a directory!")
+    require(dir.exists, s"$lndDataDir does not exist!")
+    require(dir.isDirectory, s"$lndDataDir is not a directory!")
 
-    val confFile = dir.toPath.resolve("lnd.conf").toFile
+    val confFile = lndDataDir.resolve("lnd.conf").toFile
     val config = LndConfig(confFile, dir)
 
     val remoteConfig = config.lndInstanceRemote
