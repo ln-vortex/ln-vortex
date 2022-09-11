@@ -7,7 +7,7 @@ import scala.concurrent._
 import scala.concurrent.duration.DurationInt
 import scala.util.Properties
 
-name := "LnVortex"
+name := "ln-vortex"
 
 scalaVersion := "2.13.8"
 
@@ -42,7 +42,7 @@ wixFeatures += WindowsFeature(
   )
 )
 
-lazy val root = project
+lazy val `ln-vortex` = project
   .in(file("."))
   .aggregate(
     coordinatorCli,
