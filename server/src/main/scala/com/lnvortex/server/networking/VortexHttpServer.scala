@@ -10,6 +10,7 @@ import org.bitcoins.tor.TorController
 
 import java.net.InetSocketAddress
 import scala.concurrent._
+import scala.concurrent.duration.DurationInt
 
 class VortexHttpServer(coordinator: VortexCoordinator)(implicit
     val system: ActorSystem)
@@ -67,7 +68,7 @@ class VortexHttpServer(coordinator: VortexCoordinator)(implicit
   override def stop(): Future[Unit] = {
     for {
       binding <- bindingP.future
-      _ <- binding.unbind()
+      _ <- binding.terminate(10.seconds)
     } yield ()
   }
 }
