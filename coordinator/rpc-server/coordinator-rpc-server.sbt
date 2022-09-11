@@ -28,7 +28,10 @@ packageSummary := "Vortex Coordinator"
 
 packageDescription := "Runs the Vortex coordinator daemon"
 
-dockerExposedPorts ++= Seq(12522, 12523)
+// rpc ports
+dockerExposedPorts ++= Seq(2524, 12524, 22524, 32524)
+// p2p ports
+dockerExposedPorts ++= Seq(2523, 12523, 22523, 32523)
 
 dockerEntrypoint := Seq("/opt/docker/bin/vortex-coordinator")
 
