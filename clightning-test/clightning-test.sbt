@@ -1,9 +1,9 @@
 Test / test := (Test / test dependsOn {
-  Projects.root / TaskKeys.downloadBitcoind
+  Projects.`ln-vortex` / TaskKeys.downloadBitcoind
 }).value
 
 Test / test := (Test / test dependsOn {
-  Projects.root / TaskKeys.downloadCLightning
+  Projects.`ln-vortex` / TaskKeys.downloadCLightning
 }).value
 
 publish / skip := true
