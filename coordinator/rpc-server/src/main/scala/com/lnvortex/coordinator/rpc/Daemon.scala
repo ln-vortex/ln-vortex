@@ -66,11 +66,12 @@ object Daemon extends App with Logging {
   } yield {
     sys.addShutdownHook {
       logger.info("Shutting down...")
-      val f = httpServer.stop().map { _ =>
-        logger.info("Http server stopped")
-        system.terminate()
-        logger.info("Shutdown complete")
-      }
+
+      val f = for {
+        _ <- httpServer.stop()
+        _ = logger.info("Http server stopped")
+        _ <- system.terminate()
+      } yield logger.info("Shutdown complete")
 
       Await.result(f, 60.seconds)
     }
