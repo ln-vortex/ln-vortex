@@ -1,0 +1,151 @@
+name: CI
+
+on:
+  pull_request:
+
+jobs:
+  linuxCompile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    if: "! contains(github.event.pull_request.labels.*.name, 'documentation')"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Setup Scala
+        uses: olafurpg/setup-scala@v13
+        with:
+          distribution: 'adopt'
+          java-version: '17'
+          cache: 'sbt'
+      - name: Cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.ivy2/cache
+            ~/.sbt
+          key: ${{ runner.os }}-sbt-${{ hashFiles('**/build.sbt') }}
+      - name: Compile and Check Formatting
+        run: sbt +test:compile scalafmtCheckAll
+
+  macCompile:
+    runs-on: macos-latest
+    timeout-minutes: 60
+    if: "! contains(github.event.pull_request.labels.*.name, 'documentation')"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Setup Scala
+        uses: olafurpg/setup-scala@v13
+        with:
+          distribution: 'adopt'
+          java-version: '17'
+          cache: 'sbt'
+      - name: Cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.ivy2/cache
+            ~/.sbt
+          key: ${{ runner.os }}-sbt-${{ hashFiles('**/build.sbt') }}
+      - name: Compile
+        run: sbt +test:compile
+
+  windowsCompile:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    if: "! contains(github.event.pull_request.labels.*.name, 'documentation')"
+    steps:
+      - name: Configure git
+        run: "git config --global core.autocrlf false"
+        shell: bash
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Setup Scala
+        uses: olafurpg/setup-scala@v13
+        with:
+          distribution: 'adopt'
+          java-version: '17'
+          cache: 'sbt'
+      - name: Cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.ivy2/cache
+            ~/.sbt
+          key: ${{ runner.os }}-sbt-${{ hashFiles('**/build.sbt') }}
+      - name: Compile
+        run: sbt +test:compile
+
+  clientServer:
+    needs: linuxCompile
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    if: "! contains(github.event.pull_request.labels.*.name, 'documentation')"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Setup Scala
+        uses: olafurpg/setup-scala@v13
+        with:
+          distribution: 'adopt'
+          java-version: '17'
+          cache: 'sbt'
+      - name: Cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.ivy2/cache
+            ~/.sbt
+          key: ${{ runner.os }}-sbt-${{ hashFiles('**/build.sbt') }}
+      - name: Run tests
+        run: sbt coreTest/test configTest/test clientTest/test serverTest/test clientServerTest/test
+
+  postgres:
+    needs: linuxCompile
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    if: "! contains(github.event.pull_request.labels.*.name, 'documentation')"
+    env:
+      PG_ENABLED: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Setup Scala
+        uses: olafurpg/setup-scala@v13
+        with:
+          distribution: 'adopt'
+          java-version: '17'
+          cache: 'sbt'
+      - name: Cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.ivy2/cache
+            ~/.sbt
+          key: ${{ runner.os }}-sbt-${{ hashFiles('**/build.sbt') }}
+      - name: Run postgres tests
+        run: sbt serverTest/test clientTest/test clientServerTest/test
+
+  wallets:
+    needs: linuxCompile
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    if: "! contains(github.event.pull_request.labels.*.name, 'documentation')"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Setup Scala
+        uses: olafurpg/setup-scala@v13
+        with:
+          distribution: 'adopt'
+          java-version: '17'
+          cache: 'sbt'
+      - name: Cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.ivy2/cache
+            ~/.sbt
+          key: ${{ runner.os }}-sbt-${{ hashFiles('**/build.sbt') }}
+      - name: Run tests
+        run: sbt lndTest/test bitcoindTest/test clightningTest/test
