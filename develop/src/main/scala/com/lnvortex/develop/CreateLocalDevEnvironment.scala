@@ -74,7 +74,7 @@ object CreateLocalDevEnvironment extends App with Logging {
 
     nodeId <- peerLnd.nodeId
     _ = logger.info(s"========================")
-    _ = logger.info(s"Peer node id=$nodeId")
+    _ = logger.info(s"Peer node id: $nodeId")
     _ = logger.info(s"========================")
 
     _ <- coordConfig.start()
