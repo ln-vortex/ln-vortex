@@ -14,7 +14,7 @@
     </appender>
 
     <appender name="FILE" class="ch.qos.logback.core.FileAppender">
-        <file>${bitcoins.log.location}/bitcoin-s.log</file>
+        <file>${bitcoins.log.location}/vortex.log</file>
         <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
             <!-- hourly rollover -->
             <fileNamePattern>${bitcoins.log.location}/logs/vortex-%d{yyyy-MM-dd_HH}.%i.log</fileNamePattern>
