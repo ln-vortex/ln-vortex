@@ -15,10 +15,10 @@
     </appender>
 
     <appender name="FILE" class="ch.qos.logback.core.FileAppender">
-        <file>${bitcoins.log.location}/bitcoin-s.log</file>
+        <file>${bitcoins.log.location}/vortex.log</file>
         <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
             <!-- hourly rollover -->
-            <fileNamePattern>${bitcoins.log.location}/logs/bitcoin-s-%d{yyyy-MM-dd_HH}.%i.log</fileNamePattern>
+            <fileNamePattern>${bitcoins.log.location}/logs/vortex-%d{yyyy-MM-dd_HH}.%i.log</fileNamePattern>
 
             <!-- each file should be at most 100MB, keep 2 days of history, and at most 2GB in the archive -->
             <maxFileSize>100MB</maxFileSize>
