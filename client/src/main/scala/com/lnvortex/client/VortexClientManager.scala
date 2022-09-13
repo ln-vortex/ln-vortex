@@ -25,21 +25,25 @@ class VortexClientManager[+T <: VortexWalletApi](val vortexWallet: T)(implicit
   lazy val utxoDAO: UTXODAO = UTXODAO()
 
   lazy val coordinators: Vector[CoordinatorAddress] = {
-    config.coordinatorAddresses(vortexWallet.network)
+    config.coordinatorAddresses.filter(_.network == vortexWallet.network)
   }
 
-  lazy val clients: Map[String, VortexClient[VortexWalletApi]] = {
+  lazy val clients: Vector[VortexClient[VortexWalletApi]] = {
     coordinators.map { addr =>
-      addr.name -> new VortexClient(vortexWallet, addr)
-    }.toMap
+      new VortexClient(vortexWallet, addr)
+    }
+  }
+
+  lazy val clientMap: Map[String, VortexClient[VortexWalletApi]] = {
+    clients.map(client => client.coordinatorAddress.name -> client).toMap
   }
 
   def listCoins(): Future[Vector[UnspentCoin]] = {
-    clients.values.head.listCoins()
+    clients.head.listCoins()
   }
 
   def listChannels(): Future[Vector[ChannelDetails]] = {
-    clients.values.head.listChannels()
+    clients.head.listChannels()
   }
 
   override def start(): Future[Unit] = {
@@ -48,13 +52,13 @@ class VortexClientManager[+T <: VortexWalletApi](val vortexWallet: T)(implicit
       coins <- vortexWallet.listCoins()
       _ <- utxoDAO.createMissing(coins)
 
-      startFs = clients.values.map(_.start())
+      startFs = clients.map(_.start())
       _ <- Future.sequence(startFs)
     } yield ()
   }
 
   override def stop(): Future[Unit] = {
-    val stopFs = clients.values.map(_.stop())
+    val stopFs = clients.map(_.stop())
     Future.sequence(stopFs).map(_ => ())
   }
 }
