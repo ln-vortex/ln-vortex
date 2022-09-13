@@ -13,7 +13,7 @@ object Deps {
 
     val sttpV = "1.7.2"
 
-    val microPickleV = "1.3.15"
+    val microPickleV = "1.6.0"
 
     val grizzledSlf4jV = "1.3.4"
     val logback = "1.4.0"
