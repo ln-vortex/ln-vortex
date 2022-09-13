@@ -69,6 +69,9 @@ case class VortexCoordinatorAppConfig(
 
   override def start(): Future[Unit] = FutureUtil.makeAsync { () =>
     logger.info(s"Initializing coordinator")
+    logger.info("inputScriptType: " + inputScriptType)
+    logger.info("outputScriptType: " + outputScriptType)
+    logger.info("changeScriptType: " + changeScriptType)
 
     if (Files.notExists(baseDatadir)) {
       Files.createDirectories(baseDatadir)
