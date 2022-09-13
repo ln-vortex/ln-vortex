@@ -34,6 +34,9 @@ services:
       BITCOIN_S_PROXY_ENABLED: "false"
       BITCOIN_S_TOR_ENABLED: "false"
 
+      BITCOIN_S_TOR_CONTROL: "tor:9051"
+      BITCOIN_S_TOR_PASSWORD: "topsecret"
+
       VORTEX_RPC_USER: "docker-auth"
       VORTEX_RPC_PASSWORD: $APP_PASSWORD
 
