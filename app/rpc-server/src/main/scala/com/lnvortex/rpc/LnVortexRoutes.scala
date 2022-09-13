@@ -17,7 +17,7 @@ case class LnVortexRoutes(clientManager: VortexClientManager[VortexWalletApi])(
   implicit val ec: ExecutionContext = system.dispatcher
 
   def getClient(coordinator: String): VortexClient[VortexWalletApi] = {
-    clientManager.clients(coordinator)
+    clientManager.clientMap(coordinator)
   }
 
   override def handleCommand: PartialFunction[ServerCommand, Route] = {
@@ -63,8 +63,8 @@ case class LnVortexRoutes(clientManager: VortexClientManager[VortexWalletApi])(
     case ServerCommand(id, "getstatuses", _) =>
       complete {
         val allDetails =
-          clientManager.clients.map { case (coordinator, client) =>
-            coordinator -> client.getCurrentRoundDetails
+          clientManager.clients.map { client =>
+            client.coordinatorAddress.name -> client.getCurrentRoundDetails
           }
         RpcServer.httpSuccess(id, allDetails)
       }

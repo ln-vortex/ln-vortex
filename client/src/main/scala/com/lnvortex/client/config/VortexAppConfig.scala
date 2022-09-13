@@ -63,8 +63,7 @@ case class VortexAppConfig(baseDatadir: Path, configOverrides: Vector[Config])(
     torConf.socks5ProxyParams
   }
 
-  lazy val coordinatorAddresses: Map[BitcoinNetwork,
-                                     Vector[CoordinatorAddress]] = {
+  lazy val coordinatorAddresses: Vector[CoordinatorAddress] = {
     val coordinators =
       config.getConfigList(s"$moduleName.coordinators").asScala.toList
 
@@ -77,7 +76,7 @@ case class VortexAppConfig(baseDatadir: Path, configOverrides: Vector[Config])(
                                BitcoinNetworks.fromString(networkStr),
                                NetworkUtil.parseInetSocketAddress(onion, 12523))
 
-    list.toVector.groupBy(_.network)
+    list.toVector
   }
 
   override lazy val appConfig: VortexAppConfig = this
