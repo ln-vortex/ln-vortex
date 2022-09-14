@@ -2,6 +2,7 @@ package com.lnvortex.client.config
 
 import akka.actor.ActorSystem
 import com.lnvortex.client.db.UTXODAO
+import com.lnvortex.core.VortexUtils
 import com.lnvortex.core.VortexUtils.CONFIG_FILE_NAME
 import com.lnvortex.core.api.CoordinatorAddress
 import com.typesafe.config.Config
@@ -72,9 +73,13 @@ case class VortexAppConfig(baseDatadir: Path, configOverrides: Vector[Config])(
       name = coordinatorConfig.getString("name")
       networkStr = coordinatorConfig.getString("network")
       onion = coordinatorConfig.getString("onion")
-    } yield CoordinatorAddress(name,
-                               BitcoinNetworks.fromString(networkStr),
-                               NetworkUtil.parseInetSocketAddress(onion, 12523))
+    } yield {
+      val network = BitcoinNetworks.fromString(networkStr)
+      val addr =
+        NetworkUtil.parseInetSocketAddress(onion,
+                                           VortexUtils.getDefaultPort(network))
+      CoordinatorAddress(name = name, network = network, onion = addr)
+    }
 
     list.toVector
   }
