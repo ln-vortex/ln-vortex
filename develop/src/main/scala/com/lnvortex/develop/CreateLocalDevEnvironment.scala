@@ -60,11 +60,11 @@ object CreateLocalDevEnvironment extends App with Logging {
     height <- bitcoind.getBlockCount
     _ <- {
       if (height > 100) {
-        logger.info(s"Bitcoind is already funded, we are at height=$height")
+        logger.info(s"Bitcoind is already funded, we are at height: $height")
         Future.unit
       } else {
         logger.info(
-          s"Bitcoind is not funded, we are at height=$height, funding now...")
+          s"Bitcoind is not funded, we are at height: $height, funding now...")
         bitcoind.getNewAddress.flatMap(bitcoind.generateToAddress(101, _))
       }
     }

@@ -23,7 +23,7 @@ object TransactionType extends StringFactory[TransactionType] {
   override def fromString(string: String): TransactionType = {
     fromStringOpt(string).getOrElse(
       throw new IllegalArgumentException(
-        s"Could not find TransactionType for string=$string"))
+        s"Could not find TransactionType for string: $string"))
   }
 
   def calculate(
@@ -76,7 +76,7 @@ object TransactionType extends StringFactory[TransactionType] {
       case (ScriptType.PUBKEYHASH, ScriptType.NONSTANDARD)  => Vector(OnChain)
       case _ =>
         throw new IllegalArgumentException(
-          s"Could not find TransactionType for input=$input output=$output")
+          s"Could not find TransactionType for input: $input output: $output")
     }
   }
 }
