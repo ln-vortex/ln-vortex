@@ -304,9 +304,13 @@ case class VortexCoordinatorAppConfig(
       name = coordinatorConfig.getString("name")
       networkStr = coordinatorConfig.getString("network")
       onion = coordinatorConfig.getString("onion")
-    } yield CoordinatorAddress(name,
-                               BitcoinNetworks.fromString(networkStr),
-                               NetworkUtil.parseInetSocketAddress(onion, 12523))
+    } yield {
+      val network = BitcoinNetworks.fromString(networkStr)
+      val addr =
+        NetworkUtil.parseInetSocketAddress(onion,
+                                           VortexUtils.getDefaultPort(network))
+      CoordinatorAddress(name = name, network = network, onion = addr)
+    }
 
     list.toVector.groupBy(_.network)
   }
