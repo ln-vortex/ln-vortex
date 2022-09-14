@@ -112,8 +112,9 @@ case class VortexCoordinatorAppConfig(
   torParams.map(_.privateKeyPath)
 
   lazy val listenAddress: InetSocketAddress = {
-    val str = config.getString(s"$moduleName.listen")
     val defaultPort = VortexUtils.getDefaultPort(network)
+    val str =
+      config.getStringOrElse(s"$moduleName.listen", s"0.0.0.0:$defaultPort")
     NetworkUtil.parseInetSocketAddress(str, defaultPort)
   }
 
