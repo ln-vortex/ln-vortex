@@ -38,7 +38,7 @@ class VortexHttpServer(coordinator: VortexCoordinator)(implicit
     val config = coordinator.config
 
     if (bindingP.isCompleted) {
-      Future.successful(())
+      Future.unit
     } else {
       val bindAddress = config.listenAddress
       for {
