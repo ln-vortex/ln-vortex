@@ -109,7 +109,13 @@ case class VortexCoordinatorAppConfig(
     }
   }
 
-  torParams.map(_.privateKeyPath)
+  lazy val targets: Vector[InetSocketAddress] = {
+    val targets = config.getStringList(s"$moduleName.tor.targets")
+    val defaultPort = VortexUtils.getDefaultPort(network)
+    targets.asScala.map { target =>
+      NetworkUtil.parseInetSocketAddress(target, defaultPort)
+    }.toVector
+  }
 
   lazy val listenAddress: InetSocketAddress = {
     val defaultPort = VortexUtils.getDefaultPort(network)

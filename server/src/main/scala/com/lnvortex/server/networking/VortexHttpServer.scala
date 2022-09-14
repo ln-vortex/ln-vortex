@@ -44,13 +44,16 @@ class VortexHttpServer(coordinator: VortexCoordinator)(implicit
       for {
         onionAddress <- config.torParams match {
           case Some(params) =>
+            val targets =
+              config.targets.map(ip => s"${ip.getHostString}:${ip.getPort}")
+
             TorController
               .setUpHiddenService(
                 params.controlAddress,
                 params.authentication,
                 params.privateKeyPath,
                 VortexUtils.getDefaultPort(config.network),
-                targets = Seq(s"127.0.0.1:${bindAddress.getPort}")
+                targets = s"127.0.0.1:${bindAddress.getPort}" +: targets
               )
               .map(Some(_))
           case None => Future.successful(None)
