@@ -35,10 +35,10 @@ import scala.concurrent.duration._
 import scala.jdk.CollectionConverters._
 import scala.util._
 
-/** Configuration for Ln Vortex
+/** Configuration for Vortex Coordinator
   *
   * @param directory
-  *   The data directory of the wallet
+  *   The data directory of the coordinator
   * @param configOverrides
   *   Optional sequence of configuration overrides
   */
