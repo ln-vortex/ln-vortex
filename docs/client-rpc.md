@@ -228,7 +228,7 @@ method: `cancelcoins`
 
 #### Params
 
-None
+- coordinator: String - name of the coordinator
 
 #### Response
 
