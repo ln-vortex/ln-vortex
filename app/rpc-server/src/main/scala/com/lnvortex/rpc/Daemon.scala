@@ -52,7 +52,7 @@ object Daemon extends App with Logging {
   val rpcStartF = configStartF.flatMap { _ =>
     logger.info("Starting rpc server")
     server.start().map { _ =>
-      logger.info(s"Ln Vortex Client started on network ${config.network}!")
+      logger.info(s"Vortex Client started on network ${config.network}!")
     }
   }
 

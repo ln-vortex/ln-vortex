@@ -24,9 +24,9 @@ scalacOptions ++= Seq("release", "11")
 // general package information (can be scoped to Windows)
 maintainer := "benthecarman <benthecarman@live.com>"
 // Will say "Welcome to the <packageSummary> Setup Wizard"
-packageSummary := "LN Vortex"
+packageSummary := "Vortex"
 // Will be used for drop down menu in setup wizard
-packageDescription := "LN Vortex"
+packageDescription := "Vortex"
 
 // wix build information
 wixProductId := java.util.UUID.randomUUID().toString

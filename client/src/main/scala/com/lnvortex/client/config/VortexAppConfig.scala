@@ -19,10 +19,10 @@ import scala.concurrent._
 import scala.jdk.CollectionConverters._
 import scala.util.Properties
 
-/** Configuration for Ln Vortex
+/** Configuration for Vortex
   *
   * @param baseDatadir
-  *   The data directory of the wallet
+  *   The data directory of the client
   * @param configOverrides
   *   Optional sequence of configuration overrides
   */
