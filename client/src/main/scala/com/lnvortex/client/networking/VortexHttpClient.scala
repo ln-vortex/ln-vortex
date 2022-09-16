@@ -106,7 +106,8 @@ trait VortexHttpClient[+V <: VortexWalletApi] { self: VortexClient[V] =>
   protected def subscribeRounds(network: BitcoinNetwork): Future[Unit] = {
     require(roundsSubscription.isEmpty, "Already subscribed to rounds")
 
-    logger.info(s"Connecting to coordinator $baseUrl")
+    logger.info(
+      s"Connecting to coordinator ${coordinatorAddress.name}: $baseUrl")
 
     val url =
       "ws://" + baseUrl + "/rounds/" + network.chainParams.genesisBlock.blockHeader.hashBE.hex
@@ -128,16 +129,19 @@ trait VortexHttpClient[+V <: VortexWalletApi] { self: VortexClient[V] =>
 
     upgradeResponse.map {
       case _: ValidUpgrade =>
-        logger.info("Subscribed to coordinator round announcements!")
+        logger.info(
+          s"Subscribed to coordinator ${coordinatorAddress.name} round announcements!")
         roundsSubscription = Some(closedF)
 
         shutdownP.future.foreach { _ =>
-          logger.warn("Disconnected from coordinator!")
+          logger.warn(
+            s"Disconnected from coordinator ${coordinatorAddress.name}!")
           if (roundsSubscription.isDefined) {
             roundsSubscription.foreach(_.trySuccess(None))
             roundsSubscription = None
 
-            logger.info("Attempting to reconnect to coordinator")
+            logger.info(
+              s"Attempting to reconnect to coordinator ${coordinatorAddress.name}")
             AsyncUtil.retryUntilSatisfiedF(
               () => subscribeRounds(network).map(_ => true).recover(_ => false),
               interval = 10.seconds,
