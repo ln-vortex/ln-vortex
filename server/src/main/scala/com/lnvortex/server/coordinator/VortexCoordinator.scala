@@ -167,6 +167,7 @@ class VortexCoordinator private (
       outputType = config.outputScriptType,
       changeType = config.changeScriptType,
       status = config.statusString,
+      title = config.titleOpt,
       feeRate = currentFeeRate
     )
 

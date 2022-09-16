@@ -27,6 +27,7 @@ class RoundDetailsTest extends BitcoinSUnitTest {
     minPeers = 3,
     maxPeers = 5,
     status = "hello world",
+    title = None,
     SatoshisPerVirtualByte.one
   )
 

@@ -33,6 +33,7 @@ class VortexClientTest extends VortexClientFixture {
     minPeers = 3,
     maxPeers = 5,
     status = "hello world",
+    title = None,
     feeRate = SatoshisPerVirtualByte.one
   )
 

@@ -66,6 +66,7 @@ case class RoundParameters(
     minPeers: Int,
     maxPeers: Int,
     status: String,
+    title: Option[String],
     feeRate: SatoshisPerVirtualByte)
     extends ServerAnnouncementMessage {
 
