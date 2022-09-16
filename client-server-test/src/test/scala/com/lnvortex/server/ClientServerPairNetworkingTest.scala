@@ -37,6 +37,23 @@ class ClientServerPairNetworkingTest
       } yield succeed
   }
 
+  it must "cancel multiple times" in { case (client, _, peerLnd) =>
+    for {
+      nodeId <- peerLnd.nodeId
+      _ <- client.askNonce()
+
+      // don't select all coins
+      utxos <- client.listCoins().map(c => Random.shuffle(c).take(1))
+      _ <- client.queueCoins(utxos.map(_.outputReference), nodeId, None)
+
+      _ <- client.cancelRegistration()
+      _ <- client.askNonce()
+      _ <- client.cancelRegistration()
+      _ <- client.askNonce()
+      _ <- client.cancelRegistration()
+    } yield succeed
+  }
+
   it must "get an updated fee rate" in { case (client, coordinator, _) =>
     val starting = getRoundParamsOpt(client.getCurrentRoundDetails).get.feeRate
     for {
