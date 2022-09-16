@@ -191,6 +191,10 @@ case class VortexCoordinatorAppConfig(
     config.getStringOrElse(s"$moduleName.statusString", "")
   }
 
+  lazy val titleOpt: Option[String] = {
+    config.getStringOrNone(s"$moduleName.coordinatorTitle")
+  }
+
   lazy val inputRegistrationTime: FiniteDuration = {
     val dur = config.getDuration(s"$moduleName.inputRegistrationTime")
     FiniteDuration(dur.getSeconds, SECONDS)

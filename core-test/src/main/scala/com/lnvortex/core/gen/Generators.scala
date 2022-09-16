@@ -54,6 +54,7 @@ object Generators {
         .map(_.toInt)
         .suchThat(min => min <= maxPeers)
       status <- StringGenerators.genString
+      titleOpt <- Gen.option(StringGenerators.genString)
       feeRate <- FeeUnitGen.satsPerVirtualByte
     } yield {
       RoundParameters(
@@ -69,6 +70,7 @@ object Generators {
         minPeers = minPeers,
         maxPeers = maxPeers,
         status = status,
+        title = titleOpt,
         feeRate = feeRate
       )
     }
