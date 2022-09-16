@@ -66,10 +66,16 @@ object QueueCoins extends ServerJsonModels {
           Some(res)
         } else None,
         if (json.obj.contains("peerAddr")) {
-          val res = Try(up.read[InetSocketAddress](json("peerAddr"))).getOrElse(
-            throw new IllegalArgumentException(
-              "Invalid peerAddr: " + json("peerAddr")))
-          Some(res)
+          if (json("peerAddr").strOpt.exists(_.isEmpty)) {
+            None
+          } else {
+            val res =
+              Try(up.read[InetSocketAddress](json("peerAddr"))).getOrElse(
+                throw new IllegalArgumentException(
+                  "Invalid peerAddr: " + json("peerAddr")))
+
+            Some(res)
+          }
         } else None
       ))
 
