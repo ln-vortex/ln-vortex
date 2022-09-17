@@ -53,7 +53,7 @@ case class RoundDAO()(implicit
   def hasTxIdAction(txId: DoubleSha256DigestBE): DBIOAction[Boolean,
                                                             NoStream,
                                                             Effect.Read] = {
-    table.filter(_.txIdOpt === txId).result.map(_.nonEmpty)
+    table.filter(_.txIdOpt === txId).size.result.map(_ > 0)
   }
 
   class RoundTable(tag: Tag) extends Table[RoundDb](tag, schemaName, "rounds") {

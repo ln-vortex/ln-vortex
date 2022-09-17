@@ -44,6 +44,7 @@ class VortexCoordinator private (
     val config: VortexCoordinatorAppConfig)
     extends StartStop[Unit]
     with PeerValidation
+    with VortexUtils
     with Logging {
   implicit val ec: ExecutionContext = system.dispatcher
 
@@ -544,22 +545,23 @@ class VortexCoordinator private (
       roundDb
     }
 
-    val isRemixA = if (registerInputs.inputs.size == 1) {
+    val isRemixF = if (registerInputs.inputs.size == 1) {
       val inputRef = registerInputs.inputs.head
-      roundDAO.hasTxIdAction(inputRef.outPoint.txIdBE).map { isPrevRound =>
+      bitcoind.getRawTransactionRaw(inputRef.outPoint.txIdBE).map { tx =>
+        // Make sure this was previously in a coinjoin
+        val anonSet = getAnonymitySet(tx, inputRef.outPoint.vout.toInt)
         // make sure it wasn't a change output
         val wasTargetUtxo = inputRef.output.value == config.roundAmount
         val noChange = registerInputs.changeSpkOpt.isEmpty
-        isPrevRound && wasTargetUtxo && noChange
+        anonSet > 1 && wasTargetUtxo && noChange
       }
-    } else DBIO.successful(false)
+    } else Future.successful(false)
 
     val action = for {
       roundDb <- roundDbA
       aliceDb <- aliceDAO.findByPrimaryKeyAction(peerId)
       otherInputDbs <- inputsDAO.findByRoundIdAction(roundDb.roundId)
-      isRemix <- isRemixA
-    } yield (roundDb, aliceDb, otherInputDbs, isRemix)
+    } yield (roundDb, aliceDb, otherInputDbs)
 
     val dbF = safeDatabase.run(action)
 
@@ -568,7 +570,8 @@ class VortexCoordinator private (
       case (accum, inputRef) =>
         if (accum.isEmpty) {
           for {
-            (_, aliceDb, otherInputDbs, isRemix) <- dbF
+            (_, aliceDb, otherInputDbs) <- dbF
+            isRemix <- isRemixF
             errorOpt <- validateAliceInput(inputRef,
                                            isRemix,
                                            aliceDb,
@@ -578,7 +581,8 @@ class VortexCoordinator private (
     }
 
     val f = for {
-      (roundDb, aliceDbOpt, otherInputDbs, isRemix) <- dbF
+      (roundDb, aliceDbOpt, otherInputDbs) <- dbF
+      isRemix <- isRemixF
       validInputs <- validInputsF
       isMinimal = registerInputs.isMinimal(
         roundParams.getTargetAmount(isRemix, registerInputs.inputs.size))
