@@ -208,7 +208,7 @@ You can set `address` to specify an address to do the collaborative transaction 
 
 You can set `nodeId` to specify the node's pubkey to open the channel to.
 
-Or you can set neither and LnVortex will generate an address to do the collaborative transaction to.
+Or you can set neither and Vortex will generate an address to do the collaborative transaction to.
 
 - coordinator: String - name of the coordinator
 - outpoints: Array[String] - outpoints should be in the `txid:vout` format
