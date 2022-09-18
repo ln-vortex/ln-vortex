@@ -31,7 +31,7 @@ case class LnVortexRoutes(clientManager: VortexClientManager[VortexWalletApi])(
     case ServerCommand(id, "getinfo", _) =>
       complete {
         val json = Json.obj(
-          "network" -> clientManager.vortexWallet.network.toString,
+          "network" -> clientManager.network.toString,
           "coordinators" -> clientManager.coordinators.map(_.name)
         )
 
@@ -48,7 +48,7 @@ case class LnVortexRoutes(clientManager: VortexClientManager[VortexWalletApi])(
 
     case ServerCommand(id, "listtransactions", _) =>
       complete {
-        clientManager.vortexWallet.listTransactions().map { txs =>
+        clientManager.listTransactions().map { txs =>
           RpcServer.httpSuccess(id, txs)
         }
       }
