@@ -70,6 +70,14 @@ case class LndVortexWallet(lndRpcClient: LndRpcClient)(implicit
     })
   }
 
+  override def releaseCoins(coins: Vector[OutputReference]): Future[Unit] = {
+    val releaseFs = coins.map { coin =>
+      lndRpcClient.releaseOutput(coin.outPoint)
+    }
+
+    Future.sequence(releaseFs).map(_ => ())
+  }
+
   override def createInputProof(
       nonce: SchnorrNonce,
       outputRef: OutputReference,
