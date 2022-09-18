@@ -4,21 +4,20 @@ import akka.actor.ActorSystem
 import com.lnvortex.client.config.VortexAppConfig
 import com.lnvortex.client.db.UTXODAO
 import com.lnvortex.core._
-import com.lnvortex.core.api.{
-  ChannelDetails,
-  CoordinatorAddress,
-  VortexWalletApi
-}
+import com.lnvortex.core.api._
 import grizzled.slf4j.Logging
+import org.bitcoins.core.config.BitcoinNetwork
 import org.bitcoins.core.util.StartStopAsync
 
 import scala.concurrent._
 
-class VortexClientManager[+T <: VortexWalletApi](val vortexWallet: T)(implicit
+class VortexClientManager[+T <: VortexWalletApi](vortexWallet: T)(implicit
     val system: ActorSystem,
     val config: VortexAppConfig)
     extends StartStopAsync[Unit]
     with Logging {
+
+  lazy val network: BitcoinNetwork = vortexWallet.network
 
   implicit val ec: ExecutionContext = system.dispatcher
 
@@ -44,6 +43,10 @@ class VortexClientManager[+T <: VortexWalletApi](val vortexWallet: T)(implicit
 
   def listChannels(): Future[Vector[ChannelDetails]] = {
     clients.head.listChannels()
+  }
+
+  def listTransactions(): Future[Vector[TransactionDetails]] = {
+    vortexWallet.listTransactions()
   }
 
   override def start(): Future[Unit] = {
