@@ -218,6 +218,7 @@ trait VortexHttpClient[+V <: VortexWalletApi] { self: VortexClient[V] =>
       }
     }
 
+    logger.debug(s"Opening registration websocket to coordinator: $url")
     val (upgradeResponse, _) =
       http.singleWebSocketRequest(
         WebSocketRequest(url),
