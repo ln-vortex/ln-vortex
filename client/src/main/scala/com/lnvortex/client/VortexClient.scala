@@ -6,7 +6,7 @@ import com.lnvortex.client.VortexClientException._
 import com.lnvortex.client.config.VortexAppConfig
 import com.lnvortex.client.db._
 import com.lnvortex.client.networking._
-import com.lnvortex.core.RoundDetails.{getNonceOpt, getRoundParamsOpt}
+import com.lnvortex.core.RoundDetails._
 import com.lnvortex.core._
 import com.lnvortex.core.api._
 import com.lnvortex.core.crypto.BlindSchnorrUtil
@@ -188,16 +188,33 @@ case class VortexClient[+T <: VortexWalletApi](
   }
 
   def cancelRegistration(): Future[Unit] = {
-    logger.info("Canceling registration")
-    getNonceOpt(roundDetails) match {
+    logger.info(s"Canceling registration to $coordinatorName")
+    val originalRound = getCurrentRoundDetails
+    getNonceOpt(originalRound) match {
       case Some(nonce) =>
-        val roundParams = getRoundParamsOpt(roundDetails).get
+        val roundParams = getRoundParamsOpt(originalRound).get
         val msg = CancelRegistrationMessage(nonce, roundParams.roundId)
-        cancelRegistration(msg).map { valid =>
+        cancelRegistration(msg).flatMap { valid =>
           if (valid) {
-            roundDetails = KnownRound(roundParams)
+            val releaseCoinsF = getInitDetailsOpt(originalRound) match {
+              case Some(initDetails) =>
+                vortexWallet
+                  .releaseCoins(initDetails.inputs)
+                  .recover { case err: Throwable =>
+                    logger.error(s"Failed to release coins: ${err.getMessage}",
+                                 err)
+                  }
+              case None => Future.unit
+            }
+
+            releaseCoinsF.map { _ =>
+              logger.info(s"Registration canceled to $coordinatorName")
+              roundDetails = KnownRound(roundParams)
+            }
           } else {
-            throw new RuntimeException("Registration was not canceled")
+            Future.failed(
+              new RuntimeException(
+                s"Registration to $coordinatorName was not canceled"))
           }
         }
       case None =>

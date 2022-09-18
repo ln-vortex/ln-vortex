@@ -104,6 +104,15 @@ case class BitcoindVortexWallet(
     } yield signed.psbt.inputMaps.head.finalizedScriptWitnessOpt.get.scriptWitness
   }
 
+  override def releaseCoins(coins: Vector[OutputReference]): Future[Unit] = {
+    val params = coins.map { outputRef =>
+      LockUnspentOutputParameter(outputRef.outPoint.txIdBE,
+                                 outputRef.outPoint.vout.toInt)
+    }
+
+    bitcoind.lockUnspent(unlock = true, params).map(_ => ())
+  }
+
   override def signPSBT(
       unsigned: PSBT,
       outputRefs: Vector[OutputReference]): Future[PSBT] = {

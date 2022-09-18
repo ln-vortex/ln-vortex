@@ -29,6 +29,8 @@ abstract class VortexWalletApi extends StartStopAsync[Unit] {
 
   def listCoins(): Future[Vector[UnspentCoin]]
 
+  def releaseCoins(coins: Vector[OutputReference]): Future[Unit]
+
   /** Creates a proof of ownership for the input and then locks it
     *
     * @param nonce

@@ -98,6 +98,11 @@ case class CLightningVortexWallet(clightning: CLightningRpcClient)(implicit
     } yield finalized.inputMaps.head.finalizedScriptWitnessOpt.get.scriptWitness
   }
 
+  override def releaseCoins(coins: Vector[OutputReference]): Future[Unit] = {
+    // todo add unreserveInputs to clightning
+    Future.unit
+  }
+
   override def signPSBT(
       unsigned: PSBT,
       outputRefs: Vector[OutputReference]): Future[PSBT] = {
