@@ -18,6 +18,8 @@ sealed trait RoundDetails {
   def order: Int = status.order
   def status: ClientStatus
   def transactionTypes: Vector[TransactionType]
+  def requeue: Boolean
+  def setRequeue(requeue: Boolean): RoundDetails
 }
 
 sealed trait PendingRoundDetails extends RoundDetails {
@@ -30,36 +32,55 @@ sealed trait PendingRoundDetails extends RoundDetails {
   def updateFeeRate(feeRate: SatoshisPerVirtualByte): PendingRoundDetails
 }
 
-case object NoDetails extends RoundDetails {
+case class NoDetails(requeue: Boolean) extends RoundDetails {
   override val status: ClientStatus = ClientStatus.NoDetails
   override val transactionTypes: Vector[TransactionType] = Vector.empty
 
+  override def setRequeue(requeue: Boolean): NoDetails =
+    copy(requeue = requeue)
+
   def nextStage(round: RoundParameters): KnownRound = {
-    KnownRound(round)
+    KnownRound(requeue, round)
   }
 }
 
-case class KnownRound(round: RoundParameters) extends PendingRoundDetails {
+case class KnownRound(requeue: Boolean, round: RoundParameters)
+    extends PendingRoundDetails {
   override val status: ClientStatus = ClientStatus.KnownRound
 
+  override def setRequeue(requeue: Boolean): KnownRound =
+    copy(requeue = requeue)
+
   def nextStage(nonce: SchnorrNonce): ReceivedNonce =
-    ReceivedNonce(round, nonce)
+    ReceivedNonce(requeue, round, nonce)
 
   override def updateFeeRate(feeRate: SatoshisPerVirtualByte): KnownRound = {
     copy(round = round.copy(feeRate = feeRate))
   }
 }
 
-case class ReceivedNonce(round: RoundParameters, nonce: SchnorrNonce)
+case class ReceivedNonce(
+    requeue: Boolean,
+    round: RoundParameters,
+    nonce: SchnorrNonce)
     extends PendingRoundDetails {
   override val status: ClientStatus = ClientStatus.ReceivedNonce
+
+  override def setRequeue(requeue: Boolean): ReceivedNonce =
+    copy(requeue = requeue)
 
   def nextStage(
       inputs: Vector[OutputReference],
       addressOpt: Option[BitcoinAddress],
       nodeIdOpt: Option[NodeId],
       peerAddrOpt: Option[InetSocketAddress]): InputsScheduled =
-    InputsScheduled(round, nonce, inputs, addressOpt, nodeIdOpt, peerAddrOpt)
+    InputsScheduled(requeue = requeue,
+                    round = round,
+                    nonce = nonce,
+                    inputs = inputs,
+                    addressOpt = addressOpt,
+                    nodeIdOpt = nodeIdOpt,
+                    peerAddrOpt = peerAddrOpt)
 
   override def updateFeeRate(feeRate: SatoshisPerVirtualByte): ReceivedNonce = {
     copy(round = round.copy(feeRate = feeRate))
@@ -67,6 +88,7 @@ case class ReceivedNonce(round: RoundParameters, nonce: SchnorrNonce)
 }
 
 case class InputsScheduled(
+    requeue: Boolean,
     round: RoundParameters,
     nonce: SchnorrNonce,
     inputs: Vector[OutputReference],
@@ -76,12 +98,16 @@ case class InputsScheduled(
     extends PendingRoundDetails {
   override val status: ClientStatus = ClientStatus.InputsScheduled
 
+  override def setRequeue(requeue: Boolean): InputsScheduled =
+    copy(requeue = requeue)
+
   def nextStage(
       initDetails: InitDetails,
       inputFee: CurrencyUnit,
       outputFee: CurrencyUnit,
       changeOutputFee: CurrencyUnit): InputsRegistered =
-    InputsRegistered(round = round,
+    InputsRegistered(requeue = requeue,
+                     round = round,
                      inputFee = inputFee,
                      outputFee = outputFee,
                      changeOutputFee = changeOutputFee,
@@ -128,6 +154,7 @@ sealed trait InitializedRound extends RoundDetails {
       round: RoundParameters,
       nonce: SchnorrNonce): InputsScheduled =
     InputsScheduled(
+      requeue = requeue,
       round = round,
       nonce = nonce,
       inputs = initDetails.inputs,
@@ -138,6 +165,7 @@ sealed trait InitializedRound extends RoundDetails {
 }
 
 case class InputsRegistered(
+    requeue: Boolean,
     round: RoundParameters,
     inputFee: CurrencyUnit,
     outputFee: CurrencyUnit,
@@ -147,16 +175,21 @@ case class InputsRegistered(
     extends InitializedRound {
   override val status: ClientStatus = ClientStatus.InputsRegistered
 
+  override def setRequeue(requeue: Boolean): InputsRegistered =
+    copy(requeue = requeue)
+
   def nextStage: OutputRegistered =
-    OutputRegistered(round,
-                     inputFee,
-                     outputFee,
-                     changeOutputFee,
-                     nonce,
-                     initDetails)
+    OutputRegistered(requeue = requeue,
+                     round = round,
+                     inputFee = inputFee,
+                     outputFee = outputFee,
+                     changeOutputFee = changeOutputFee,
+                     nonce = nonce,
+                     initDetails = initDetails)
 }
 
 case class OutputRegistered(
+    requeue: Boolean,
     round: RoundParameters,
     inputFee: CurrencyUnit,
     outputFee: CurrencyUnit,
@@ -166,17 +199,22 @@ case class OutputRegistered(
     extends InitializedRound {
   override val status: ClientStatus = ClientStatus.OutputRegistered
 
+  override def setRequeue(requeue: Boolean): OutputRegistered =
+    copy(requeue = requeue)
+
   def nextStage(psbt: PSBT): PSBTSigned =
-    PSBTSigned(round,
-               inputFee,
-               outputFee,
-               changeOutputFee,
-               nonce,
-               initDetails,
-               psbt)
+    PSBTSigned(requeue = requeue,
+               round = round,
+               inputFee = inputFee,
+               outputFee = outputFee,
+               changeOutputFee = changeOutputFee,
+               nonce = nonce,
+               initDetails = initDetails,
+               psbt = psbt)
 }
 
 case class PSBTSigned(
+    requeue: Boolean,
     round: RoundParameters,
     inputFee: CurrencyUnit,
     outputFee: CurrencyUnit,
@@ -187,7 +225,7 @@ case class PSBTSigned(
     extends InitializedRound {
   override val status: ClientStatus = ClientStatus.PSBTSigned
 
-  val channelOutpoint: TransactionOutPoint = {
+  val targetOutpoint: TransactionOutPoint = {
     val txId = psbt.transaction.txId
     val vout = UInt32(
       psbt.transaction.outputs.indexWhere(
@@ -211,6 +249,9 @@ case class PSBTSigned(
 
   lazy val targetSpk: ScriptPubKey = initDetails.targetOutput.scriptPubKey
 
+  override def setRequeue(requeue: Boolean): PSBTSigned =
+    copy(requeue = requeue)
+
   def nextStage: NoDetails.type = NoDetails
 }
 
@@ -218,9 +259,9 @@ object RoundDetails {
 
   def getRoundParamsOpt(details: RoundDetails): Option[RoundParameters] = {
     details match {
-      case NoDetails                  => None
+      case _: NoDetails               => None
       case known: KnownRound          => Some(known.round)
-      case ReceivedNonce(round, _)    => Some(round)
+      case ReceivedNonce(_, round, _) => Some(round)
       case scheduled: InputsScheduled => Some(scheduled.round)
       case round: InitializedRound    => Some(round.round)
     }
@@ -228,16 +269,17 @@ object RoundDetails {
 
   def getNonceOpt(details: RoundDetails): Option[SchnorrNonce] = {
     details match {
-      case NoDetails | _: KnownRound  => None
-      case ReceivedNonce(_, nonce)    => Some(nonce)
-      case scheduled: InputsScheduled => Some(scheduled.nonce)
-      case round: InitializedRound    => Some(round.nonce)
+      case _: NoDetails | _: KnownRound => None
+      case ReceivedNonce(_, _, nonce)   => Some(nonce)
+      case scheduled: InputsScheduled   => Some(scheduled.nonce)
+      case round: InitializedRound      => Some(round.nonce)
     }
   }
 
   def getInitDetailsOpt(details: RoundDetails): Option[InitDetails] = {
     details match {
-      case NoDetails | _: KnownRound | _: ReceivedNonce | _: InputsScheduled =>
+      case _: NoDetails | _: KnownRound | _: ReceivedNonce |
+          _: InputsScheduled =>
         None
       case round: InitializedRound =>
         Some(round.initDetails)

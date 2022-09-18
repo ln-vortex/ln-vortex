@@ -46,7 +46,9 @@ case class VortexClient[+T <: VortexWalletApi](
 
   private val coordinatorName: String = coordinatorAddress.name
 
-  private var roundDetails: RoundDetails = NoDetails
+  private var roundDetails: RoundDetails = NoDetails(false)
+
+  private def requeue: Boolean = roundDetails.requeue
 
   // only used for debugging / testing
   private[client] def setRoundDetails(details: RoundDetails): Unit =
@@ -54,15 +56,20 @@ case class VortexClient[+T <: VortexWalletApi](
 
   def getCurrentRoundDetails: RoundDetails = roundDetails
 
+  def setRequeue(bool: Boolean): Unit = {
+    logger.debug(s"Setting requeue to: $bool")
+    roundDetails = roundDetails.setRequeue(bool)
+  }
+
   private[lnvortex] def setRound(params: RoundParameters): Future[Unit] = {
     if (VortexClient.knownVersions.contains(params.version)) {
       roundDetails match {
-        case NoDetails | _: ReceivedNonce | _: KnownRound |
+        case _: NoDetails | _: ReceivedNonce | _: KnownRound |
             _: InputsScheduled =>
           logger.debug(
             s"Received round parameters from coordinator $coordinatorName")
           logger.trace(s"Round Parameters: $params")
-          roundDetails = KnownRound(params)
+          roundDetails = KnownRound(requeue, params)
           Future.unit
         case state: InitializedRound =>
           // Potential race condition here
@@ -97,7 +104,7 @@ case class VortexClient[+T <: VortexWalletApi](
             // todo verify inputs are okay
             ()
         }
-      case state @ (NoDetails | _: InitializedRound) =>
+      case state @ (_: NoDetails | _: InitializedRound) =>
         logger.debug(
           s"Received new fee rate, but cannot update at state $state")
         ()
@@ -153,7 +160,7 @@ case class VortexClient[+T <: VortexWalletApi](
   def askNonce(): Future[SchnorrNonce] = {
     logger.info("Asking nonce from coordinator")
     roundDetails match {
-      case KnownRound(round) =>
+      case KnownRound(_, round) =>
         for {
           _ <- startRegistration(round.roundId)
           _ = logger.debug("Awaiting response from coordinator")
@@ -170,7 +177,7 @@ case class VortexClient[+T <: VortexWalletApi](
           logger.info(s"Got nonce from coordinator $nonce")
           nonce
         }
-      case state @ (NoDetails | _: ReceivedNonce | _: InputsScheduled |
+      case state @ (_: NoDetails | _: ReceivedNonce | _: InputsScheduled |
           _: InitializedRound) =>
         Future.failed(
           new IllegalStateException(s"Cannot ask nonce at state $state"))
@@ -179,7 +186,7 @@ case class VortexClient[+T <: VortexWalletApi](
 
   private[lnvortex] def storeNonce(nonce: SchnorrNonce): Unit = {
     roundDetails match {
-      case state @ (NoDetails | _: ReceivedNonce | _: InitializedRound |
+      case state @ (_: NoDetails | _: ReceivedNonce | _: InitializedRound |
           _: InputsScheduled) =>
         throw new IllegalStateException(s"Cannot store nonce at state $state")
       case details: KnownRound =>
@@ -189,6 +196,8 @@ case class VortexClient[+T <: VortexWalletApi](
 
   def cancelRegistration(): Future[Unit] = {
     logger.info(s"Canceling registration to $coordinatorName")
+    setRequeue(false)
+
     val originalRound = getCurrentRoundDetails
     getNonceOpt(originalRound) match {
       case Some(nonce) =>
@@ -209,7 +218,7 @@ case class VortexClient[+T <: VortexWalletApi](
 
             releaseCoinsF.map { _ =>
               logger.info(s"Registration canceled to $coordinatorName")
-              roundDetails = KnownRound(roundParams)
+              roundDetails = KnownRound(requeue = false, roundParams)
             }
           } else {
             Future.failed(
@@ -312,7 +321,7 @@ case class VortexClient[+T <: VortexWalletApi](
     require(outputRefs.nonEmpty, "Must include inputs")
     logger.trace(s"queueing coins $outputRefs to $nodeId@$peerAddrOpt")
     roundDetails match {
-      case state @ (NoDetails | _: KnownRound | _: InputsScheduled |
+      case state @ (_: NoDetails | _: KnownRound | _: InputsScheduled |
           _: InputsRegistered | _: OutputRegistered | _: PSBTSigned) =>
         throw new IllegalStateException(
           s"At invalid state $state, cannot queue coins")
@@ -369,7 +378,7 @@ case class VortexClient[+T <: VortexWalletApi](
     require(outputRefs.nonEmpty, "Must include inputs")
     logger.trace(s"queueing coins $outputRefs to $address")
     roundDetails match {
-      case state @ (NoDetails | _: KnownRound | _: InputsScheduled |
+      case state @ (_: NoDetails | _: KnownRound | _: InputsScheduled |
           _: InputsRegistered | _: OutputRegistered | _: PSBTSigned) =>
         throw new IllegalStateException(
           s"At invalid state $state, cannot queue coins")
@@ -418,7 +427,7 @@ case class VortexClient[+T <: VortexWalletApi](
       outputFee: CurrencyUnit,
       changeOutputFee: CurrencyUnit): Future[RegisterInputs] = {
     roundDetails match {
-      case state @ (NoDetails | _: InitializedRound) =>
+      case state @ (_: NoDetails | _: InitializedRound) =>
         Future.failed(
           new IllegalStateException(
             s"At invalid state $state, cannot register coins"))
@@ -551,7 +560,7 @@ case class VortexClient[+T <: VortexWalletApi](
   def processBlindOutputSig(blindOutputSig: FieldElement): RegisterOutput = {
     logger.info("Got blind signature from coordinator, processing...")
     roundDetails match {
-      case state @ (NoDetails | _: KnownRound | _: ReceivedNonce |
+      case state @ (_: NoDetails | _: KnownRound | _: ReceivedNonce |
           _: InputsScheduled | _: OutputRegistered | _: PSBTSigned) =>
         throw new IllegalStateException(
           s"At invalid state $state, cannot processBlindOutputSig")
@@ -592,7 +601,7 @@ case class VortexClient[+T <: VortexWalletApi](
   def validateAndSignPsbt(unsigned: PSBT): Future[PSBT] = {
     logger.info("Received unsigned PSBT from coordinator, verifying...")
     roundDetails match {
-      case state @ (NoDetails | _: KnownRound | _: ReceivedNonce |
+      case state @ (_: NoDetails | _: KnownRound | _: ReceivedNonce |
           _: InputsScheduled | _: InputsRegistered | _: PSBTSigned) =>
         Future.failed(
           new IllegalStateException(
@@ -732,7 +741,7 @@ case class VortexClient[+T <: VortexWalletApi](
 
   def restartRound(msg: RestartRoundMessage): Future[Unit] = {
     roundDetails match {
-      case state @ (NoDetails | _: KnownRound | _: ReceivedNonce |
+      case state @ (_: NoDetails | _: KnownRound | _: ReceivedNonce |
           _: InputsScheduled | _: InputsRegistered | _: OutputRegistered) =>
         throw new IllegalStateException(
           s"At invalid state $state, cannot restartRound")
@@ -745,7 +754,7 @@ case class VortexClient[+T <: VortexWalletApi](
             // channel from the transaction we just showed them, but is
             // now not going to be signed.
             logger.debug("Canceling lightning channel from round")
-            vortexWallet.cancelChannel(state.channelOutpoint, nodeId)
+            vortexWallet.cancelChannel(state.targetOutpoint, nodeId)
           case None => Future.unit
         }
 
@@ -758,16 +767,15 @@ case class VortexClient[+T <: VortexWalletApi](
 
   def completeRound(signedTx: Transaction): Future[Unit] = {
     roundDetails match {
-      case state @ (NoDetails | _: KnownRound | _: ReceivedNonce |
+      case state @ (_: NoDetails | _: KnownRound | _: ReceivedNonce |
           _: InputsScheduled | _: InputsRegistered | _: OutputRegistered) =>
         Future.failed(
           new IllegalStateException(
             s"At invalid state $state, cannot completeRound"))
       case state: PSBTSigned =>
         logger.info("Round complete!")
-        val anonSet = VortexUtils.getAnonymitySet(
-          signedTx,
-          state.channelOutpoint.vout.toInt)
+        val anonSet =
+          VortexUtils.getAnonymitySet(signedTx, state.targetOutpoint.vout.toInt)
 
         logger.info(s"Anonymity Set gained from round: $anonSet")
 
@@ -783,15 +791,43 @@ case class VortexClient[+T <: VortexWalletApi](
             logger.debug(s"Failed to broadcast transaction: ${signedTx.hex}")
           }
 
-        for {
+        val completeRoundF = for {
           _ <- broadcastF
           _ <- vortexWallet
             .labelTransaction(signedTx.txId, s"Vortex Anonymity set: $anonSet")
             .recover(_ => ())
           _ <- utxoDAO.setAnonSets(state, anonSet)
           _ <- disconnectRegistration()
-          _ = roundDetails = NoDetails
+          _ = roundDetails = NoDetails(requeue)
         } yield ()
+
+        val requeueF = completeRoundF.flatMap { _ =>
+          if (requeue) {
+            logger.info("Requeueing round...")
+            // Wait until we have the new round params
+            AsyncUtil
+              .awaitCondition(
+                () => getCurrentRoundDetails.status != ClientStatus.NoDetails,
+                interval = 100.milliseconds,
+                maxTries = 300)
+              .flatMap { _ =>
+                logger.debug("Received new round params, requeueing round...")
+                for {
+                  _ <- askNonce()
+                  addr <- vortexWallet.getNewAddress(state.round.outputType)
+                  _ <- getCoinsAndQueue(Vector(state.targetOutpoint), addr)
+                } yield logger.info("Requeueing round complete!")
+              }
+          } else {
+            Future.unit
+          }
+        }
+
+        requeueF.failed.foreach { err =>
+          logger.error(s"Failed to requeue round: ${err.getMessage}", err)
+        }
+
+        completeRoundF
     }
   }
 }

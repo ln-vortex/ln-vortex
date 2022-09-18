@@ -12,7 +12,7 @@ trait ServerRoute {
 
   def withValidServerCommand[R](validator: Try[R]): Directive1[R] =
     validator.fold(
-      e => reject(ValidationRejection("failure", Some(e))),
+      e => reject(ValidationRejection(e.getMessage, Some(e))),
       provide
     )
 }

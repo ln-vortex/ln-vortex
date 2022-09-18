@@ -90,12 +90,13 @@ class VortexClientTest extends VortexClientFixture {
         targetOutput = targetOutput,
         tweaks = dummyTweaks
       )
-      testState = OutputRegistered(roundParams,
-                                   Satoshis.zero,
-                                   Satoshis.zero,
-                                   Satoshis.zero,
-                                   nonce,
-                                   testDetails)
+      testState = OutputRegistered(requeue = false,
+                                   round = roundParams,
+                                   inputFee = Satoshis.zero,
+                                   outputFee = Satoshis.zero,
+                                   changeOutputFee = Satoshis.zero,
+                                   nonce = nonce,
+                                   initDetails = testDetails)
       _ = vortexClient.setRoundDetails(testState)
 
       inputs = refs
@@ -132,12 +133,13 @@ class VortexClientTest extends VortexClientFixture {
           targetOutput = target,
           tweaks = dummyTweaks
         )
-        testState = OutputRegistered(roundParams,
-                                     Satoshis.zero,
-                                     Satoshis.zero,
-                                     Satoshis.zero,
-                                     nonce,
-                                     testDetails)
+        testState = OutputRegistered(requeue = false,
+                                     round = roundParams,
+                                     inputFee = Satoshis.zero,
+                                     outputFee = Satoshis.zero,
+                                     changeOutputFee = Satoshis.zero,
+                                     nonce = nonce,
+                                     initDetails = testDetails)
         _ = vortexClient.setRoundDetails(testState)
 
         inputs = refs
@@ -174,12 +176,13 @@ class VortexClientTest extends VortexClientFixture {
         targetOutput = target,
         tweaks = dummyTweaks
       )
-      testState = OutputRegistered(roundParams,
-                                   Satoshis.zero,
-                                   Satoshis.zero,
-                                   Satoshis.zero,
-                                   nonce,
-                                   testDetails)
+      testState = OutputRegistered(requeue = false,
+                                   round = roundParams,
+                                   inputFee = Satoshis.zero,
+                                   outputFee = Satoshis.zero,
+                                   changeOutputFee = Satoshis.zero,
+                                   nonce = nonce,
+                                   initDetails = testDetails)
       _ = vortexClient.setRoundDetails(testState)
 
       inputs = refs
@@ -225,12 +228,13 @@ class VortexClientTest extends VortexClientFixture {
           targetOutput = targetOutput,
           tweaks = dummyTweaks
         )
-        testState = OutputRegistered(roundParams,
-                                     Satoshis.zero,
-                                     Satoshis.zero,
-                                     Satoshis.zero,
-                                     nonce,
-                                     testDetails)
+        testState = OutputRegistered(requeue = false,
+                                     round = roundParams,
+                                     inputFee = Satoshis.zero,
+                                     outputFee = Satoshis.zero,
+                                     changeOutputFee = Satoshis.zero,
+                                     nonce = nonce,
+                                     initDetails = testDetails)
         _ = vortexClient.setRoundDetails(testState)
 
         inputs = refs
@@ -267,12 +271,13 @@ class VortexClientTest extends VortexClientFixture {
           targetOutput = targetOutput,
           tweaks = dummyTweaks
         )
-        testState = OutputRegistered(roundParams,
-                                     Satoshis.zero,
-                                     Satoshis.zero,
-                                     Satoshis.zero,
-                                     nonce,
-                                     testDetails)
+        testState = OutputRegistered(requeue = false,
+                                     round = roundParams,
+                                     inputFee = Satoshis.zero,
+                                     outputFee = Satoshis.zero,
+                                     changeOutputFee = Satoshis.zero,
+                                     nonce = nonce,
+                                     initDetails = testDetails)
         _ = vortexClient.setRoundDetails(testState)
 
         inputs = refs
@@ -309,12 +314,13 @@ class VortexClientTest extends VortexClientFixture {
         targetOutput = targetOutput,
         tweaks = dummyTweaks
       )
-      testState = OutputRegistered(roundParams,
-                                   Satoshis.zero,
-                                   Satoshis.zero,
-                                   Satoshis.zero,
-                                   nonce,
-                                   testDetails)
+      testState = OutputRegistered(requeue = false,
+                                   round = roundParams,
+                                   inputFee = Satoshis.zero,
+                                   outputFee = Satoshis.zero,
+                                   changeOutputFee = Satoshis.zero,
+                                   nonce = nonce,
+                                   initDetails = testDetails)
       _ = vortexClient.setRoundDetails(testState)
 
       inputs = refs
@@ -352,12 +358,13 @@ class VortexClientTest extends VortexClientFixture {
           targetOutput = targetOutput,
           tweaks = dummyTweaks
         )
-        testState = OutputRegistered(roundParams,
-                                     Satoshis.zero,
-                                     Satoshis.zero,
-                                     Satoshis.zero,
-                                     nonce,
-                                     testDetails)
+        testState = OutputRegistered(requeue = false,
+                                     round = roundParams,
+                                     inputFee = Satoshis.zero,
+                                     outputFee = Satoshis.zero,
+                                     changeOutputFee = Satoshis.zero,
+                                     nonce = nonce,
+                                     initDetails = testDetails)
         _ = vortexClient.setRoundDetails(testState)
 
         inputs = refs

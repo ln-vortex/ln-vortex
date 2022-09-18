@@ -32,10 +32,11 @@ class ClientServerPairTest
   it must "get the correct round details" in { case (client, coordinator, _) =>
     coordinator.currentRound().map { roundDb =>
       client.getCurrentRoundDetails match {
-        case NoDetails | _: ReceivedNonce | _: InputsScheduled |
+        case _: NoDetails | _: ReceivedNonce | _: InputsScheduled |
             _: InitializedRound =>
           fail("Invalid client round state")
-        case KnownRound(round) =>
+        case KnownRound(requeue, round) =>
+          assert(!requeue)
           assert(round.roundId == roundDb.roundId)
           assert(round.amount == roundDb.amount)
           assert(round.coordinatorFee == roundDb.coordinatorFee)
