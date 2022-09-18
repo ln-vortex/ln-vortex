@@ -125,7 +125,7 @@ case class UTXODAO()(implicit
           (Math.max(1, minPrevAnonSet + anonSet - 1), None)
         }
 
-      val outputDb = UTXODb(state.channelOutpoint,
+      val outputDb = UTXODb(state.targetOutpoint,
                             state.targetSpk,
                             newAnonSet,
                             warning = warning,

@@ -85,6 +85,7 @@ trait DualClientFixture
           _ <-
             if (!isNetworkingTest) {
               coordinator.connectionHandlerMap.clear()
+              coordinator.roundSubscribers.clear()
               clientA.stop().flatMap(_ => clientB.stop())
             } else Future.unit
         } yield (clientA, clientB, coordinator)

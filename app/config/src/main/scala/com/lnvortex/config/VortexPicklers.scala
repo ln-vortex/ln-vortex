@@ -196,7 +196,7 @@ object VortexPicklers {
   implicit val RoundDetailsWrites: OWrites[RoundDetails] =
     (details: RoundDetails) => {
       val original = details match {
-        case NoDetails            => JsObject(Vector.empty)
+        case nd: NoDetails        => Json.writes[NoDetails].writes(nd)
         case kr: KnownRound       => Json.writes[KnownRound].writes(kr)
         case rn: ReceivedNonce    => Json.writes[ReceivedNonce].writes(rn)
         case is: InputsScheduled  => Json.writes[InputsScheduled].writes(is)

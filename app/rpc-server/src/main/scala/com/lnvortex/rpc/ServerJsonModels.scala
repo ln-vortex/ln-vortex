@@ -38,7 +38,8 @@ case class QueueCoins(
     outpoints: Vector[TransactionOutPoint],
     address: Option[BitcoinAddress],
     nodeId: Option[NodeId],
-    peerAddr: Option[InetSocketAddress]) {
+    peerAddr: Option[InetSocketAddress],
+    requeue: Boolean) {
 
   require(!(address.isDefined && nodeId.isDefined),
           "Cannot have nodeId and address set")
@@ -76,7 +77,8 @@ object QueueCoins extends ServerJsonModels {
 
             Some(res)
           }
-        } else None
+        } else None,
+        Try(json("requeue").bool).getOrElse(false)
       ))
 
   def fromJsObj(obj: ujson.Obj): Try[QueueCoins] = {

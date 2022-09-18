@@ -61,6 +61,7 @@ class RoundDetailsTest extends BitcoinSUnitTest {
 
   it must "calculate expected change amount" in {
     val details = InputsRegistered(
+      requeue = false,
       round = roundParams,
       inputFee = Satoshis(149),
       outputFee = Satoshis(43),
@@ -78,6 +79,7 @@ class RoundDetailsTest extends BitcoinSUnitTest {
 
   it must "calculate expected change amount with no change" in {
     val details = InputsRegistered(
+      requeue = false,
       round = roundParams,
       inputFee = Satoshis(149),
       outputFee = Satoshis(43),

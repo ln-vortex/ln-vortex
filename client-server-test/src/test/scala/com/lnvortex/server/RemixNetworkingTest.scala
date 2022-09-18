@@ -3,6 +3,7 @@ package com.lnvortex.server
 import akka.http.scaladsl.model.ws.Message
 import akka.stream.OverflowStrategy
 import akka.stream.scaladsl._
+import com.lnvortex.core.{ClientStatus, InputsScheduled}
 import com.lnvortex.core.ClientStatus._
 import com.lnvortex.testkit._
 import org.bitcoins.core.script.ScriptType
@@ -18,7 +19,7 @@ class RemixNetworkingTest
     extends DualClientFixture
     with ClientServerTestUtils
     with EmbeddedPg {
-  override val isNetworkingTest = false
+  override val isNetworkingTest = true
   override val outputScriptType: ScriptType = WITNESS_V1_TAPROOT
   override val changeScriptType: ScriptType = WITNESS_V1_TAPROOT
   override val inputScriptType: ScriptType = WITNESS_V1_TAPROOT
@@ -60,14 +61,20 @@ class RemixNetworkingTest
       addrB <- clientB.vortexWallet.getNewAddress(
         nextCoordinator.roundParams.outputType)
 
-      _ <- TestAsyncUtil.awaitCondition(
-        () => {
-          clientA.getCurrentRoundDetails.order == KnownRound.order &&
-          clientB.getCurrentRoundDetails.order == KnownRound.order
-        },
-        interval = interval,
-        maxTries = maxTries
-      )
+      _ <- TestAsyncUtil
+        .awaitCondition(
+          () => {
+            clientA.getCurrentRoundDetails.order == KnownRound.order &&
+            clientB.getCurrentRoundDetails.order == KnownRound.order
+          },
+          interval = interval,
+          maxTries = maxTries
+        )
+        .recoverWith { case _: Throwable =>
+          fail(
+            s"clientA status: ${clientA.getCurrentRoundDetails.status}, " +
+              s"clientB status: ${clientB.getCurrentRoundDetails.status}")
+        }
 
       _ <- clientA.askNonce()
       _ <- clientB.askNonce()
@@ -107,6 +114,51 @@ class RemixNetworkingTest
 
       assert(coinsA.count(_.anonSet == 3) == 1)
       assert(coinsB.count(_.anonSet == 2) == 2)
+    }
+  }
+
+  it must "requeue" in { case (clientA, clientB, coordinator) =>
+    clientA.setRequeue(true)
+
+    for {
+      addrA <- clientA.vortexWallet.getNewAddress(
+        coordinator.roundParams.outputType)
+
+      addrB <- clientB.vortexWallet.getNewAddress(
+        coordinator.roundParams.outputType)
+
+      _ <- clientA.askNonce()
+      _ <- clientB.askNonce()
+      // don't select all coins
+      utxosA <- clientA.listCoins().map(c => Random.shuffle(c).take(1))
+      _ = clientA.queueCoins(utxosA.map(_.outputReference), addrA)
+      utxosB <- clientB.listCoins().map(c => Random.shuffle(c).take(1))
+      _ = clientB.queueCoins(utxosB.map(_.outputReference), addrB)
+
+      txId <- coordinator.getCompletedTx.map(_.txIdBE)
+
+      _ <- TestAsyncUtil
+        .awaitCondition(
+          () => {
+            clientA.getCurrentRoundDetails.status == ClientStatus.InputsScheduled
+          },
+          interval = interval,
+          maxTries = maxTries)
+        .recoverWith { case _: Throwable =>
+          fail(s"clientA status: ${clientA.getCurrentRoundDetails.status}")
+        }
+    } yield {
+      // verify we are still requeueing
+      assert(clientA.getCurrentRoundDetails.requeue)
+      // verify we are now at inputs scheduled
+      assert(
+        clientA.getCurrentRoundDetails.status == ClientStatus.InputsScheduled)
+      // verify correct inputs are requeued
+      assert(
+        clientA.getCurrentRoundDetails
+          .asInstanceOf[InputsScheduled]
+          .inputs
+          .exists(_.outPoint.txIdBE == txId))
     }
   }
 }

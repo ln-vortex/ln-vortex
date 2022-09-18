@@ -7,13 +7,16 @@ import com.lnvortex.client._
 import com.lnvortex.config.VortexPicklers._
 import com.lnvortex.core.RoundDetails.getRoundParamsOpt
 import com.lnvortex.core.api.VortexWalletApi
+import grizzled.slf4j.Logging
 import play.api.libs.json._
 
 import scala.concurrent._
 
-case class LnVortexRoutes(clientManager: VortexClientManager[VortexWalletApi])(
-    implicit system: ActorSystem)
-    extends ServerRoute {
+case class VortexClientRpcRoutes(
+    clientManager: VortexClientManager[VortexWalletApi])(implicit
+    system: ActorSystem)
+    extends ServerRoute
+    with Logging {
   implicit val ec: ExecutionContext = system.dispatcher
 
   def getClient(coordinator: String): VortexClient[VortexWalletApi] = {
@@ -96,9 +99,11 @@ case class LnVortexRoutes(clientManager: VortexClientManager[VortexWalletApi])(
                         outpoints,
                         addrOpt,
                         nodeIdOpt,
-                        peerAddrOpt) =>
+                        peerAddrOpt,
+                        requeue) =>
           complete {
             val client = getClient(coordinator)
+            client.setRequeue(requeue)
             val f = client.askNonce().flatMap { _ =>
               (addrOpt, nodeIdOpt) match {
                 case (Some(_), Some(_)) =>
@@ -109,9 +114,11 @@ case class LnVortexRoutes(clientManager: VortexClientManager[VortexWalletApi])(
                 case (None, Some(nodeId)) =>
                   client.getCoinsAndQueue(outpoints, nodeId, peerAddrOpt)
                 case (None, None) =>
+                  val outputType = getRoundParamsOpt(
+                    client.getCurrentRoundDetails).get.outputType
+
                   for {
-                    addr <- client.vortexWallet.getNewAddress(getRoundParamsOpt(
-                      client.getCurrentRoundDetails).get.outputType)
+                    addr <- client.vortexWallet.getNewAddress(outputType)
                     _ <- client.getCoinsAndQueue(outpoints, addr)
                   } yield ()
               }
@@ -119,6 +126,7 @@ case class LnVortexRoutes(clientManager: VortexClientManager[VortexWalletApi])(
 
             f.recoverWith { case ex: Throwable =>
               client.cancelRegistration().recover(_ => ())
+              logger.error("Failed to queue coins: ", ex)
               Future.failed(ex)
             }.map(_ => RpcServer.httpSuccess(id, JsNull))
           }

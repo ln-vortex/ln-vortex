@@ -75,7 +75,10 @@ trait ClientServerPairFixture
             client.getCurrentRoundDetails.order > 0)
 
           // don't send message if not networking test
-          _ = if (!isNetworkingTest) coordinator.connectionHandlerMap.clear()
+          _ = if (!isNetworkingTest) {
+            coordinator.connectionHandlerMap.clear()
+            coordinator.roundSubscribers.clear()
+          }
         } yield (client, coordinator, peerLnd)
       },
       { case (client, coordinator, peerLnd) =>

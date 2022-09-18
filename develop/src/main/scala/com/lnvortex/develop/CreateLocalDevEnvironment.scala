@@ -115,7 +115,7 @@ object CreateLocalDevEnvironment extends App with Logging {
     val configStartF = serverConfig.start()
 
     val server = RpcServer(
-      handlers = Vector(LnVortexRoutes(clientManager)),
+      handlers = Vector(VortexClientRpcRoutes(clientManager)),
       rpcBindOpt = serverConfig.rpcBind,
       rpcPort = serverConfig.rpcPort,
       rpcUser = serverConfig.rpcUsername,
