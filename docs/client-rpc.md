@@ -215,6 +215,7 @@ Or you can set neither and LnVortex will generate an address to do the collabora
 - address: String - optional, address to do the collaborative transaction to
 - nodeId: String - optional, the node's pubkey to open the channel to
 - peerAddr: String - optional, IP or Onion Service's address of the peer
+- requeue: Boolean - optional, if the coins should be requeued automatically for the next round
 
 #### Response
 
