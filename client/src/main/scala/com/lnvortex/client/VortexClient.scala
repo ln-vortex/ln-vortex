@@ -44,6 +44,8 @@ case class VortexClient[+T <: VortexWalletApi](
 
   lazy val utxoDAO: UTXODAO = UTXODAO()
 
+  private val coordinatorName: String = coordinatorAddress.name
+
   private var roundDetails: RoundDetails = NoDetails
 
   // only used for debugging / testing
@@ -52,12 +54,15 @@ case class VortexClient[+T <: VortexWalletApi](
 
   def getCurrentRoundDetails: RoundDetails = roundDetails
 
-  private[lnvortex] def setRound(adv: RoundParameters): Future[Unit] = {
-    if (VortexClient.knownVersions.contains(adv.version)) {
+  private[lnvortex] def setRound(params: RoundParameters): Future[Unit] = {
+    if (VortexClient.knownVersions.contains(params.version)) {
       roundDetails match {
         case NoDetails | _: ReceivedNonce | _: KnownRound |
             _: InputsScheduled =>
-          roundDetails = KnownRound(adv)
+          logger.debug(
+            s"Received round parameters from coordinator $coordinatorName")
+          logger.trace(s"Round Parameters: $params")
+          roundDetails = KnownRound(params)
           Future.unit
         case state: InitializedRound =>
           // Potential race condition here
@@ -66,7 +71,7 @@ case class VortexClient[+T <: VortexWalletApi](
             .awaitCondition(() => !roundDetails.isInstanceOf[InitializedRound],
                             interval = 100.milliseconds,
                             maxTries = 300)
-            .flatMap(_ => setRound(adv))
+            .flatMap(_ => setRound(params))
             .recoverWith { _ =>
               Future.failed(
                 new IllegalStateException(
@@ -75,13 +80,15 @@ case class VortexClient[+T <: VortexWalletApi](
       }
     } else {
       Future.failed(new RuntimeException(
-        s"Received unknown version ${adv.version}, consider updating software"))
+        s"Received unknown version ${params.version}, consider updating software"))
     }
   }
 
   protected def updateFeeRate(feeRate: SatoshisPerVirtualByte): Unit = {
     roundDetails match {
       case details: PendingRoundDetails =>
+        logger.debug(
+          s"Received new fee rate from coordinator $coordinatorName: $feeRate")
         roundDetails = details.updateFeeRate(feeRate)
         details match {
           case _: KnownRound | _: ReceivedNonce =>
@@ -108,6 +115,7 @@ case class VortexClient[+T <: VortexWalletApi](
   }
 
   def listCoins(): Future[Vector[UnspentCoin]] = {
+    logger.trace("Returning wallet's coins")
     for {
       coins <- vortexWallet.listCoins()
       utxoDbs <- utxoDAO.createOutPointMap(coins.map(_.outPoint))
@@ -126,6 +134,7 @@ case class VortexClient[+T <: VortexWalletApi](
   }
 
   def listChannels(): Future[Vector[ChannelDetails]] = {
+    logger.trace("Returning wallet's channels")
     for {
       channels <- vortexWallet.listChannels()
       utxoDbs <- utxoDAO.createOutPointMap(channels.map(_.outPoint))
@@ -147,6 +156,7 @@ case class VortexClient[+T <: VortexWalletApi](
       case KnownRound(round) =>
         for {
           _ <- startRegistration(round.roundId)
+          _ = logger.debug("Awaiting response from coordinator")
           _ <- AsyncUtil
             .awaitCondition(() => getNonceOpt(roundDetails).isDefined,
                             interval = 100.milliseconds,
@@ -199,6 +209,7 @@ case class VortexClient[+T <: VortexWalletApi](
       amount: CurrencyUnit,
       nodeId: NodeId,
       peerAddrOpt: Option[InetSocketAddress]): Future[Unit] = {
+    logger.debug(s"Verifying $nodeId's min chan size is below $amount")
     val connectF = vortexWallet.isConnected(nodeId).flatMap { connected =>
       if (!connected) {
         peerAddrOpt match {
@@ -282,6 +293,7 @@ case class VortexClient[+T <: VortexWalletApi](
       nodeId: NodeId,
       peerAddrOpt: Option[InetSocketAddress]): Future[Unit] = {
     require(outputRefs.nonEmpty, "Must include inputs")
+    logger.trace(s"queueing coins $outputRefs to $nodeId@$peerAddrOpt")
     roundDetails match {
       case state @ (NoDetails | _: KnownRound | _: InputsScheduled |
           _: InputsRegistered | _: OutputRegistered | _: PSBTSigned) =>
@@ -338,6 +350,7 @@ case class VortexClient[+T <: VortexWalletApi](
       outputRefs: Vector[OutputReference],
       address: BitcoinAddress): Unit = {
     require(outputRefs.nonEmpty, "Must include inputs")
+    logger.trace(s"queueing coins $outputRefs to $address")
     roundDetails match {
       case state @ (NoDetails | _: KnownRound | _: InputsScheduled |
           _: InputsRegistered | _: OutputRegistered | _: PSBTSigned) =>
@@ -395,12 +408,15 @@ case class VortexClient[+T <: VortexWalletApi](
       case _: KnownRound | _: ReceivedNonce =>
         // Sometimes we get the AskInputs before the round details + nonce,
         // so we need to wait for the round details to be set.
+        logger.debug(
+          "Received AskInputs before expected, waiting until inputs are scheduled")
         AsyncUtil
           .awaitCondition(
             () => roundDetails.status == ClientStatus.InputsScheduled,
             interval = 100.milliseconds,
             maxTries = 300)
           .recover { _ =>
+            logger.debug("Inputs were never scheduled")
             throw new IllegalStateException(
               s"At invalid state ${roundDetails.status}, cannot register coins")
           }
@@ -421,9 +437,16 @@ case class VortexClient[+T <: VortexWalletApi](
 
         val needsChange = changeAmt >= Policy.dustThreshold
 
+        if (logger.isDebugEnabled && needsChange) {
+          logger.debug(s"Calculated change amount: $changeAmt")
+        } else if (logger.isDebugEnabled) {
+          logger.debug("No change will be used for this round")
+        }
+
         // Reserve utxos until 10 minutes after the round is scheduled.
         val timeUtilRound = round.time + 600 - TimeUtil.currentEpochSecond
 
+        logger.debug("Creating input proofs")
         for {
           inputProofs <- FutureUtil.sequentially(outputRefs)(
             vortexWallet
@@ -434,12 +457,14 @@ case class VortexClient[+T <: VortexWalletApi](
           }
 
           changeAddrOpt <-
-            if (needsChange)
+            if (needsChange) {
+              logger.debug("Generating change address")
               vortexWallet.getChangeAddress(round.changeType).map(Some(_))
-            else FutureUtil.none
+            } else FutureUtil.none
 
           channelDetails <- scheduled.nodeIdOpt match {
             case Some(nodeId) =>
+              logger.debug(s"Initializing channel open to $nodeId")
               vortexWallet
                 .initChannelOpen(nodeId = nodeId,
                                  peerAddrOpt = scheduled.peerAddrOpt,
@@ -460,7 +485,9 @@ case class VortexClient[+T <: VortexWalletApi](
                     Future.failed(new InvalidTargetOutputException(
                       s"Need a ${round.outputType} address, got ${addr.scriptPubKey.scriptType}"))
                   }
-                case None => vortexWallet.getNewAddress(round.outputType)
+                case None =>
+                  logger.debug("Generating address for round")
+                  vortexWallet.getNewAddress(round.outputType)
               }
 
               addressF.map { addr =>
@@ -470,6 +497,8 @@ case class VortexClient[+T <: VortexWalletApi](
           }
         } yield {
           val targetOutput = channelDetails.output
+
+          logger.debug("Generating blinding details...")
           val hashedOutput =
             RegisterOutput.calculateChallenge(targetOutput, round.roundId)
 
@@ -517,6 +546,8 @@ case class VortexClient[+T <: VortexWalletApi](
 
         val challenge =
           RegisterOutput.calculateChallenge(targetOutput, details.round.roundId)
+
+        logger.debug("Unblinding signature from coordinator")
         val sig = BlindSchnorrUtil.unblindSignature(blindSig = blindOutputSig,
                                                     signerPubKey = publicKey,
                                                     signerNonce = nonce,
@@ -550,6 +581,7 @@ case class VortexClient[+T <: VortexWalletApi](
           new IllegalStateException(
             s"At invalid state $state, cannot validateAndSignPsbt"))
       case state: OutputRegistered =>
+        logger.trace("Getting current block height")
         vortexWallet.getBlockHeight().flatMap { height =>
           val inputs: Vector[OutputReference] = state.initDetails.inputs
           lazy val myOutpoints = inputs.map(_.outPoint)
@@ -597,13 +629,15 @@ case class VortexClient[+T <: VortexWalletApi](
 
           lazy val noDust = tx.outputs.forall(_.value >= Policy.dustThreshold)
 
-          lazy val goodFeeRate = {
+          lazy val estimateFeeRate = {
+            logger.debug("Verifying transaction has a valid fee rate")
             val inputAmt = unsigned.inputMaps
               .flatMap(_.witnessUTXOOpt)
               .map(_.witnessUTXO.value)
               .sum
 
             // add fake signatures so we can correctly estimate the size
+            logger.trace("Adding fake signatures to transaction")
             val signedPsbt =
               unsigned.inputMaps.zipWithIndex.foldLeft(unsigned) {
                 case (psbt, (_, index)) =>
@@ -623,10 +657,7 @@ case class VortexClient[+T <: VortexWalletApi](
 
             val dummySigned = signedPsbt.extractTransaction
 
-            val feeRate =
-              SatoshisPerVirtualByte.calc(inputAmt, dummySigned)
-
-            feeRate.toLong >= 1
+            SatoshisPerVirtualByte.calc(inputAmt, dummySigned)
           }
 
           if (!goodLockTime) {
@@ -656,9 +687,10 @@ case class VortexClient[+T <: VortexWalletApi](
           } else if (!correctOutputTypes) {
             Future.failed(new InvalidOutputTypeException(
               s"Expected output type ${state.round.outputType} & ${state.round.changeType}"))
-          } else if (!goodFeeRate) {
+          } else if (estimateFeeRate.toLong < 1) {
             Future.failed(
-              new TooLowOfFeeException("Transaction has a too low fee"))
+              new TooLowOfFeeException(
+                s"Transaction has a too low fee, $estimateFeeRate"))
           } else {
             logger.info("PSBT is valid, giving channel peer...")
             for {
@@ -692,6 +724,10 @@ case class VortexClient[+T <: VortexWalletApi](
 
         val cancelF = state.initDetails.nodeIdOpt match {
           case Some(nodeId) =>
+            // We need to cancel the channel because the peer expects the
+            // channel from the transaction we just showed them, but is
+            // now not going to be signed.
+            logger.debug("Canceling lightning channel from round")
             vortexWallet.cancelChannel(state.channelOutpoint, nodeId)
           case None => Future.unit
         }
@@ -718,11 +754,22 @@ case class VortexClient[+T <: VortexWalletApi](
 
         logger.info(s"Anonymity Set gained from round: $anonSet")
 
+        // Recover failed broadcasts because we should expect
+        // the coordinator or one of the other clients to broadcast.
+        // We still want to label the transaction and account for it in
+        // our database to update anon sets.
+        val broadcastF = vortexWallet
+          .broadcastTransaction(signedTx)
+          .recover { _ =>
+            logger.warn(
+              s"Failed to broadcast transaction: ${signedTx.txIdBE.hex}")
+            logger.debug(s"Failed to broadcast transaction: ${signedTx.hex}")
+          }
+
         for {
-          _ <- vortexWallet.broadcastTransaction(signedTx)
+          _ <- broadcastF
           _ <- vortexWallet
-            .labelTransaction(signedTx.txId,
-                              s"LnVortex Anonymity set: $anonSet")
+            .labelTransaction(signedTx.txId, s"Vortex Anonymity set: $anonSet")
             .recover(_ => ())
           _ <- utxoDAO.setAnonSets(state, anonSet)
           _ <- disconnectRegistration()
