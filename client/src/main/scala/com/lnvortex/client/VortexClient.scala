@@ -836,6 +836,7 @@ case class VortexClient[+T <: VortexWalletApi](
 object VortexClient {
   val knownVersions: Vector[Int] = Vector(0)
 
+  // $COVERAGE-OFF
   def getDummyWitness(
       scriptType: ScriptType): (ScriptSignature, Option[ScriptWitness]) = {
     scriptType match {
@@ -873,4 +874,5 @@ object VortexClient {
         (scriptSig, Some(dummyWit))
     }
   }
+  // $COVERAGE-ON
 }

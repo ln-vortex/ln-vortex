@@ -35,6 +35,7 @@ case class CLightningVortexWallet(clightning: CLightningRpcClient)(implicit
     clightning.getInfo.map(_.blockheight)
   }
 
+  // $COVERAGE-OFF
   private def addressTypeFromScriptType(scriptType: ScriptType): AddressType = {
     scriptType match {
       case tpe @ (ScriptType.PUBKEY | ScriptType.NONSTANDARD |
@@ -54,6 +55,7 @@ case class CLightningVortexWallet(clightning: CLightningRpcClient)(implicit
         throw new IllegalArgumentException("Waiting on cln to support taproot")
     }
   }
+  // $COVERAGE-ON
 
   override def getNewAddress(scriptType: ScriptType): Future[BitcoinAddress] = {
     val addressType = addressTypeFromScriptType(scriptType)
