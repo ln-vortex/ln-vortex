@@ -78,11 +78,6 @@ case class AliceDAO()(implicit
       .map(_.toVector)
   }
 
-  def findRegisteredForRound(
-      roundId: DoubleSha256Digest): Future[Vector[AliceDb]] = {
-    safeDatabase.run(findRegisteredForRoundAction(roundId))
-  }
-
   def numRegisteredForRoundAction(
       roundId: DoubleSha256Digest): DBIOAction[Int,
                                                profile.api.NoStream,
@@ -93,24 +88,6 @@ case class AliceDAO()(implicit
       .distinct
       .size
       .result
-  }
-
-  def numRegisteredForRound(roundId: DoubleSha256Digest): Future[Int] = {
-    val action = numRegisteredForRoundAction(roundId)
-
-    safeDatabase.run(action)
-  }
-
-  def getPeerIdSigMapAction(
-      roundId: DoubleSha256Digest): DBIOAction[Vector[(Sha256Digest,
-                                                       FieldElement)],
-                                               NoStream,
-                                               Effect.Read] = {
-    table
-      .filter(t => t.roundId === roundId && t.blindOutputSigOpt.isDefined)
-      .map(t => (t.peerId, t.blindOutputSigOpt.get))
-      .result
-      .map(_.toVector)
   }
 
   def findSignedForRoundAction(
@@ -138,10 +115,6 @@ case class AliceDAO()(implicit
       case None        => 0
       case Some(value) => value + 1
     }
-  }
-
-  def nextNonceIndex(): Future[Int] = {
-    safeDatabase.run(nextNonceIndexAction())
   }
 
   class AliceTable(tag: Tag) extends Table[AliceDb](tag, schemaName, "alices") {

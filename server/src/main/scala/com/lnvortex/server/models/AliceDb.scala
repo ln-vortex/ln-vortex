@@ -54,14 +54,6 @@ case class AliceDb(
 
     copy(signedPSBT = Some(psbt))
   }
-
-  def unregister(): AliceDb = {
-    copy(blindedOutputOpt = None,
-         changeSpkOpt = None,
-         blindOutputSigOpt = None,
-         signedPSBT = None,
-         numInputs = -1)
-  }
 }
 
 object AliceDbs {

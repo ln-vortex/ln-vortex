@@ -205,12 +205,7 @@ class VortexCoordinator private (
   }
 
   def getRound(roundId: DoubleSha256Digest): Future[RoundDb] = {
-    roundDAO.read(roundId).map {
-      case Some(db) => db
-      case None =>
-        throw new RuntimeException(
-          s"Could not find a round db for roundId $roundId")
-    }
+    roundDAO.safeDatabase.run(getRoundAction(roundId))
   }
 
   def currentRoundAction(): DBIOAction[RoundDb, NoStream, Effect.Read] = {
@@ -548,12 +543,14 @@ class VortexCoordinator private (
     val isRemixF = if (registerInputs.inputs.size == 1) {
       val inputRef = registerInputs.inputs.head
       bitcoind.getRawTransactionRaw(inputRef.outPoint.txIdBE).map { tx =>
-        // Make sure this was previously in a coinjoin
-        val anonSet = getAnonymitySet(tx, inputRef.outPoint.vout.toInt)
-        // make sure it wasn't a change output
-        val wasTargetUtxo = inputRef.output.value == config.roundAmount
-        val noChange = registerInputs.changeSpkOpt.isEmpty
-        anonSet > 1 && wasTargetUtxo && noChange
+        Try {
+          // Make sure this was previously in a coinjoin
+          val anonSet = getAnonymitySet(tx, inputRef.outPoint.vout.toInt)
+          // make sure it wasn't a change output
+          val wasTargetUtxo = inputRef.output.value == config.roundAmount
+          val noChange = registerInputs.changeSpkOpt.isEmpty
+          anonSet > 1 && wasTargetUtxo && noChange
+        }.getOrElse(false)
       }
     } else Future.successful(false)
 
@@ -693,13 +690,28 @@ class VortexCoordinator private (
         inputDbs <- inputsDAO.findByRoundIdAction(round.roundId)
         spks = inputDbs.map(_.output.scriptPubKey) ++ aliceDbs.flatMap(
           _.changeSpkOpt)
-        bobAddr = BitcoinAddress.fromScriptPubKey(bob.output.scriptPubKey,
-                                                  config.network)
         _ <-
           if (spks.contains(bob.output.scriptPubKey)) {
+            val bobAddr = BitcoinAddress.fromScriptPubKey(
+              bob.output.scriptPubKey,
+              config.network)
             DBIO.failed(
               new InvalidTargetOutputScriptPubKeyException(
                 s"$bobAddr already registered as an input"))
+          } else DBIO.successful(())
+
+        outputDbs <- outputsDAO.findByRoundIdAction(round.roundId)
+
+        _ <-
+          if (
+            outputDbs.exists(_.output.scriptPubKey == bob.output.scriptPubKey)
+          ) {
+            val bobAddr = BitcoinAddress.fromScriptPubKey(
+              bob.output.scriptPubKey,
+              config.network)
+            DBIO.failed(
+              new InvalidTargetOutputScriptPubKeyException(
+                s"$bobAddr already registered as an output"))
           } else DBIO.successful(())
 
         _ <- outputsDAO.createAction(db)

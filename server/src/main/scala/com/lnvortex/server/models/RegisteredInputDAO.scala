@@ -71,12 +71,6 @@ case class RegisteredInputDAO()(implicit
       .map(_.toVector)
   }
 
-  def findByPeerId(
-      peerId: Sha256Digest,
-      roundId: DoubleSha256Digest): Future[Vector[RegisteredInputDb]] = {
-    safeDatabase.run(findByPeerIdAction(peerId, roundId))
-  }
-
   def findByPeerIdsAction(
       peerIds: Vector[Sha256Digest],
       roundId: DoubleSha256Digest): DBIOAction[Vector[RegisteredInputDb],
@@ -92,12 +86,6 @@ case class RegisteredInputDAO()(implicit
       peerId: Sha256Digest,
       roundId: DoubleSha256Digest): DBIOAction[Int, NoStream, Effect.Write] = {
     table.filter(t => t.peerId === peerId && t.roundId === roundId).delete
-  }
-
-  def deleteByPeerId(
-      peerId: Sha256Digest,
-      roundId: DoubleSha256Digest): Future[Int] = {
-    safeDatabase.run(deleteByPeerIdAction(peerId, roundId))
   }
 
   def deleteByRoundIdAction(
