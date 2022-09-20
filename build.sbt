@@ -352,7 +352,7 @@ TaskKeys.downloadLnd := {
       logger.info(s"Extracting archive with command: $extractCommand")
       extractCommand.!!
     } else {
-      logger.error(
+      sys.error(
         s"Downloaded invalid version of lnd, got $hash, expected $expectedHash")
     }
 
@@ -490,7 +490,7 @@ TaskKeys.downloadBitcoind := {
           logger.info(s"Extracting archive with command: $extractCommand")
           extractCommand.!!
         } else {
-          logger.error(
+          sys.error(
             s"Downloaded invalid version of bitcoind v$version, got $hash, expected ${expectedHash(version)}")
         }
 
@@ -560,7 +560,7 @@ TaskKeys.downloadCLightning := {
       logger.info(s"Extracting archive with command: $extractCommand")
       extractCommand.!!
     } else {
-      logger.error(
+      sys.error(
         s"Downloaded invalid version of c-lightning, got $hash, expected $expectedHash")
     }
 
