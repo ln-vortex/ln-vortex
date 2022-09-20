@@ -37,15 +37,6 @@ case class UTXODAO()(implicit
       ts: Vector[UTXODb]): Query[UTXOTable, UTXODb, Seq] =
     findByPrimaryKeys(ts.map(_.outPoint))
 
-  def findByOutPoint(outPoint: TransactionOutPoint): Future[Option[UTXODb]] = {
-    safeDatabase.run(findByPrimaryKey(outPoint).result.headOption)
-  }
-
-  def findByOutPoints(
-      outPoints: Vector[TransactionOutPoint]): Future[Vector[UTXODb]] = {
-    safeDatabase.runVec(findByPrimaryKeys(outPoints).result)
-  }
-
   def findBySPKsAction(spks: Vector[ScriptPubKey]): DBIOAction[Vector[UTXODb],
                                                                NoStream,
                                                                Effect.Read] = {

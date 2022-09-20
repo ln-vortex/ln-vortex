@@ -122,6 +122,8 @@ class LndVortexWalletTest extends LndVortexWalletFixture {
       outRefs = utxos.map(_.outputReference)
       proofFs = outRefs.map(wallet.createInputProof(nonce, _, 3600.seconds))
       proofs <- Future.sequence(proofFs)
+
+      _ <- wallet.releaseCoins(outRefs)
     } yield {
       val inputRefs = outRefs.zip(proofs).map { case (outRef, proof) =>
         InputReference(outRef, proof)
