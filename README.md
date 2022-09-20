@@ -1,5 +1,5 @@
 # Vortex
-[![Build Status](https://github.com/ln-vortex/ln-vortex/workflows/Release/badge.svg)](https://github.com/ln-vortex/ln-vortex/actions)
+[![Build Status](https://github.com/ln-vortex/ln-vortex/workflows/docker/badge.svg)](https://github.com/ln-vortex/ln-vortex/actions)
 [![Coverage Status](https://coveralls.io/repos/github/ln-vortex/ln-vortex/badge.svg?branch=master)](https://coveralls.io/github/ln-vortex/ln-vortex?branch=master)
 
 Vortex is a tool to allow users to open lightning channels in a collaborative transaction when
