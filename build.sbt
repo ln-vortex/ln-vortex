@@ -116,6 +116,7 @@ lazy val cli = project
   .settings(libraryDependencies ++= Deps.cli)
   .settings(name := "vortex-cli")
   .dependsOn(config)
+  .settings(coverageExcludedPackages := "com.lnvortex.cli")
 
 lazy val rpcServer = project
   .in(file("app/rpc-server"))
@@ -128,10 +129,11 @@ lazy val rpcServer = project
   .enablePlugins(
     JavaAppPackaging,
     DockerPlugin,
-//                 JlinkPlugin,
+    // JlinkPlugin,
     // needed for windows, else we have the 'The input line is too long` on windows OS
     LauncherJarPlugin
   )
+  .settings(coverageExcludedPackages := "com.lnvortex.rpc;de.heikoseeberger.akkahttpupickle")
 
 lazy val coordinatorConfig = project
   .in(file("coordinator/config"))
@@ -146,6 +148,7 @@ lazy val coordinatorCli = project
   .settings(libraryDependencies ++= Deps.cli)
   .settings(name := "coordinator-cli")
   .dependsOn(coordinatorConfig)
+  .settings(coverageExcludedPackages := "com.lnvortex.coordinator.cli")
 
 lazy val coordinatorRpc = project
   .in(file("coordinator/rpc-server"))
@@ -157,10 +160,11 @@ lazy val coordinatorRpc = project
   .enablePlugins(
     JavaAppPackaging,
     DockerPlugin,
-    //                 JlinkPlugin,
+    // JlinkPlugin,
     // needed for windows, else we have the 'The input line is too long` on windows OS
     LauncherJarPlugin
   )
+  .settings(coverageExcludedPackages := "com.lnvortex.coordinator.rpc;de.heikoseeberger.akkahttpupickle")
 
 lazy val lnd = project
   .in(file("lnd"))
