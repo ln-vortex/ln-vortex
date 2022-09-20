@@ -3,7 +3,6 @@ package com.lnvortex.core
 import org.bitcoins.core.currency._
 import org.bitcoins.core.number._
 import org.bitcoins.core.protocol.script._
-import org.bitcoins.core.protocol.tlv.TLVUtil
 import org.bitcoins.core.protocol.transaction._
 import org.bitcoins.core.script.interpreter.ScriptInterpreter
 import org.bitcoins.core.script.util.PreviousOutputMap
@@ -12,20 +11,12 @@ import org.bitcoins.commons.serializers.JsonSerializers._
 import org.bitcoins.commons.serializers.JsonWriters._
 import org.bitcoins.commons.serializers.JsonReaders._
 import play.api.libs.json._
-import scodec.bits._
 
 case class InputReference(
     outputReference: OutputReference,
-    inputProof: ScriptWitness)
-    extends NetworkElement
-    with TLVUtil {
-
+    inputProof: ScriptWitness) {
   val output: TransactionOutput = outputReference.output
   val outPoint: TransactionOutPoint = outputReference.outPoint
-
-  override def bytes: ByteVector = {
-    u16Prefix(outputReference.bytes) ++ u16Prefix(inputProof.bytes)
-  }
 }
 
 object InputReference {

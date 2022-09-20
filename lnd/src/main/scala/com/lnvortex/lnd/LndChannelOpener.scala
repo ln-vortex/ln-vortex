@@ -2,7 +2,6 @@ package com.lnvortex.lnd
 
 import akka.actor.ActorSystem
 import akka.stream.scaladsl.Sink
-import com.lnvortex.core.NodeUri
 import com.lnvortex.core.api.OutputDetails
 import grizzled.slf4j.Logging
 import lnrpc.ChannelPoint.FundingTxid
@@ -12,7 +11,7 @@ import lnrpc.OpenStatusUpdate.Update.PsbtFund
 import lnrpc._
 import org.bitcoins.core.currency._
 import org.bitcoins.core.protocol.BitcoinAddress
-import org.bitcoins.core.protocol.ln.node.NodeId
+import org.bitcoins.core.protocol.ln.node.{NodeId, NodeUri}
 import org.bitcoins.core.protocol.transaction.TransactionOutPoint
 import org.bitcoins.core.psbt.PSBT
 import org.bitcoins.crypto._
@@ -33,10 +32,13 @@ case class LndChannelOpener(lndRpcClient: LndRpcClient)(implicit
       nodeUri: NodeUri,
       fundingAmount: CurrencyUnit,
       privateChannel: Boolean): Future[OutputDetails] = {
-    initPSBTChannelOpen(nodeUri.nodeId,
-                        Some(nodeUri.socketAddress),
-                        fundingAmount,
-                        privateChannel)
+    initPSBTChannelOpen(
+      nodeId = nodeUri.nodeId,
+      peerAddrOpt =
+        Some(InetSocketAddress.createUnresolved(nodeUri.host, nodeUri.port)),
+      fundingAmount = fundingAmount,
+      privateChannel = privateChannel
+    )
   }
 
   /** Connects to the peer and starts the process of opening a channel

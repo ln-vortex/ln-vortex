@@ -51,20 +51,7 @@ object RoundStatus extends StringFactory[RoundStatus] {
   override def fromString(string: String): RoundStatus = {
     fromStringOpt(string) match {
       case Some(value) => value
-      case None =>
-        sys.error(s"Could not find a RoundStatus for $string")
-    }
-  }
-
-  def fromIntOpt(int: Int): Option[RoundStatus] = {
-    all.find(_.order == int)
-  }
-
-  def fromInt(int: Int): RoundStatus = {
-    fromIntOpt(int) match {
-      case Some(value) => value
-      case None =>
-        sys.error(s"Could not find a RoundStatus for order $int")
+      case None        => sys.error(s"Could not find a RoundStatus for $string")
     }
   }
 }
