@@ -102,6 +102,7 @@ lazy val config = project
   .settings(libraryDependencies ++= Deps.config)
   .settings(name := "config")
   .dependsOn(core)
+  .settings(coverageExcludedPackages := "com.lnvortex.config")
 
 lazy val configTest = project
   .in(file("app/config-test"))
