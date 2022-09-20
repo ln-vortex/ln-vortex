@@ -33,6 +33,7 @@ case class BitcoindVortexWallet(
 
   override def getBlockHeight(): Future[Int] = bitcoind.getBlockCount
 
+  // $COVERAGE-OFF
   private def addressTypeFromScriptType(scriptType: ScriptType): AddressType = {
     scriptType match {
       case tpe @ (ScriptType.NONSTANDARD | ScriptType.MULTISIG |
@@ -50,6 +51,7 @@ case class BitcoindVortexWallet(
       case ScriptType.WITNESS_V1_TAPROOT    => AddressType.Bech32m
     }
   }
+  // $COVERAGE-ON
 
   override def getNewAddress(scriptType: ScriptType): Future[BitcoinAddress] = {
     val addrType = addressTypeFromScriptType(scriptType)
