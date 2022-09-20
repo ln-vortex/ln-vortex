@@ -824,6 +824,7 @@ case class VortexClient[+T <: VortexWalletApi](
         }
 
         requeueF.failed.foreach { err =>
+          err.printStackTrace()
           logger.error(s"Failed to requeue round: ${err.getMessage}", err)
         }
 
