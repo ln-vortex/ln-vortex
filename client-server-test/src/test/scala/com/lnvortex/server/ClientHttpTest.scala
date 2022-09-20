@@ -1,7 +1,7 @@
 package com.lnvortex.server
 
 import com.lnvortex.testkit.HttpTestFixture
-import org.bitcoins.core.config.TestNet3
+import org.bitcoins.core.config.{RegTest, TestNet3}
 
 class ClientHttpTest extends HttpTestFixture {
 
@@ -24,5 +24,16 @@ class ClientHttpTest extends HttpTestFixture {
         case None => fail("Could not find Taproot Testnet coordinator")
       }
     }
+  }
+
+  it must "get round params" in { case (client, server) =>
+    client.getRoundParams(RegTest).map { params =>
+      assert(params == server.currentCoordinator.roundParams)
+    }
+  }
+
+  it must "fail to get get round params for a different network" in {
+    case (client, _) =>
+      recoverToSucceededIf[RuntimeException](client.getRoundParams(TestNet3))
   }
 }
