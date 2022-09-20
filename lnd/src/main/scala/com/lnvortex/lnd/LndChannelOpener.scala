@@ -34,8 +34,7 @@ case class LndChannelOpener(lndRpcClient: LndRpcClient)(implicit
       privateChannel: Boolean): Future[OutputDetails] = {
     initPSBTChannelOpen(
       nodeId = nodeUri.nodeId,
-      peerAddrOpt =
-        Some(InetSocketAddress.createUnresolved(nodeUri.host, nodeUri.port)),
+      peerAddrOpt = Some(nodeUri.socketAddress),
       fundingAmount = fundingAmount,
       privateChannel = privateChannel
     )

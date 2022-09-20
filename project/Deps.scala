@@ -7,7 +7,7 @@ object Deps {
     val akkaStreamV = "2.6.20"
     val akkaActorV: String = akkaStreamV
 
-    val bitcoinsV = "1.9.4-24-c0443a97-SNAPSHOT"
+    val bitcoinsV = "1.9.4-26-75b034d6-SNAPSHOT"
 
     val scoptV = "4.1.0"
 
