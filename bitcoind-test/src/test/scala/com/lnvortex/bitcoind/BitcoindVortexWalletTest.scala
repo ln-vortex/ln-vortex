@@ -47,7 +47,7 @@ class BitcoindVortexWalletTest extends BitcoinSFixture with CachedBitcoindV23 {
       assert(p2wpkh.value.startsWith("bcrt1q"))
       assert(p2tr.value.startsWith("bcrt1p"))
       assert(nested.value.startsWith("2"))
-      assert(p2pkh.value.startsWith("n"))
+      assert(p2pkh.value.startsWith("n") || p2pkh.value.startsWith("m"))
     }
   }
 
