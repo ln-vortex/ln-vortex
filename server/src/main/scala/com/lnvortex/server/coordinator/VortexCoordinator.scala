@@ -355,7 +355,7 @@ class VortexCoordinator private (
     sendPSBTCancellable.foreach(_.cancel())
     sendPSBTCancellable = None
 
-    // $COVERAGE-OFF
+    // $COVERAGE-OFF$
     val addressType = config.changeScriptType match {
       case tpe @ (ScriptType.NONSTANDARD | ScriptType.MULTISIG |
           ScriptType.CLTV | ScriptType.CSV |
@@ -371,7 +371,7 @@ class VortexCoordinator private (
       case ScriptType.WITNESS_V0_SCRIPTHASH => AddressType.Bech32m
       case ScriptType.WITNESS_V1_TAPROOT    => AddressType.Bech32m
     }
-    // $COVERAGE-ON
+    // $COVERAGE-ON$
 
     for {
       addr <- bitcoind.getNewAddress(roundAddressLabel, addressType)

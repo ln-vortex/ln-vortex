@@ -39,7 +39,7 @@ trait FeeCalculator {
       changeScriptType: ScriptType): CurrencyUnit =
     feeRate * getScriptTypeOutputSize(changeScriptType)
 
-  // $COVERAGE-OFF
+  // $COVERAGE-OFF$
   /** Returns the expected size of an input for the script type in vbytes
     *
     * @see
@@ -85,7 +85,7 @@ trait FeeCalculator {
       case ScriptType.WITNESS_V1_TAPROOT    => 43
     }
   }
-  // $COVERAGE-ON
+  // $COVERAGE-ON$
 
   def calculateChangeOutput(
       roundParams: RoundParameters,

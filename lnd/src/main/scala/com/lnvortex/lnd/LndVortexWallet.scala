@@ -276,7 +276,7 @@ object LndVortexWallet {
 
   final val MIN_LND_VERSION = "0.15.1"
 
-  // $COVERAGE-OFF
+  // $COVERAGE-OFF$
   def addressTypeFromScriptType(scriptType: ScriptType): AddressType = {
     scriptType match {
       case tpe @ (ScriptType.PUBKEY | ScriptType.PUBKEYHASH |
@@ -317,5 +317,5 @@ object LndVortexWallet {
          HashType.sigHashDefault)
     }
   }
-  // $COVERAGE-ON
+  // $COVERAGE-ON$
 }
