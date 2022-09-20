@@ -206,6 +206,8 @@ lazy val core = project
   .in(file("core"))
   .settings(CommonSettings.settings: _*)
   .settings(name := "core", libraryDependencies ++= Deps.core)
+  .settings(
+    coverageExcludedPackages := "com.lnvortex.core.api;com.lnvortex.core.config")
 
 lazy val coreTest = project
   .in(file("core-test"))
@@ -257,6 +259,36 @@ lazy val develop = project
   .settings(CommonSettings.prodSettings: _*)
   .settings(name := "develop", libraryDependencies ++= Deps.develop)
   .dependsOn(coordinatorRpc, rpcServer, testkit)
+
+commands += Command.command("testWallets") { state =>
+  "coverage" ::
+    "lndTest/test" ::
+    "lnd/coverageAggregate" ::
+    "lnd/coveralls" ::
+    "clightningTest/test" ::
+    "clightning/coverageAggregate" ::
+    "clightning/coveralls" ::
+    "bitcoindTest/test" ::
+    "bitcoind/coverageAggregate" ::
+    "bitcoind/coveralls" ::
+    state
+}
+
+commands += Command.command("testClientServer") { state =>
+  "coverage" ::
+    "coreTest/test" ::
+    "core/coverageAggregate" ::
+    "core/coveralls" ::
+    "configTest/test" ::
+    "clientTest/test" ::
+    "serverTest/test" ::
+    "clientServerTest/test" ::
+    "client/coverageAggregate" ::
+    "client/coveralls" ::
+    "server/coverageAggregate" ::
+    "server/coveralls" ::
+    state
+}
 
 TaskKeys.downloadLnd := {
   val logger = streams.value.log

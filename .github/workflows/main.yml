@@ -17,9 +17,7 @@ jobs:
       - name: Setup Scala
         uses: olafurpg/setup-scala@v13
         with:
-          distribution: 'adopt'
           java-version: '17'
-          cache: 'sbt'
       - name: Cache
         uses: actions/cache@v3
         with:
@@ -40,9 +38,7 @@ jobs:
       - name: Setup Scala
         uses: olafurpg/setup-scala@v13
         with:
-          distribution: 'adopt'
           java-version: '17'
-          cache: 'sbt'
       - name: Cache
         uses: actions/cache@v3
         with:
@@ -66,9 +62,7 @@ jobs:
       - name: Setup Scala
         uses: olafurpg/setup-scala@v13
         with:
-          distribution: 'adopt'
           java-version: '17'
-          cache: 'sbt'
       - name: Cache
         uses: actions/cache@v3
         with:
@@ -79,20 +73,28 @@ jobs:
       - name: Compile
         run: sbt +test:compile
 
-  clientServer:
+  test:
     needs: linuxCompile
     runs-on: ubuntu-latest
     timeout-minutes: 60
     if: "! contains(github.event.pull_request.labels.*.name, 'documentation')"
+    strategy:
+      fail-fast: false
+      matrix:
+        action:
+          - testClientServer
+          - testWallets
+        postgres: [true, false]
+        exclude:
+          - postgres: true
+            action: testWallets
     steps:
       - name: Checkout
         uses: actions/checkout@v3
       - name: Setup Scala
         uses: olafurpg/setup-scala@v13
         with:
-          distribution: 'adopt'
           java-version: '17'
-          cache: 'sbt'
       - name: Cache
         uses: actions/cache@v3
         with:
@@ -100,55 +102,8 @@ jobs:
             ~/.ivy2/cache
             ~/.sbt
           key: ${{ runner.os }}-sbt-${{ hashFiles('**/build.sbt') }}
-      - name: Run tests
-        run: sbt coverage coreTest/test core/coverageAggregate core/coveralls configTest/test clientTest/test serverTest/test clientServerTest/test server/coverageAggregate server/coveralls client/coverageAggregate client/coveralls
-
-  postgres:
-    needs: linuxCompile
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    if: "! contains(github.event.pull_request.labels.*.name, 'documentation')"
-    env:
-      PG_ENABLED: "1"
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-      - name: Setup Scala
-        uses: olafurpg/setup-scala@v13
-        with:
-          distribution: 'adopt'
-          java-version: '17'
-          cache: 'sbt'
-      - name: Cache
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.ivy2/cache
-            ~/.sbt
-          key: ${{ runner.os }}-sbt-${{ hashFiles('**/build.sbt') }}
-      - name: Run postgres tests
-        run: sbt serverTest/test clientTest/test clientServerTest/test
-
-  wallets:
-    needs: linuxCompile
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    if: "! contains(github.event.pull_request.labels.*.name, 'documentation')"
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-      - name: Setup Scala
-        uses: olafurpg/setup-scala@v13
-        with:
-          distribution: 'adopt'
-          java-version: '17'
-          cache: 'sbt'
-      - name: Cache
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.ivy2/cache
-            ~/.sbt
-          key: ${{ runner.os }}-sbt-${{ hashFiles('**/build.sbt') }}
-      - name: Run tests
-        run: sbt coverage lndTest/test lnd/coverageAggregate lnd/coveralls bitcoindTest/test bitcoind/coverageAggregate bitcoind/coveralls clightningTest/test clightning/coverageAggregate clightning/coveralls
+      - name: Test ${{ matrix.action }}
+        run: sbt ${{ matrix.action }}
+        env:
+          POSTGRES: ${{ matrix.postgres }}
+          COVERALLS_FLAG_NAME: ${{ matrix.action }}-${{ matrix.postgres }}
