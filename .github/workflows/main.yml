@@ -3,9 +3,6 @@ name: CI
 on:
   pull_request:
 
-env:
-  COVERALLS_REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
 jobs:
   linuxCompile:
     runs-on: ubuntu-latest
@@ -78,16 +75,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     if: "! contains(github.event.pull_request.labels.*.name, 'documentation')"
-    strategy:
-      fail-fast: false
-      matrix:
-        action:
-          - testClientServer
-          - testWallets
-        postgres: [true, false]
-        exclude:
-          - postgres: true
-            action: testWallets
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -102,8 +89,33 @@ jobs:
             ~/.ivy2/cache
             ~/.sbt
           key: ${{ runner.os }}-sbt-${{ hashFiles('**/build.sbt') }}
-      - name: Test ${{ matrix.action }}
-        run: sbt ${{ matrix.action }}
+      - name: Run Tests
+        run: sbt clean coverage test
+      - name: Upload coverage data to Coveralls
+        run: sbt coverageAggregate coveralls
         env:
-          POSTGRES: ${{ matrix.postgres }}
-          COVERALLS_FLAG_NAME: ${{ matrix.action }}-${{ matrix.postgres }}
+          COVERALLS_REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  postgres:
+    needs: linuxCompile
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    if: "! contains(github.event.pull_request.labels.*.name, 'documentation')"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Setup Scala
+        uses: olafurpg/setup-scala@v13
+        with:
+          java-version: '17'
+      - name: Cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.ivy2/cache
+            ~/.sbt
+          key: ${{ runner.os }}-sbt-${{ hashFiles('**/build.sbt') }}
+      - name: Postgres Tests
+        run: sbt clientTest/test serverTest/test clientServerTest/test
+        env:
+          PG_ENABLED: true
