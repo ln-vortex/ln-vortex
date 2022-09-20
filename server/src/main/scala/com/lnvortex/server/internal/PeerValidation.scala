@@ -62,13 +62,14 @@ trait PeerValidation extends Logging { self: VortexCoordinator =>
     } yield {
       if (!correctScriptType) {
         Some(new InvalidInputsException(
-          s"UTXO $outPoint has invalid script type, got ${inputRef.output.scriptPubKey.scriptType}"))
+          s"UTXO ${outPoint.toHumanReadableString} has invalid script type, got ${inputRef.output.scriptPubKey.scriptType}"))
       } else if (!notBanned) {
-        Some(new InvalidInputsException(s"UTXO $outPoint is currently banned"))
-      } else if (!isRealInput) {
         Some(
           new InvalidInputsException(
-            s"UTXO $outPoint given does not exist on the blockchain"))
+            s"UTXO ${outPoint.toHumanReadableString} is currently banned"))
+      } else if (!isRealInput) {
+        Some(new InvalidInputsException(
+          s"UTXO ${outPoint.toHumanReadableString} given does not exist on the blockchain"))
       } else if (!validProof) {
         Some(
           new InvalidInputsException(
@@ -93,9 +94,8 @@ trait PeerValidation extends Logging { self: VortexCoordinator =>
       registerInputs: RegisterInputs,
       otherInputs: Vector[RegisteredInputDb]): Option[VortexServerException] = {
     if (isRemix) {
-      registerInputs.changeSpkOpt.map(_ =>
-        new InvalidChangeScriptPubKeyException(
-          s"Alice registered with change for a remix"))
+      // if it is a remix we don't care about the change
+      None
     } else {
       val uniqueChangeSpk = registerInputs.changeSpkOpt.forall { spk =>
         !otherInputs
