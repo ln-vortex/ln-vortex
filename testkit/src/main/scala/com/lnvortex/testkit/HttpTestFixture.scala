@@ -20,11 +20,11 @@ trait HttpTestFixture
     with EmbeddedPg {
 
   override type FixtureParam =
-    (VortexClient[BitcoindVortexWallet], VortexCoordinator)
+    (VortexClient[BitcoindVortexWallet], VortexHttpServer)
 
   override def withFixture(test: OneArgAsyncTest): FutureOutcome = {
     makeDependentFixture[(VortexClient[BitcoindVortexWallet],
-                          VortexCoordinator)](
+                          VortexHttpServer)](
       () => {
         implicit val (clientConfig, serverConf) = getTestConfigs()
 
@@ -41,9 +41,10 @@ trait HttpTestFixture
           coordinatorAddr = CoordinatorAddress("test", RegTest, addr)
           vortexClient = VortexClient(BitcoindVortexWallet(bitcoind),
                                       coordinatorAddr)(system, clientConfig)
-        } yield (vortexClient, coordinator)
+        } yield (vortexClient, server)
       },
-      { case (client, coordinator) =>
+      { case (client, server) =>
+        val coordinator = server.currentCoordinator
         for {
           _ <- client.vortexWallet.stop()
           _ <- client.stop()
@@ -52,6 +53,8 @@ trait HttpTestFixture
           _ <- coordinator.config.dropAll().map(_ => coordinator.config.clean())
           _ = coordinator.stop()
           _ <- coordinator.config.stop()
+
+          _ <- server.stop()
         } yield {
           val directory = new Directory(coordinator.config.baseDatadir.toFile)
           directory.deleteRecursively()

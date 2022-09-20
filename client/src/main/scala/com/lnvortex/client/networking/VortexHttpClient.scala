@@ -67,13 +67,17 @@ trait VortexHttpClient[+V <: VortexWalletApi] { self: VortexClient[V] =>
       newConnection: Boolean)(implicit reads: Reads[T]): Future[T] = {
     sendRequest(request, newConnection).map { str =>
       if (str.nonEmpty) {
-        val json = Json.parse(str)
-        json.validate[T] match {
-          case JsSuccess(value, _) => value
-          case JsError(errors) =>
-            sys.error(
-              s"Error parsing response, got $json\n${errors.mkString("\n")}")
+        val t = Try {
+          val json = Json.parse(str)
+          json.validate[T] match {
+            case JsSuccess(value, _) => value
+            case JsError(errors) =>
+              sys.error(
+                s"Error parsing response, got $json\n${errors.mkString("\n")}")
+          }
         }
+
+        t.getOrElse(sys.error(s"Error parsing response, got $str"))
       } else {
         sys.error("Error: did not receive response")
       }
@@ -86,8 +90,7 @@ trait VortexHttpClient[+V <: VortexWalletApi] { self: VortexClient[V] =>
       newConnection = false).map(_ == "pong")
   }
 
-  protected def getRoundParams(
-      network: BitcoinNetwork): Future[RoundParameters] = {
+  def getRoundParams(network: BitcoinNetwork): Future[RoundParameters] = {
     val request = Get(
       "http://" + baseUrl + "/params/" + network.chainParams.genesisBlock.blockHeader.hashBE.hex)
 
