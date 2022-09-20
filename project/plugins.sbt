@@ -17,3 +17,10 @@ addSbtPlugin("org.scalameta" % "sbt-native-image" % "0.3.2")
 addSbtPlugin("com.typesafe.sbt" % "sbt-web" % "1.4.4")
 
 addSbtPlugin("com.typesafe.sbt" % "sbt-digest" % "1.1.4")
+
+//https://github.com/scoverage/sbt-scoverage
+addSbtPlugin("org.scoverage" % "sbt-scoverage" % "2.0.3")
+
+// report code coverage to Coveralls
+//https://github.com/scoverage/sbt-coveralls
+addSbtPlugin("org.scoverage" % "sbt-coveralls" % "1.3.2")

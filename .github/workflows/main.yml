@@ -3,6 +3,9 @@ name: CI
 on:
   pull_request:
 
+env:
+  COVERALLS_REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
 jobs:
   linuxCompile:
     runs-on: ubuntu-latest
@@ -98,7 +101,7 @@ jobs:
             ~/.sbt
           key: ${{ runner.os }}-sbt-${{ hashFiles('**/build.sbt') }}
       - name: Run tests
-        run: sbt coreTest/test configTest/test clientTest/test serverTest/test clientServerTest/test
+        run: sbt coverage coreTest/test core/coverageAggregate core/coveralls configTest/test clientTest/test serverTest/test clientServerTest/test server/coverageAggregate server/coveralls client/coverageAggregate client/coveralls
 
   postgres:
     needs: linuxCompile
@@ -148,4 +151,4 @@ jobs:
             ~/.sbt
           key: ${{ runner.os }}-sbt-${{ hashFiles('**/build.sbt') }}
       - name: Run tests
-        run: sbt lndTest/test bitcoindTest/test clightningTest/test
+        run: sbt coverage lndTest/test lnd/coverageAggregate lnd/coveralls bitcoindTest/test bitcoind/coverageAggregate bitcoind/coveralls clightningTest/test clightning/coverageAggregate clightning/coveralls
