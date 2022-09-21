@@ -161,21 +161,10 @@ case class VortexClient[+T <: VortexWalletApi](
     logger.info("Asking nonce from coordinator")
     roundDetails match {
       case KnownRound(_, round) =>
-        for {
-          _ <- startRegistration(round.roundId)
-          _ = logger.debug("Awaiting response from coordinator")
-          _ <- AsyncUtil
-            .awaitCondition(() => getNonceOpt(roundDetails).isDefined,
-                            interval = 100.milliseconds,
-                            maxTries = 300)
-            .recover { case _: Throwable =>
-              throw new RuntimeException(
-                "Did not receive nonce from coordinator")
-            }
-        } yield {
-          val nonce = getNonceOpt(roundDetails).get
-          logger.info(s"Got nonce from coordinator $nonce")
-          nonce
+        // http client flow will update round details
+        startRegistration(round.roundId).map { nonceMsg =>
+          logger.info(s"Got nonce from coordinator ${nonceMsg.schnorrNonce}")
+          nonceMsg.schnorrNonce
         }
       case state @ (_: NoDetails | _: ReceivedNonce | _: InputsScheduled |
           _: InitializedRound) =>
