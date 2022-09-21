@@ -2,12 +2,12 @@ package com.lnvortex.server
 
 import com.lnvortex.core.RoundDetails.getRoundParamsOpt
 import com.lnvortex.testkit._
-import lnrpc.DisconnectPeerRequest
 import org.bitcoins.core.script.ScriptType
 import org.bitcoins.core.script.ScriptType._
 import org.bitcoins.lnd.rpc.config.LndInstanceLocal
 import org.bitcoins.testkit.EmbeddedPg
 import org.bitcoins.testkit.async.TestAsyncUtil
+import org.bitcoins.testkit.lnd.LndRpcTestUtil
 
 import java.net.InetSocketAddress
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
@@ -29,6 +29,8 @@ class ClientServerPairNetworkingTest
     case (client, _, peerLnd) =>
       for {
         nodeId <- peerLnd.nodeId
+        _ <- LndRpcTestUtil.connectLNNodes(client.vortexWallet.lndRpcClient,
+                                           peerLnd)
         _ <- client.askNonce()
 
         // don't select all coins
@@ -43,6 +45,8 @@ class ClientServerPairNetworkingTest
   it must "cancel multiple times" in { case (client, _, peerLnd) =>
     for {
       nodeId <- peerLnd.nodeId
+      _ <- LndRpcTestUtil.connectLNNodes(client.vortexWallet.lndRpcClient,
+                                         peerLnd)
       _ <- client.askNonce()
 
       // don't select all coins
@@ -77,6 +81,8 @@ class ClientServerPairNetworkingTest
   it must "open a channel" in { case (client, coordinator, peerLnd) =>
     for {
       nodeId <- peerLnd.nodeId
+      _ <- LndRpcTestUtil.connectLNNodes(client.vortexWallet.lndRpcClient,
+                                         peerLnd)
       _ <- client.askNonce()
       roundId = coordinator.getCurrentRoundId
 
@@ -125,10 +131,7 @@ class ClientServerPairNetworkingTest
   it must "connect and open a channel" in {
     case (client, coordinator, peerLnd) =>
       for {
-        // disconnect
         nodeId <- peerLnd.nodeId
-        req = DisconnectPeerRequest(nodeId.hex)
-        _ <- client.vortexWallet.lndRpcClient.lnd.disconnectPeer(req)
         port = peerLnd.instance
           .asInstanceOf[LndInstanceLocal]
           .listenBinding

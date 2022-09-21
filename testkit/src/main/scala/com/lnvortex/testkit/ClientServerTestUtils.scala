@@ -16,6 +16,7 @@ import org.bitcoins.core.wallet.fee.SatoshisPerVirtualByte
 import org.bitcoins.crypto._
 import org.bitcoins.lnd.rpc.LndRpcClient
 import org.bitcoins.testkit.async.TestAsyncUtil
+import org.bitcoins.testkit.lnd.LndRpcTestUtil
 import org.scalactic.Tolerance.convertNumericToPlusOrMinusWrapper
 import org.scalatest.Assertions.convertToEqualizer
 
@@ -64,6 +65,8 @@ trait ClientServerTestUtils {
       ec: ExecutionContext): Future[FieldElement] = {
     for {
       nodeId <- peerLnd.nodeId
+      _ <- LndRpcTestUtil.connectLNNodes(client.vortexWallet.lndRpcClient,
+                                         peerLnd)
       _ <- getNonce(peerId, client, coordinator)
       // select random minimal utxo
       utxos <- client.listCoins().map(c => Random.shuffle(c).take(1))
