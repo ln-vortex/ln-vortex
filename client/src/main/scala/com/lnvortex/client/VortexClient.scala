@@ -260,7 +260,6 @@ case class VortexClient[+T <: VortexWalletApi](
     connectF.flatMap { _ =>
       val f = for {
         details <- vortexWallet.initChannelOpen(nodeId,
-                                                peerAddrOpt,
                                                 amount,
                                                 privateChannel = true)
         _ <- vortexWallet.cancelPendingChannel(details.id)
@@ -493,7 +492,6 @@ case class VortexClient[+T <: VortexWalletApi](
               logger.debug(s"Initializing channel open to $nodeId")
               vortexWallet
                 .initChannelOpen(nodeId = nodeId,
-                                 peerAddrOpt = scheduled.peerAddrOpt,
                                  fundingAmount = scheduled.round.amount,
                                  privateChannel = true)
                 .map { details =>

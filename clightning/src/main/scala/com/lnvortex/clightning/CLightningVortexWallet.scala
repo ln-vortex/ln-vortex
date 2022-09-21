@@ -144,13 +144,9 @@ case class CLightningVortexWallet(clightning: CLightningRpcClient)(implicit
 
   override def initChannelOpen(
       nodeId: NodeId,
-      peerAddrOpt: Option[InetSocketAddress],
       fundingAmount: CurrencyUnit,
       privateChannel: Boolean): Future[OutputDetails] =
-    channelOpener.initPSBTChannelOpen(nodeId,
-                                      peerAddrOpt,
-                                      fundingAmount,
-                                      privateChannel)
+    channelOpener.initPSBTChannelOpen(nodeId, fundingAmount, privateChannel)
 
   override def completeChannelOpen(
       chanId: ByteVector,

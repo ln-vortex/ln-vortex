@@ -158,11 +158,9 @@ case class LndVortexWallet(lndRpcClient: LndRpcClient)(implicit
 
   override def initChannelOpen(
       nodeId: NodeId,
-      peerAddrOpt: Option[InetSocketAddress],
       fundingAmount: CurrencyUnit,
       privateChannel: Boolean): Future[OutputDetails] =
     channelOpener.initPSBTChannelOpen(nodeId = nodeId,
-                                      peerAddrOpt = peerAddrOpt,
                                       fundingAmount = fundingAmount,
                                       privateChannel = privateChannel)
 
