@@ -9,7 +9,6 @@ import org.bitcoins.core.currency._
 import org.bitcoins.core.protocol.ln.node.NodeId
 import org.bitcoins.core.psbt.PSBT
 
-import java.net.InetSocketAddress
 import scala.concurrent._
 
 case class CLightningChannelOpener(clightning: CLightningRpcClient)(implicit
@@ -19,26 +18,13 @@ case class CLightningChannelOpener(clightning: CLightningRpcClient)(implicit
 
   def initPSBTChannelOpen(
       nodeId: NodeId,
-      peerAddrOpt: Option[InetSocketAddress],
       fundingAmount: CurrencyUnit,
       privateChannel: Boolean): Future[OutputDetails] = {
-    // connect to peer
-    val connectF = peerAddrOpt match {
-      case Some(addr) =>
-        clightning.isConnected(nodeId).flatMap { connected =>
-          if (connected) Future.unit
-          else clightning.connect(nodeId, addr)
-        }
-      case None => Future.unit
-    }
-
-    connectF.flatMap { _ =>
-      clightning
-        .initChannelOpen(nodeId, fundingAmount, privateChannel)
-        .map { res =>
-          OutputDetails(nodeId.bytes, fundingAmount, res.funding_address)
-        }
-    }
+    clightning
+      .initChannelOpen(nodeId, fundingAmount, privateChannel)
+      .map { res =>
+        OutputDetails(nodeId.bytes, fundingAmount, res.funding_address)
+      }
   }
 
   def completeChannelOpen(

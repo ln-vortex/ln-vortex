@@ -57,7 +57,6 @@ abstract class VortexWalletApi extends StartStopAsync[Unit] {
 
   def initChannelOpen(
       nodeId: NodeId,
-      peerAddrOpt: Option[InetSocketAddress],
       fundingAmount: CurrencyUnit,
       privateChannel: Boolean): Future[OutputDetails]
 

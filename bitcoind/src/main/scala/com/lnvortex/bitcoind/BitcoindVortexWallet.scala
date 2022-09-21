@@ -168,7 +168,6 @@ case class BitcoindVortexWallet(
 
   override def initChannelOpen(
       nodeId: NodeId,
-      peerAddrOpt: Option[InetSocketAddress],
       fundingAmount: CurrencyUnit,
       privateChannel: Boolean): Future[OutputDetails] =
     Future.failed(

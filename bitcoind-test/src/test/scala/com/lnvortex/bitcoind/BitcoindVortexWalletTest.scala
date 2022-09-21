@@ -120,7 +120,7 @@ class BitcoindVortexWalletTest extends BitcoinSFixture with CachedBitcoindV23 {
         wallet.isConnected(nodeId))
       _ <- recoverToSucceededIf[UnsupportedOperationException](
         wallet
-          .initChannelOpen(nodeId, None, Satoshis.zero, privateChannel = false))
+          .initChannelOpen(nodeId, Satoshis.zero, privateChannel = false))
       _ <- recoverToSucceededIf[UnsupportedOperationException](
         wallet
           .completeChannelOpen(ByteVector.empty, PSBT.empty))

@@ -21,7 +21,6 @@ class LndChannelOpenerTest extends LndChannelOpenerFixture {
       _ <- LndRpcTestUtil.connectLNNodes(lndA, lndB)
       nodeId <- lndB.nodeId
       fundDetails <- opener.initPSBTChannelOpen(nodeId = nodeId,
-                                                peerAddrOpt = None,
                                                 fundingAmount = amount,
                                                 privateChannel = false)
     } yield {
@@ -44,7 +43,6 @@ class LndChannelOpenerTest extends LndChannelOpenerFixture {
 
         nodeId <- lndB.nodeId
         fundDetails <- opener.initPSBTChannelOpen(nodeId = nodeId,
-                                                  peerAddrOpt = None,
                                                   fundingAmount = amount,
                                                   privateChannel = false)
 
@@ -88,7 +86,6 @@ class LndChannelOpenerTest extends LndChannelOpenerFixture {
 
       nodeId <- lndB.nodeId
       fundDetails <- opener.initPSBTChannelOpen(nodeId = nodeId,
-                                                peerAddrOpt = None,
                                                 fundingAmount = amount,
                                                 privateChannel = false)
 
