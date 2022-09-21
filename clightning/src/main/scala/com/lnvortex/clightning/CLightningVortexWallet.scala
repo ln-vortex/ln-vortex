@@ -2,6 +2,7 @@ package com.lnvortex.clightning
 
 import akka.actor.ActorSystem
 import com.bitcoins.clightning.rpc.CLightningRpcClient
+import com.lnvortex.clightning.CLightningVortexWallet.addressTypeFromScriptType
 import com.lnvortex.core.api._
 import com.lnvortex.core.{InputReference, UnspentCoin}
 import org.bitcoins.core.config._
@@ -34,28 +35,6 @@ case class CLightningVortexWallet(clightning: CLightningRpcClient)(implicit
   override def getBlockHeight(): Future[Int] = {
     clightning.getInfo.map(_.blockheight)
   }
-
-  // $COVERAGE-OFF$
-  private def addressTypeFromScriptType(scriptType: ScriptType): AddressType = {
-    scriptType match {
-      case tpe @ (ScriptType.PUBKEY | ScriptType.NONSTANDARD |
-          ScriptType.MULTISIG | ScriptType.CLTV | ScriptType.CSV |
-          ScriptType.NONSTANDARD_IF_CONDITIONAL |
-          ScriptType.NOT_IF_CONDITIONAL | ScriptType.MULTISIG_WITH_TIMEOUT |
-          ScriptType.PUBKEY_WITH_TIMEOUT | ScriptType.NULLDATA |
-          ScriptType.WITNESS_UNKNOWN | ScriptType.WITNESS_COMMITMENT) =>
-        throw new IllegalArgumentException(s"Unknown address type $tpe")
-      case ScriptType.PUBKEYHASH         => AddressType.Legacy
-      case ScriptType.SCRIPTHASH         => AddressType.NestedSegWit
-      case ScriptType.WITNESS_V0_KEYHASH => AddressType.SegWit
-      case ScriptType.WITNESS_V0_SCRIPTHASH =>
-        throw new IllegalArgumentException(
-          s"Unknown address type ${ScriptType.WITNESS_V0_SCRIPTHASH}")
-      case ScriptType.WITNESS_V1_TAPROOT =>
-        throw new IllegalArgumentException("Waiting on cln to support taproot")
-    }
-  }
-  // $COVERAGE-ON$
 
   override def getNewAddress(scriptType: ScriptType): Future[BitcoinAddress] = {
     val addressType = addressTypeFromScriptType(scriptType)
@@ -213,4 +192,29 @@ case class CLightningVortexWallet(clightning: CLightningRpcClient)(implicit
       }
     }
   }
+}
+
+object CLightningVortexWallet {
+
+  // $COVERAGE-OFF$
+  def addressTypeFromScriptType(scriptType: ScriptType): AddressType = {
+    scriptType match {
+      case tpe @ (ScriptType.PUBKEY | ScriptType.NONSTANDARD |
+          ScriptType.MULTISIG | ScriptType.CLTV | ScriptType.CSV |
+          ScriptType.NONSTANDARD_IF_CONDITIONAL |
+          ScriptType.NOT_IF_CONDITIONAL | ScriptType.MULTISIG_WITH_TIMEOUT |
+          ScriptType.PUBKEY_WITH_TIMEOUT | ScriptType.NULLDATA |
+          ScriptType.WITNESS_UNKNOWN | ScriptType.WITNESS_COMMITMENT) =>
+        throw new IllegalArgumentException(s"Unknown address type $tpe")
+      case ScriptType.PUBKEYHASH         => AddressType.Legacy
+      case ScriptType.SCRIPTHASH         => AddressType.NestedSegWit
+      case ScriptType.WITNESS_V0_KEYHASH => AddressType.SegWit
+      case ScriptType.WITNESS_V0_SCRIPTHASH =>
+        throw new IllegalArgumentException(
+          s"Unknown address type ${ScriptType.WITNESS_V0_SCRIPTHASH}")
+      case ScriptType.WITNESS_V1_TAPROOT =>
+        throw new IllegalArgumentException("Waiting on cln to support taproot")
+    }
+  }
+  // $COVERAGE-ON$
 }
