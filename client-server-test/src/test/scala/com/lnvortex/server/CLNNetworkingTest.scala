@@ -132,7 +132,15 @@ class CLNNetworkingTest
           interval = interval,
           maxTries = 500)
 
+        // wait until cln sees new channel
+        _ <- TestAsyncUtil.awaitConditionF(
+          () => client.listChannels().map(_.exists(_.remotePubkey == nodeId)),
+          interval = interval,
+          maxTries = 500)
+
         roundDbs <- coordinator.roundDAO.findAll()
-      } yield assert(roundDbs.size == 2)
+      } yield {
+        assert(roundDbs.size == 2)
+      }
   }
 }

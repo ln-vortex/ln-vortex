@@ -91,7 +91,7 @@ case class VortexClient[+T <: VortexWalletApi](
     }
   }
 
-  protected def updateFeeRate(feeRate: SatoshisPerVirtualByte): Unit = {
+  private[client] def updateFeeRate(feeRate: SatoshisPerVirtualByte): Unit = {
     roundDetails match {
       case details: PendingRoundDetails =>
         logger.debug(
@@ -327,25 +327,30 @@ case class VortexClient[+T <: VortexWalletApi](
           !outputRefs.forall(
             _.output.scriptPubKey.scriptType == round.inputType)
         ) {
-          throw new InvalidInputException(
-            s"Error. Must use ${round.inputType} inputs")
+          Future.failed(
+            new InvalidInputException(
+              s"Error. Must use ${round.inputType} inputs"))
         } else if (outputRefs.map(_.output.value).sum < round.amount) {
-          throw new InvalidInputException(
-            s"Must select more inputs to find round, needed ${round.amount}")
-        } else if (round.outputType != ScriptType.WITNESS_V0_SCRIPTHASH) {
-          throw new InvalidTargetOutputException(
-            "This version of LND only supports SegwitV0 channels")
+          Future.failed(
+            new InvalidInputException(
+              s"Must select more inputs to find round, needed ${round.amount}"))
         } else if (
           outputRefs.distinctBy(_.output.scriptPubKey).size != outputRefs.size
         ) {
-          throw new InvalidInputException(
-            s"Cannot have inputs from duplicate addresses")
+          Future.failed(
+            new InvalidInputException(
+              s"Cannot have inputs from duplicate addresses"))
         } else if (outputRefs.map(_.output.value).sum < target) {
-          throw new InvalidInputException(
-            s"Must select more inputs to find round, needed $target")
+          Future.failed(
+            new InvalidInputException(
+              s"Must select more inputs to find round, needed $target"))
         } else if (!VortexUtils.isMinimalSelection(outputRefs, target)) {
-          throw new InvalidInputException(
-            s"Must select minimal inputs for target amount, please deselect some")
+          Future.failed(new InvalidInputException(
+            s"Must select minimal inputs for target amount, please deselect some"))
+        } else if (round.outputType != ScriptType.WITNESS_V0_SCRIPTHASH) {
+          Future.failed(
+            new InvalidTargetOutputException(
+              "This version of LND only supports SegwitV0 channels"))
         } else {
           checkMinChanSize(amount = round.amount,
                            nodeId = nodeId,
@@ -388,6 +393,9 @@ case class VortexClient[+T <: VortexWalletApi](
         } else if (address.scriptPubKey.scriptType != round.outputType) {
           throw new InvalidTargetOutputException(
             s"Error. Must use ${round.outputType} address")
+        } else if (address.networkParameters != coordinatorAddress.network) {
+          throw new InvalidTargetOutputException(
+            "Error. Address is not for the correct network")
         } else if (
           outputRefs.distinctBy(_.output.scriptPubKey).size != outputRefs.size
         ) {
@@ -782,7 +790,7 @@ case class VortexClient[+T <: VortexWalletApi](
           _ <- broadcastF
           _ <- vortexWallet
             .labelTransaction(signedTx.txId, s"Vortex Anonymity set: $anonSet")
-            .recover(_ => ())
+            .recover(_ => logger.warn("Failed to label transaction"))
           _ <- utxoDAO.setAnonSets(state, anonSet)
           _ <- disconnectRegistration()
           _ = roundDetails = NoDetails(requeue)

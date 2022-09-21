@@ -75,13 +75,16 @@ trait LnVortexTestUtils { self: EmbeddedPg =>
       () => pgUrl())
 
     val clientConf =
-      VortexAppConfig(dir, Vector(clientPg, serverPg, overrideConf) ++ config)
+      VortexAppConfig.fromDatadir(
+        dir,
+        Vector(clientPg, serverPg, overrideConf) ++ config)
     val serverConf =
-      VortexCoordinatorAppConfig(dir,
-                                 Vector(clientPg,
-                                        serverPg,
-                                        overrideConf,
-                                        genCoordinatorNameConf) ++ config)
+      VortexCoordinatorAppConfig.fromDatadir(
+        dir,
+        Vector(clientPg,
+               serverPg,
+               overrideConf,
+               genCoordinatorNameConf) ++ config)
 
     (clientConf, serverConf)
   }

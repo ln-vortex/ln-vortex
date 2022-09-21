@@ -42,6 +42,14 @@ class VortexClientTest extends VortexClientFixture {
   val dummyTweaks: BlindingTweaks =
     BlindingTweaks.freshBlindingTweaks(roundParams.publicKey, nonce)
 
+  it must "have create missing be idempotent" in { client =>
+    for {
+      utxos <- client.listCoins()
+      _ <- client.utxoDAO.createMissing(utxos)
+      utxos2 <- client.listCoins()
+    } yield assert(utxos == utxos2)
+  }
+
   it must "fail to process an unknown version AskRoundParameters" in {
     vortexClient =>
       forAllAsync(

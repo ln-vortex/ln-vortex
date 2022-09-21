@@ -21,12 +21,37 @@ class LndVortexWalletTest extends LndVortexWalletFixture {
     assert(wallet.network == RegTest)
   }
 
+  it must "get addresses" in { wallet =>
+    for {
+      p2wpkh <- wallet.getNewAddress(ScriptType.WITNESS_V0_KEYHASH)
+      p2tr <- wallet.getNewAddress(ScriptType.WITNESS_V1_TAPROOT)
+      nested <- wallet.getNewAddress(ScriptType.SCRIPTHASH)
+      _ = assertThrows[IllegalArgumentException](
+        wallet.getNewAddress(ScriptType.CLTV))
+    } yield {
+      assert(p2wpkh.value.startsWith("bcrt1q"))
+      assert(p2tr.value.startsWith("bcrt1p"))
+      assert(nested.value.startsWith("2"))
+    }
+  }
+
   it must "list transactions" in { wallet =>
     for {
       txs <- wallet.listTransactions()
     } yield {
       assert(txs.nonEmpty)
     }
+  }
+
+  it must "label a transaction" in { wallet =>
+    val testLabel = "hello world"
+
+    for {
+      tx <- wallet.listTransactions().map(_.head)
+      _ <- wallet.labelTransaction(tx.txId.flip, testLabel)
+      txs <- wallet.lndRpcClient.getTransactions()
+      labeled = txs.find(_.txId == tx.txId)
+    } yield assert(labeled.exists(_.label == testLabel))
   }
 
   it must "correctly sign a psbt with segwitV0 inputs" in { wallet =>

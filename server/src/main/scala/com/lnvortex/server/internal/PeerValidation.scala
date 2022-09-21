@@ -137,9 +137,8 @@ trait PeerValidation extends Logging { self: VortexCoordinator =>
         Some(new InvalidChangeScriptPubKeyException(
           s"Alice registered with invalid change spk ${registerInputs.changeSpkOpt}"))
       } else if (!enoughFunding) {
-        Some(
-          new NotEnoughFundingException(
-            s"Alice registered with not enough funding, need $excess more"))
+        Some(new NotEnoughFundingException(
+          s"Alice registered with not enough funding, need $excess more, feeRate: $currentFeeRate"))
       } else if (!uniqueSpks) {
         Some(
           new AttemptedAddressReuseException(
