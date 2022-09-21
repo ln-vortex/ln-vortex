@@ -3,7 +3,6 @@ package com.lnvortex.server
 import akka.http.scaladsl.model.ws.Message
 import akka.stream.OverflowStrategy
 import akka.stream.scaladsl._
-import com.lnvortex.core.ClientStatus
 import com.lnvortex.testkit._
 import org.bitcoins.core.script.ScriptType
 import org.bitcoins.core.script.ScriptType._
@@ -76,34 +75,6 @@ class RemixTest
 
       assert(coinsA.count(_.anonSet == 3) == 1)
       assert(coinsB.count(_.anonSet == 2) == 2)
-    }
-  }
-
-  it must "requeue" in { case (clientA, clientB, coordinator) =>
-    clientA.setRequeue(true)
-
-    for {
-      _ <- completeOnChainRound(None,
-                                peerId,
-                                peerId,
-                                clientA,
-                                clientB,
-                                coordinator)
-
-      nextCoordinator <- coordinator.getNextCoordinator
-      _ <- clientA.setRound(nextCoordinator.roundParams)
-      _ = assert(clientA.getCurrentRoundDetails.requeue)
-
-      _ <- TestAsyncUtil.awaitCondition(
-        () => {
-          clientA.getCurrentRoundDetails.status == ClientStatus.InputsScheduled
-        },
-        interval = interval,
-        maxTries = maxTries)
-    } yield {
-      assert(clientA.getCurrentRoundDetails.requeue)
-      assert(
-        clientA.getCurrentRoundDetails.status == ClientStatus.InputsScheduled)
     }
   }
 }

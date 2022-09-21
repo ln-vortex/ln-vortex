@@ -308,8 +308,8 @@ trait VortexHttpClient[+V <: VortexWalletApi] { self: VortexClient[V] =>
         updateFeeRate(feeRate)
         Future.unit
       case msg: NonceMessage =>
-        nonceMsgP.trySuccess(msg)
         storeNonce(msg.schnorrNonce)
+        nonceMsgP.trySuccess(msg)
         Future.unit
       case AskInputs(roundId, inputFee, outputFee, changeOutputFee) =>
         logger.info("Received AskInputs from coordinator")
