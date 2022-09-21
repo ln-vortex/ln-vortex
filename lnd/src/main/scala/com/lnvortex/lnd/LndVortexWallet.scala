@@ -112,9 +112,6 @@ case class LndVortexWallet(lndRpcClient: LndRpcClient)(implicit
         .map(_.getOrElse(
           throw new RuntimeException("Missing witness UTXO in psbt")))
 
-    require(prevOuts.size == unsigned.transaction.inputs.size,
-            "Number of previous outputs does not match number of inputs")
-
     val signDescriptors = inputs.map { input =>
       val idx = txOutpoints.indexOf(input.outPoint)
       val (signMethod, hashType) = getSignMethod(input.output)
