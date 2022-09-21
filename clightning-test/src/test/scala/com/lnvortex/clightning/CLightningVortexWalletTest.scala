@@ -19,6 +19,14 @@ import scala.concurrent.duration.DurationInt
 
 class CLightningVortexWalletTest extends CLightningVortexWalletFixture {
 
+  it must "list transactions" in { wallet =>
+    for {
+      txs <- wallet.listTransactions()
+    } yield {
+      assert(txs.nonEmpty)
+    }
+  }
+
   it must "correctly sign a psbt" in { wallet =>
     for {
       utxos <- wallet.listCoins()

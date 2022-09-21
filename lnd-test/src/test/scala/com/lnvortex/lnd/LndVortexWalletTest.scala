@@ -21,6 +21,14 @@ class LndVortexWalletTest extends LndVortexWalletFixture {
     assert(wallet.network == RegTest)
   }
 
+  it must "list transactions" in { wallet =>
+    for {
+      txs <- wallet.listTransactions()
+    } yield {
+      assert(txs.nonEmpty)
+    }
+  }
+
   it must "correctly sign a psbt with segwitV0 inputs" in { wallet =>
     for {
       utxos <- wallet
@@ -112,6 +120,36 @@ class LndVortexWalletTest extends LndVortexWalletFixture {
       case Failure(exception) => fail(exception)
       case Success(_)         => succeed
     }
+  }
+
+  it must "fail to sign a psbt with missing utxos" in { wallet =>
+    for {
+      utxos <- wallet.listCoins()
+      refs = utxos.map(_.outputReference)
+      addr <- wallet.getNewAddress(ScriptType.WITNESS_V1_TAPROOT)
+
+      inputs = utxos
+        .map(_.outPoint)
+        .map(TransactionInput(_, EmptyScriptSignature, UInt32.zero))
+
+      output = {
+        val amt = utxos.map(_.amount).sum - Satoshis(300)
+        TransactionOutput(amt, addr.scriptPubKey)
+      }
+
+      tx = BaseTransaction(Int32.two, inputs, Vector(output), UInt32.zero)
+      unsigned = PSBT.fromUnsignedTx(tx)
+
+      // call .tail to skip one of the inputs
+      psbt = inputs.zipWithIndex.tail.foldLeft(unsigned) {
+        case (psbt, (input, idx)) =>
+          val prevOut =
+            utxos.find(_.outPoint == input.previousOutput).get.output
+          psbt.addWitnessUTXOToInput(prevOut, idx)
+      }
+
+      ex = intercept[RuntimeException](wallet.signPSBT(psbt, refs))
+    } yield assert(ex.getMessage.contains("Missing witness UTXO in psbt"))
   }
 
   it must "correctly create input proofs" in { wallet =>
