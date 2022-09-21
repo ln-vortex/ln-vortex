@@ -27,6 +27,18 @@ class CLightningVortexWalletTest extends CLightningVortexWalletFixture {
     }
   }
 
+  it must "get addresses" in { wallet =>
+    for {
+      p2wpkh <- wallet.getNewAddress(ScriptType.WITNESS_V0_KEYHASH)
+      nested <- wallet.getNewAddress(ScriptType.SCRIPTHASH)
+      _ = assertThrows[IllegalArgumentException](
+        wallet.getNewAddress(ScriptType.CLTV))
+    } yield {
+      assert(p2wpkh.value.startsWith("bcrt1q"))
+      assert(nested.value.startsWith("2"))
+    }
+  }
+
   it must "correctly sign a psbt" in { wallet =>
     for {
       utxos <- wallet.listCoins()

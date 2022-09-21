@@ -11,7 +11,9 @@ import org.bitcoins.core.util.StartStopAsync
 
 import scala.concurrent._
 
-class VortexClientManager[+T <: VortexWalletApi](vortexWallet: T)(implicit
+class VortexClientManager[+T <: VortexWalletApi](
+    private[lnvortex] val vortexWallet: T,
+    extraCoordinators: Vector[CoordinatorAddress] = Vector.empty)(implicit
     val system: ActorSystem,
     val config: VortexAppConfig)
     extends StartStopAsync[Unit]
@@ -24,7 +26,8 @@ class VortexClientManager[+T <: VortexWalletApi](vortexWallet: T)(implicit
   lazy val utxoDAO: UTXODAO = UTXODAO()
 
   lazy val coordinators: Vector[CoordinatorAddress] = {
-    config.coordinatorAddresses.filter(_.network == vortexWallet.network)
+    val all = config.coordinatorAddresses ++ extraCoordinators
+    all.filter(_.network == vortexWallet.network)
   }
 
   lazy val clients: Vector[VortexClient[VortexWalletApi]] = {

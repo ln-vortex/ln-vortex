@@ -60,11 +60,12 @@ trait CLNClientServerPairFixture
           _ <- clientConfig.start()
           coordinatorAddr = CoordinatorAddress("test", RegTest, addr)
 
-          (lnd, peerLnd) <- CLNTestUtils.createNodePair(bitcoind,
+          (cln, peerLnd) <- CLNTestUtils.createNodePair(bitcoind,
                                                         inputScriptType)
-          client = VortexClient(CLightningVortexWallet(lnd), coordinatorAddr)(
-            system,
-            clientConfig)
+          vortexWallet = CLightningVortexWallet(cln)
+          _ <- vortexWallet.start()
+          client = VortexClient(vortexWallet, coordinatorAddr)(system,
+                                                               clientConfig)
           _ <- client.start()
 
           // wait for it to receive round params
