@@ -12,7 +12,6 @@ import org.bitcoins.lnd.rpc.LndRpcClient
 import org.bitcoins.testkit.EmbeddedPg
 import org.bitcoins.testkit.async.TestAsyncUtil
 import org.bitcoins.testkit.fixtures.BitcoinSFixture
-import org.bitcoins.testkit.lnd.LndRpcTestUtil
 import org.bitcoins.testkit.rpc.CachedBitcoindV23
 import org.scalatest.FutureOutcome
 
@@ -67,8 +66,6 @@ trait ClientServerPairFixture
             system,
             clientConfig)
           _ <- client.start()
-
-          _ <- LndRpcTestUtil.connectLNNodes(lnd, peerLnd)
 
           // wait for it to receive round params
           _ <- TestAsyncUtil.awaitCondition(() =>

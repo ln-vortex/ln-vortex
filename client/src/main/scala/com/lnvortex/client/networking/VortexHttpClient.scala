@@ -176,7 +176,8 @@ trait VortexHttpClient[+V <: VortexWalletApi] { self: VortexClient[V] =>
     } yield response
   }
 
-  protected def startRegistration(roundId: DoubleSha256Digest): Future[Unit] = {
+  protected def startRegistration(
+      roundId: DoubleSha256Digest): Future[NonceMessage] = {
     require(registrationQueue.isEmpty, "Already registered")
 
     val url = "ws://" + baseUrl + "/register/" + roundId.hex
@@ -187,6 +188,8 @@ trait VortexHttpClient[+V <: VortexWalletApi] { self: VortexClient[V] =>
                       maxConcurrentOffers = 2)
       .toMat(BroadcastHub.sink)(Keep.both)
       .run()
+
+    val nonceMsgP = Promise[NonceMessage]()
 
     val sink = Sink.foreachAsync[Message](5) {
       case TextMessage.Strict(text) =>
@@ -201,7 +204,7 @@ trait VortexHttpClient[+V <: VortexWalletApi] { self: VortexClient[V] =>
             Future.failed(
               new RuntimeException(s"Received client message $clientMessage"))
           case message: ServerVortexMessage =>
-            handleVortexMessage(queue, message)
+            handleVortexMessage(nonceMsgP, queue, message)
         }
       case streamed: TextMessage.Streamed =>
         streamed.textStream.runWith(Sink.ignore)
@@ -229,11 +232,11 @@ trait VortexHttpClient[+V <: VortexWalletApi] { self: VortexClient[V] =>
         settings = httpConnectionPoolSettings.connectionSettings)
     registrationQueue = Some((queue, shutdownP))
 
-    upgradeResponse.map {
-      case _: ValidUpgrade => ()
+    upgradeResponse.flatMap {
+      case _: ValidUpgrade => nonceMsgP.future
       case InvalidUpgradeResponse(response, cause) =>
-        throw new RuntimeException(
-          s"Connection failed ${response.status}: $cause")
+        Future.failed(
+          new RuntimeException(s"Connection failed ${response.status}: $cause"))
     }
   }
 
@@ -293,6 +296,7 @@ trait VortexHttpClient[+V <: VortexWalletApi] { self: VortexClient[V] =>
   }
 
   private def handleVortexMessage(
+      nonceMsgP: Promise[NonceMessage],
       queue: SourceQueueWithComplete[Message],
       message: ServerVortexMessage): Future[Unit] = {
     message match {
@@ -303,8 +307,9 @@ trait VortexHttpClient[+V <: VortexWalletApi] { self: VortexClient[V] =>
         logger.info(s"Received fee rate hint $feeRate")
         updateFeeRate(feeRate)
         Future.unit
-      case NonceMessage(schnorrNonce) =>
-        storeNonce(schnorrNonce)
+      case msg: NonceMessage =>
+        nonceMsgP.trySuccess(msg)
+        storeNonce(msg.schnorrNonce)
         Future.unit
       case AskInputs(roundId, inputFee, outputFee, changeOutputFee) =>
         logger.info("Received AskInputs from coordinator")
