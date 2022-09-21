@@ -175,6 +175,7 @@ list of transactions:
 - tx: String - transaction in network serialization
 - numConfirmations: Number
 - blockHeight: Number
+- isVortex: Boolean - if this transaction was a vortex transaction
 - label: String
 
 ### List Channels

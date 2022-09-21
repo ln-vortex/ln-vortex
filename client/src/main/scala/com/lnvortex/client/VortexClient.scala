@@ -157,6 +157,16 @@ case class VortexClient[+T <: VortexWalletApi](
     }
   }
 
+  def listTransactions(): Future[Vector[TransactionDetails]] = {
+    logger.trace("Returning wallet's transactions")
+    for {
+      txs <- vortexWallet.listTransactions()
+      vortexTxs <- utxoDAO.getVortexTransactions()
+    } yield {
+      txs.map(tx => tx.copy(isVortex = vortexTxs.contains(tx.txId)))
+    }
+  }
+
   def askNonce(): Future[SchnorrNonce] = {
     logger.info("Asking nonce from coordinator")
     roundDetails match {

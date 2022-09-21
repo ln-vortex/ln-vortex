@@ -8,5 +8,6 @@ case class TransactionDetails(
     tx: Transaction,
     numConfirmations: Int,
     blockHeight: Int,
+    isVortex: Boolean,
     label: String
 )

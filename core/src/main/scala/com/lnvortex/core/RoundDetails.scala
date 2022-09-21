@@ -10,7 +10,7 @@ import org.bitcoins.core.protocol.script.ScriptPubKey
 import org.bitcoins.core.protocol.transaction._
 import org.bitcoins.core.psbt.PSBT
 import org.bitcoins.core.wallet.fee.SatoshisPerVirtualByte
-import org.bitcoins.crypto.{SchnorrNonce, StringFactory}
+import org.bitcoins.crypto.{DoubleSha256DigestBE, SchnorrNonce, StringFactory}
 
 import java.net.InetSocketAddress
 
@@ -225,8 +225,9 @@ case class PSBTSigned(
     extends InitializedRound {
   override val status: ClientStatus = ClientStatus.PSBTSigned
 
+  val txId: DoubleSha256DigestBE = psbt.transaction.txIdBE
+
   val targetOutpoint: TransactionOutPoint = {
-    val txId = psbt.transaction.txId
     val vout = UInt32(
       psbt.transaction.outputs.indexWhere(
         _.scriptPubKey == initDetails.targetOutput.scriptPubKey))
@@ -236,7 +237,6 @@ case class PSBTSigned(
 
   val changeOutpointOpt: Option[TransactionOutPoint] =
     initDetails.changeSpkOpt.map { spk =>
-      val txId = psbt.transaction.txId
       val vout =
         UInt32(psbt.transaction.outputs.indexWhere(_.scriptPubKey == spk))
 
