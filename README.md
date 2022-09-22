@@ -1,4 +1,10 @@
-# Vortex
+<div>
+  <img src="docs/assets/vortex-light-mode.svg#gh-light-mode-only" alt="ln-vortex">
+  <img src="docs/assets/vortex-dark-mode.svg#gh-dark-mode-only" alt="ln-vortex">
+</div>
+
+---
+
 [![Build Status](https://github.com/ln-vortex/ln-vortex/workflows/CI%20to%20Docker%20Hub/badge.svg)](https://github.com/ln-vortex/ln-vortex/actions)
 [![Coverage Status](https://coveralls.io/repos/github/ln-vortex/ln-vortex/badge.svg?branch=master)](https://coveralls.io/github/ln-vortex/ln-vortex?branch=master)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
