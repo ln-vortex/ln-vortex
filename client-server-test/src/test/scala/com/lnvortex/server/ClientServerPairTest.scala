@@ -95,6 +95,10 @@ class ClientServerPairTest
       _ <- completeChannelRound(peerId, client, coordinator, peerLnd)
 
       roundDbs <- coordinator.roundDAO.findAll()
-    } yield assert(roundDbs.size == 2)
+      txs <- client.listTransactions()
+    } yield {
+      assert(roundDbs.size == 2)
+      assert(txs.exists(_.isVortex))
+    }
   }
 }

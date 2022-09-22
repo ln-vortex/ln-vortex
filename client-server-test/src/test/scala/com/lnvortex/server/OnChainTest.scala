@@ -98,6 +98,10 @@ class OnChainTest
       _ <- TestAsyncUtil.nonBlockingSleep(5.seconds)
 
       roundDbs <- coordinator.roundDAO.findAll()
-    } yield assert(roundDbs.size == 2)
+      txs <- client.listTransactions()
+    } yield {
+      assert(roundDbs.size == 2)
+      assert(txs.exists(_.isVortex))
+    }
   }
 }

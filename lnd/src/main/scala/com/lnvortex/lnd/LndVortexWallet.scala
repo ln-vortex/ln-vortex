@@ -200,6 +200,7 @@ case class LndVortexWallet(lndRpcClient: LndRpcClient)(implicit
                            tx = tx.tx,
                            numConfirmations = tx.numConfirmations,
                            blockHeight = tx.blockHeight,
+                           isVortex = false,
                            label = tx.label)
       })
   }

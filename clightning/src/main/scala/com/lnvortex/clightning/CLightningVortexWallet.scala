@@ -161,6 +161,7 @@ case class CLightningVortexWallet(clightning: CLightningRpcClient)(implicit
                            tx = tx.rawtx,
                            numConfirmations = confs,
                            blockHeight = tx.blockheight,
+                           isVortex = false,
                            label = "")
       }
     }

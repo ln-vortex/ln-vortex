@@ -49,7 +49,7 @@ class VortexClientManager[+T <: VortexWalletApi](
   }
 
   def listTransactions(): Future[Vector[TransactionDetails]] = {
-    vortexWallet.listTransactions()
+    clients.head.listTransactions()
   }
 
   override def start(): Future[Unit] = {

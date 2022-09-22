@@ -4,6 +4,7 @@ import com.lnvortex.client.config.VortexAppConfig
 import com.lnvortex.core.{PSBTSigned, UTXOWarning, UnspentCoin}
 import org.bitcoins.core.protocol.script.ScriptPubKey
 import org.bitcoins.core.protocol.transaction.TransactionOutPoint
+import org.bitcoins.crypto.DoubleSha256DigestBE
 import org.bitcoins.db._
 import slick.lifted.ProvenShape
 
@@ -73,10 +74,12 @@ case class UTXODAO()(implicit
               } else (1, None)
 
             UTXODb(outPoint = m.outPoint,
+                   txId = m.outPoint.txIdBE,
                    scriptPubKey = m.spk,
                    anonSet = anonSet,
                    warning = warning,
-                   isChange = false)
+                   isChange = false,
+                   isVortex = true)
           }
 
           createAllAction(dbs)
@@ -100,10 +103,12 @@ case class UTXODAO()(implicit
         } else (1, None)
 
         UTXODb(outPoint = c,
+               txId = c.txIdBE,
                scriptPubKey = spk,
                anonSet = anonSet,
                warning = warning,
-               isChange = true)
+               isChange = true,
+               isVortex = true)
       }
 
       val minPrevAnonSet =
@@ -117,10 +122,12 @@ case class UTXODAO()(implicit
         }
 
       val outputDb = UTXODb(state.targetOutpoint,
+                            state.txId,
                             state.targetSpk,
                             newAnonSet,
                             warning = warning,
-                            isChange = false)
+                            isChange = false,
+                            isVortex = true)
       val newDbs = outputDb +: changeDbOpt.toVector
 
       upsertAllAction(newDbs)
@@ -129,9 +136,16 @@ case class UTXODAO()(implicit
     safeDatabase.run(q)
   }
 
+  def getVortexTransactions(): Future[Vector[DoubleSha256DigestBE]] = {
+    val q = table.filter(_.isVortex).map(_.txId).result
+    safeDatabase.runVec(q)
+  }
+
   class UTXOTable(tag: Tag) extends Table[UTXODb](tag, schemaName, "utxos") {
 
     def outPoint: Rep[TransactionOutPoint] = column("outpoint", O.PrimaryKey)
+
+    def txId: Rep[DoubleSha256DigestBE] = column("txid")
 
     def spk: Rep[ScriptPubKey] = column("script_pub_key")
 
@@ -141,8 +155,11 @@ case class UTXODAO()(implicit
 
     def isChange: Rep[Boolean] = column("is_change")
 
+    def isVortex: Rep[Boolean] = column("is_vortex")
+
     def * : ProvenShape[UTXODb] =
-      (outPoint, spk, anonSet, warning, isChange).<>(UTXODb.tupled,
-                                                     UTXODb.unapply)
+      (outPoint, txId, spk, anonSet, warning, isChange, isVortex).<>(
+        UTXODb.tupled,
+        UTXODb.unapply)
   }
 }
