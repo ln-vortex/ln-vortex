@@ -7,9 +7,9 @@ services:
     restart: on-failure
     stop_grace_period: 1m
     environment:
-      rpcUrl: "http://vortexd:12522"
-      rpcUser: "user"
-      rpcPassword: $APP_PASSWORD
+      VORTEX_RPC_URL: "http://vortexd:12522"
+      VORTEX_RPC_USER: "user"
+      VORTEX_RPC_PASSWORD: $APP_PASSWORD
     ports:
       - "3000:3000"
     depends_on:
