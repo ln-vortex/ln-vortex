@@ -1,28 +1,21 @@
 version: "3.7"
 
 services:
-#  web:
-#    image: bitcoinscala/wallet-server-ui:latest
-#    user: 0:1000
-#    restart: on-failure
-#    stop_grace_period: 1m
-#    volumes:
-#      - ./data/wallet:/bitcoin-s
-#      - ./data/log:/log
-#    environment:
-#      LOG_PATH: "/log/"
-#      BITCOIN_S_HOME: "/bitcoin-s/"
-#      MEMPOOL_API_URL: "http://mempool.space/api"
-#      WALLET_SERVER_API_URL: "http://walletserver:9999/"
-#      WALLET_SERVER_WS: "ws://walletserver:19999/events"
-#      DEFAULT_UI_PASSWORD: $APP_PASSWORD
-#      BITCOIN_S_SERVER_RPC_PASSWORD: $APP_PASSWORD
-#    ports:
-#      - "3002:3002"
-#    depends_on:
-#      - walletserver
+  gui:
+    image: lnvortex/vortex-gui:master
+    user: 0:1000
+    restart: on-failure
+    stop_grace_period: 1m
+    environment:
+      rpcUrl: "http://vortexd:12522"
+      rpcUser: "user"
+      rpcPassword: $APP_PASSWORD
+    ports:
+      - "3000:3000"
+    depends_on:
+      - vortexd
   vortexd:
-    image: lnvortex/vortexd:0.0.0-310-891b5315-SNAPSHOT@sha256:eef1aeec10cfe04eb9f185993fb2171d6f74aecd15e3572ace620e2b7264c028
+    image: lnvortex/vortexd:0.0.0-387-ae87716a-SNAPSHOT@sha256:6f1ee215f74600a401b6112ed112065ccd084ecbf4dce5a7063cc5cb9bd079a0
     entrypoint: ["/opt/docker/bin/vortexd", "--datadir", "/ln-vortex", "--conf", "/opt/docker/docker-application.conf"]
     user: 0:1000
     restart: on-failure
@@ -30,20 +23,23 @@ services:
       - ./data/wallet:/ln-vortex
       - ${HOME}/.lnd:/lnd:ro
     environment:
+      BITCOIN_S_NETWORK: "testnet3"
+
       BITCOIN_S_TOR_PROVIDED: "true"
-      BITCOIN_S_PROXY_ENABLED: "false"
       BITCOIN_S_TOR_ENABLED: "false"
+      BITCOIN_S_PROXY_ENABLED: "true"
+      BITCOIN_S_SOCKS5_PROXY: "tor:9050"
 
-      BITCOIN_S_TOR_CONTROL: "tor:9051"
-      BITCOIN_S_TOR_PASSWORD: "topsecret"
-
-      VORTEX_RPC_USER: "docker-auth"
+      VORTEX_RPC_USER: "user"
       VORTEX_RPC_PASSWORD: $APP_PASSWORD
 
       VORTEX_LND_RPC_URI: "$APP_LIGHTNING_NODE_IP:$APP_LIGHTNING_NODE_GRPC_PORT"
       VORTEX_LND_DATADIR: "/lnd/"
     ports:
-      - "12524:12524"
+      - "2522:2522"
+      - "12522:12522"
+      - "22522:22522"
+      - "32522:32522"
     # to connect to locally running lightning node
     extra_hosts:
       - "host.docker.internal:host-gateway"
