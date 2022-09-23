@@ -192,8 +192,18 @@ case class BitcoindVortexWallet(
   override def stop(): Future[Unit] = Future.unit
 
   override def listTransactions(): Future[Vector[TransactionDetails]] = {
-    // todo
-    Future.successful(Vector.empty)
+    bitcoind.listTransactions(count = 100).map { txs =>
+      txs.map { tx =>
+        TransactionDetails(
+          txId = tx.txid.get,
+          tx = EmptyTransaction,
+          numConfirmations = tx.confirmations.getOrElse(0),
+          blockHeight = tx.blockheight.getOrElse(0),
+          isVortex = false,
+          label = tx.label.getOrElse("")
+        )
+      }
+    }
   }
 
   override def listChannels(): Future[Vector[ChannelDetails]] = Future.failed(
