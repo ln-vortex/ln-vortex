@@ -61,6 +61,14 @@ class BitcoindVortexWalletTest extends BitcoinSFixture with CachedBitcoindV23 {
     }
   }
 
+  it must "list transactions" in { wallet =>
+    for {
+      txs <- wallet.listTransactions()
+    } yield {
+      assert(txs.nonEmpty)
+    }
+  }
+
   it must "correctly sign a psbt" in { wallet =>
     for {
       utxos <- wallet.listCoins()
