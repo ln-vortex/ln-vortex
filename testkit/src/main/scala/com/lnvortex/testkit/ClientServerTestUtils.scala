@@ -21,7 +21,7 @@ import org.scalactic.Tolerance.convertNumericToPlusOrMinusWrapper
 import org.scalatest.Assertions.convertToEqualizer
 
 import scala.concurrent.duration.DurationInt
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.util.Random
 
 trait ClientServerTestUtils {
@@ -124,7 +124,9 @@ trait ClientServerTestUtils {
       utxos <- clientB.listCoins().map(c => Random.shuffle(c).take(1))
       _ <- clientB.queueCoins(utxos.map(_.outputReference), nodeIdA, None)
 
-      msg <- coordinator.getAskInputsMessage
+      _ <- coordinator.checkBeginInputRegistration()
+      // this is a promise so give it a timeout in case it never completes
+      msg = Await.result(coordinator.getAskInputsMessage, 30.seconds)
 
       registerInputsA <- clientA.registerCoins(msg.roundId,
                                                msg.inputFee,
@@ -147,6 +149,7 @@ trait ClientServerTestUtils {
       peerLnd: LndRpcClient)(implicit ec: ExecutionContext): Future[Unit] = {
     for {
       blindSig <- registerInputs(peerId, client, coordinator, peerLnd)
+      _ <- coordinator.checkBeginInputRegistration()
 
       register = client.processBlindOutputSig(blindSig)
 
@@ -431,7 +434,10 @@ trait ClientServerTestUtils {
         coordinator.roundParams.outputType)
       coinsB = Random.shuffle(utxosB.map(_.outputReference)).take(1)
       _ = clientB.queueCoins(coinsB, addrB)
-      msg <- coordinator.getAskInputsMessage
+
+      _ <- coordinator.checkBeginInputRegistration()
+      // this is a promise so give it a timeout in case it never completes
+      msg = Await.result(coordinator.getAskInputsMessage, 30.seconds)
 
       registerInputsA <- clientA.registerCoins(msg.roundId,
                                                msg.inputFee,

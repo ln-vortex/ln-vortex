@@ -18,7 +18,6 @@ import org.bitcoins.core.protocol.transaction._
 import org.bitcoins.core.psbt.PSBT
 import org.bitcoins.core.util.TimeUtil
 import org.bitcoins.crypto._
-import org.bitcoins.rpc.BitcoindException.InvalidAddressOrKey
 import org.bitcoins.testkit.EmbeddedPg
 import org.bitcoins.testkitcore.Implicits.GeneratorOps
 
@@ -612,7 +611,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
                                 dummyQueue(),
                                 coordinator.getCurrentRoundId)
       _ <- coordinator.beginInputRegistration()
-      res <- recoverToSucceededIf[InvalidAddressOrKey](
+      res <- recoverToSucceededIf[InvalidInputsException](
         coordinator.registerAlice(Sha256Digest.empty, genInputs))
     } yield res
   }

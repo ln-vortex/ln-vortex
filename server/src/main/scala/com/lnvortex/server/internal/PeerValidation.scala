@@ -10,7 +10,7 @@ import org.bitcoins.core.currency._
 import org.bitcoins.core.protocol.BitcoinAddress
 import org.bitcoins.core.protocol.script.ScriptPubKey
 import org.bitcoins.core.protocol.transaction.TransactionOutput
-import org.bitcoins.core.util.TimeUtil
+import org.bitcoins.core.util.{FutureUtil, TimeUtil}
 
 import scala.concurrent._
 import scala.util._
@@ -20,9 +20,12 @@ trait PeerValidation extends Logging { self: VortexCoordinator =>
   def validateAliceInput(
       inputRef: InputReference,
       isRemix: Boolean,
-      aliceDb: Option[AliceDb],
+      aliceDbOpt: Option[AliceDb],
       otherInputs: Vector[RegisteredInputDb]): Future[
     Option[InvalidInputsException]] = {
+    logger.trace(s"Validating input $inputRef")
+    logger.trace(s"Validating input ${inputRef.outPoint.toHumanReadableString}")
+
     val outPoint = inputRef.outPoint
     val output = inputRef.output
 
@@ -37,29 +40,40 @@ trait PeerValidation extends Logging { self: VortexCoordinator =>
         case None => true
       }
 
-      txResult <- bitcoind.getRawTransaction(outPoint.txIdBE)
-      txOutT = Try(txResult.vout(outPoint.vout.toInt))
-      isRealInput = txOutT match {
-        case Failure(_) => false
-        case Success(out) =>
+      callT = Try(
+        bitcoind.getTxOut(outPoint.txIdBE, outPoint.vout.toInt).map(Some(_)))
+
+      getTxOutF <- Future
+        .fromTry(callT)
+        .map(Some(_))
+        .recover(_ => None)
+
+      txOutOpt <- getTxOutF
+        .getOrElse(FutureUtil.none)
+        .recover { case _: Throwable =>
+          None
+        }
+    } yield {
+      val isRealInput = txOutOpt match {
+        case None => false
+        case Some(out) =>
           val spk = ScriptPubKey.fromAsmHex(out.scriptPubKey.hex)
           TransactionOutput(out.value, spk) == output
       }
-      isConfirmed = txResult.confirmations.exists(_ > 0)
-      validConfs = isConfirmed || isRemix
+      lazy val isConfirmed = txOutOpt.exists(_.confirmations > 0)
+      lazy val validConfs = isConfirmed || isRemix
 
-      peerNonce = aliceDb match {
+      lazy val peerNonce = aliceDbOpt match {
         case Some(db) => db.nonce
         case None =>
           throw new IllegalArgumentException(s"No alice found")
       }
-      validProof = InputReference.verifyInputProof(inputRef, peerNonce)
+      lazy val validProof = InputReference.verifyInputProof(inputRef, peerNonce)
 
-      uniqueSpk = !otherInputs
+      lazy val uniqueSpk = !otherInputs
         .map(_.output.scriptPubKey)
         .contains(output.scriptPubKey)
 
-    } yield {
       if (!correctScriptType) {
         Some(new InvalidInputsException(
           s"UTXO ${outPoint.toHumanReadableString} has invalid script type, got ${inputRef.output.scriptPubKey.scriptType}"))
@@ -97,6 +111,7 @@ trait PeerValidation extends Logging { self: VortexCoordinator =>
       // if it is a remix we don't care about the change
       None
     } else {
+      logger.debug("Validating Alice's change")
       val uniqueChangeSpk = registerInputs.changeSpkOpt.forall { spk =>
         !otherInputs
           .map(_.output.scriptPubKey)
