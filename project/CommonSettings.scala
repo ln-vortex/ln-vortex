@@ -164,6 +164,8 @@ object CommonSettings {
     Compile / unmanagedResourceDirectories += baseDirectory.value / "src" / "universal"
   )
 
+  lazy val additionalDockerTag: Option[String] = sys.env.get("DOCKER_TAG")
+
   lazy val dockerSettings: Seq[Setting[_]] = {
     Vector(
       // https://sbt-native-packager.readthedocs.io/en/latest/formats/docker.html
@@ -178,7 +180,10 @@ object CommonSettings {
       Docker / version := version.value,
       // add a default exposed volume of /ln-vortex so we can always write data here
       dockerExposedVolumes += "/ln-vortex",
-      dockerUpdateLatest := isRelease
+      dockerUpdateLatest := isRelease,
+      dockerAliases ++= additionalDockerTag
+        .map(t => dockerAlias.value.withTag(Some(t)))
+        .toSeq
     )
   }
 
