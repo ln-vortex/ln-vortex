@@ -49,9 +49,8 @@ object RoundStatus extends StringFactory[RoundStatus] {
   }
 
   override def fromString(string: String): RoundStatus = {
-    fromStringOpt(string) match {
-      case Some(value) => value
-      case None        => sys.error(s"Could not find a RoundStatus for $string")
-    }
+    fromStringOpt(string).getOrElse(
+      throw new IllegalArgumentException(
+        s"Could not find a RoundStatus for string: $string"))
   }
 }
