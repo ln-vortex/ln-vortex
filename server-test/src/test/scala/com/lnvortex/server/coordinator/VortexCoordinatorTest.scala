@@ -18,12 +18,11 @@ import org.bitcoins.core.protocol.transaction._
 import org.bitcoins.core.psbt.PSBT
 import org.bitcoins.core.util.TimeUtil
 import org.bitcoins.crypto._
-import org.bitcoins.testkit.EmbeddedPg
 import org.bitcoins.testkitcore.Implicits.GeneratorOps
 
 import scala.concurrent.Future
 
-class VortexCoordinatorTest extends VortexCoordinatorFixture with EmbeddedPg {
+class VortexCoordinatorTest extends VortexCoordinatorFixture {
   behavior of "VortexCoordinator"
 
   val badPeerId: Sha256Digest = Sha256Digest(
