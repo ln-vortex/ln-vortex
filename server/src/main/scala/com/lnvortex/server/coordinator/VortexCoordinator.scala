@@ -96,6 +96,7 @@ class VortexCoordinator private (
   }
 
   private[server] def sendUpdatedFeeRate(): Future[SatoshisPerVirtualByte] = {
+    logger.debug("Updating fee rate...")
     config.fetchFeeRate().map { feeRate =>
       if (feeRate != currentFeeRate) {
         currentFeeRate = feeRate
@@ -183,7 +184,7 @@ class VortexCoordinator private (
   private val inputsRegisteredP: Promise[Unit] = Promise[Unit]()
   private val outputsRegisteredP: Promise[Unit] = Promise[Unit]()
 
-  private val signedPMap: mutable.Map[Sha256Digest, Boolean] =
+  private val signedPeersMap: mutable.Map[Sha256Digest, Boolean] =
     mutable.Map.empty
 
   private val completedTxP: Promise[Transaction] =
@@ -235,10 +236,17 @@ class VortexCoordinator private (
         case MainNet | TestNet3 | SigNet =>
           // Wait 3 seconds to help prevent race conditions in clients
           // but only in live environments
+          val duration = 3.seconds
+          logger.debug(s"Waiting $duration until fetching fee rate")
           AsyncUtil
-            .nonBlockingSleep(3.seconds)
-            .flatMap(_ => config.fetchFeeRate())
-        case RegTest => config.fetchFeeRate()
+            .nonBlockingSleep(duration)
+            .flatMap { _ =>
+              logger.debug("Fetching fee rate")
+              config.fetchFeeRate()
+            }
+        case RegTest =>
+          logger.debug("Fetching fee rate")
+          config.fetchFeeRate()
       }
 
       feeRateF.flatMap { feeRate =>
@@ -246,6 +254,7 @@ class VortexCoordinator private (
 
         val action = for {
           roundDb <- currentRoundAction()
+          _ = logger.trace("Updating round status and fee rate")
           updated = roundDb.copy(status = RegisterAlices,
                                  feeRate = Some(feeRate))
           _ <- roundDAO.updateAction(updated)
@@ -255,6 +264,7 @@ class VortexCoordinator private (
         safeDatabase.run(action).flatMap { numAlices =>
           if (numAlices >= config.minPeers) {
             // Create Output Registration timer
+            logger.debug("Scheduling input registration timeout")
             beginOutputRegistrationCancellable = Some(
               system.scheduler.scheduleOnce(config.inputRegistrationTime) {
                 inputsRegisteredP.trySuccess(())
@@ -305,13 +315,18 @@ class VortexCoordinator private (
 
     val action = for {
       roundDb <- currentRoundAction()
+      _ = logger.trace("Updating round status")
       updated = roundDb.copy(status = RegisterOutputs)
       _ <- roundDAO.updateAction(updated)
 
+      _ = logger.trace("Getting alices registered for current round")
       alices <- aliceDAO.findRegisteredForRoundAction(roundId)
     } yield {
       val numRemixes = alices.count(_.isRemix)
       val numNewEntrants = alices.count(!_.isRemix)
+
+      logger.trace(
+        s"Found $numRemixes remixes and $numNewEntrants new entrants")
 
       if (numRemixes < config.minRemixPeers) {
         throw new RuntimeException(
@@ -321,6 +336,7 @@ class VortexCoordinator private (
           s"Not enough new entrants: $numNewEntrants < ${config.minNewPeers}")
       }
 
+      logger.debug("Scheduling output registration timeout")
       sendPSBTCancellable = Some(
         system.scheduler.scheduleOnce(config.outputRegistrationTime) {
           outputsRegisteredP.trySuccess(())
@@ -373,11 +389,13 @@ class VortexCoordinator private (
     }
     // $COVERAGE-ON$
 
+    logger.debug("Generating fee address")
     for {
       addr <- bitcoind.getNewAddress(roundAddressLabel, addressType)
       psbt <- constructUnsignedPSBT(addr)
 
       msg = TextMessage(Json.toJson(UnsignedPsbtMessage(psbt)).toString)
+      _ = logger.info("Sending psbt to peers")
       sendFs = connectionHandlerMap.map { case (id, peer) =>
         logger.trace(s"Sending UnsignedPsbtMessage to peer ${id.hex}")
         peer.offer(msg).map(_ => ()).recover { ex =>
@@ -386,8 +404,9 @@ class VortexCoordinator private (
       }
       _ <- Future.sequence(sendFs)
 
+      _ = logger.info("Awaiting signatures from peers")
       _ <- AsyncUtil
-        .awaitCondition(() => signedPMap.forall(_._2),
+        .awaitCondition(() => signedPeersMap.forall(_._2),
                         1.second,
                         config.signingTime.toSeconds.toInt)
         .recoverWith { case _: TimeoutException =>
@@ -395,15 +414,19 @@ class VortexCoordinator private (
           Future.failed(
             new RuntimeException("Timed out waiting for all peers to sign"))
         }
+      _ = logger.info("Received signatures from all peers")
 
       alices <- aliceDAO.findSignedForRound(roundId)
 
+      _ = logger.info("Constructing final transaction")
       signedT = Try {
         val psbts = alices.flatMap(_.signedPSBT)
 
         val combined = psbts.reduce(_ combinePSBT _)
         combined.extractTransactionAndValidate
       }.flatten
+
+      _ = logger.trace(s"Final transaction: ${signedT.map(_.hex)}")
 
       // make promise complete
       _ = completedTxP.tryComplete(signedT)
@@ -412,12 +435,14 @@ class VortexCoordinator private (
 
   private[lnvortex] def onCompletedTransaction(
       tx: Transaction): Future[Unit] = {
+    logger.info(s"Broadcasting transaction ${tx.txIdBE.hex}")
     val f = for {
       _ <- bitcoind.sendRawTransaction(tx)
-      _ = logger.info(s"Broadcasted transaction ${tx.txIdBE.hex}")
+      _ = logger.debug(s"Broadcasted transaction ${tx.txIdBE.hex}")
 
       msg = SignedTxMessage(tx)
 
+      _ = logger.debug(s"Sending SignedTxMessage to peers")
       // Announce to peers
       sendFs = connectionHandlerMap.map { case (peerId, peer) =>
         logger.trace(s"Sending SignedTxMessage to peer ${peerId.hex}")
@@ -428,6 +453,7 @@ class VortexCoordinator private (
           }
       }
 
+      _ = logger.debug(s"Calculating coordinator profit")
       addrs <- bitcoind.listReceivedByAddress(confirmations = 0,
                                               includeEmpty = false,
                                               includeWatchOnly = true,
@@ -436,6 +462,7 @@ class VortexCoordinator private (
       profitOpt = addrOpt.map(_.amount)
       profit = profitOpt.getOrElse(Satoshis.zero)
 
+      _ = logger.info(s"Updating round with profit $profit")
       action = currentRoundAction().flatMap { roundDb =>
         val updatedRoundDb = roundDb.completeRound(tx, profit)
         roundDAO.updateAction(updatedRoundDb)
@@ -443,6 +470,8 @@ class VortexCoordinator private (
 
       _ <- safeDatabase.run(action)
       _ <- Future.sequence(sendFs)
+
+      _ = logger.info("Round complete!")
       _ <- VortexCoordinator.nextRound(this)
     } yield ()
 
@@ -468,6 +497,7 @@ class VortexCoordinator private (
     aliceDAO.findByPrimaryKeyAction(peerId).flatMap {
       case Some(alice) =>
         if (alice.roundId == peerRoundId) {
+          logger.trace("Already registered alice, giving same nonce")
           DBIO.successful(alice)
         } else {
           DBIO.failed(new RuntimeException(
@@ -488,18 +518,23 @@ class VortexCoordinator private (
       peerId: Sha256Digest,
       connectionHandler: SourceQueueWithComplete[Message],
       peerRoundId: DoubleSha256Digest): Future[AliceDb] = {
-    safeDatabase.run(getNonceAction(peerId, peerRoundId)).flatMap { db =>
+    safeDatabase.run(getNonceAction(peerId, peerRoundId)).map { db =>
+      logger.debug("Adding alice to connection handler map")
       connectionHandlerMap.put(peerId, connectionHandler)
+      db
+    }
+  }
 
-      // Call this synchronized so that we don't send AskInputs twice
-      synchronized {
-        if (
-          connectionHandlerMap.values.size >= config.maxPeers
-          && !beginInputRegistrationCancellable.isCancelled
-        ) {
-          beginInputRegistration().map(_ => db)
-        } else Future.successful(db)
-      }
+  def checkBeginInputRegistration(): Future[Option[AskInputs]] = {
+    // Call this synchronized so that we don't send AskInputs twice
+    synchronized {
+      logger.debug("Checking if we should begin input registration")
+      if (
+        connectionHandlerMap.values.size >= config.maxPeers
+        && !beginInputRegistrationCancellable.isCancelled
+      ) {
+        beginInputRegistration().map(Some(_))
+      } else FutureUtil.none
     }
   }
 
@@ -507,6 +542,8 @@ class VortexCoordinator private (
       either: Either[SchnorrNonce, Sha256Digest],
       roundId: DoubleSha256Digest): Future[Unit] = {
     if (this.roundId == roundId) {
+      logger.debug(s"Canceling registration for peer $either")
+
       val action = for {
         aliceDbOpt <- aliceDAO.findByEitherAction(either)
         aliceDb = aliceDbOpt match {
@@ -517,13 +554,11 @@ class VortexCoordinator private (
           case None =>
             throw new IllegalArgumentException(s"No alice found with $either")
         }
-        _ = logger.info(s"Alice ${aliceDb.peerId.hex} canceling registration")
-
         _ <- inputsDAO.deleteByPeerIdAction(aliceDb.peerId, aliceDb.roundId)
         _ <- aliceDAO.deleteAction(aliceDb)
-        _ = signedPMap.remove(aliceDb.peerId)
+        _ = signedPeersMap.remove(aliceDb.peerId)
         _ = connectionHandlerMap.remove(aliceDb.peerId)
-      } yield ()
+      } yield logger.info(s"Alice ${aliceDb.peerId.hex} canceled registration")
 
       safeDatabase.run(action)
     } else Future.unit
@@ -543,6 +578,7 @@ class VortexCoordinator private (
     }
 
     val isRemixF = if (registerInputs.inputs.size == 1) {
+      logger.debug("Checking if alice is remixing")
       val inputRef = registerInputs.inputs.head
       bitcoind.getRawTransactionRaw(inputRef.outPoint.txIdBE).map { tx =>
         Try {
@@ -569,11 +605,11 @@ class VortexCoordinator private (
       case (accum, inputRef) =>
         if (accum.isEmpty) {
           for {
-            (_, aliceDb, otherInputDbs) <- dbF
+            (_, aliceDbOpt, otherInputDbs) <- dbF
             isRemix <- isRemixF
             errorOpt <- validateAliceInput(inputRef,
                                            isRemix,
-                                           aliceDb,
+                                           aliceDbOpt,
                                            otherInputDbs)
           } yield errorOpt
         } else Future.successful(accum)
@@ -644,6 +680,7 @@ class VortexCoordinator private (
       registerInputs: RegisterInputs,
       banError: VortexServerException,
       roundId: DoubleSha256Digest): Future[Nothing] = {
+    logger.info(s"Banning ${registerInputs.inputs.size} inputs")
     val bannedUntil =
       TimeUtil.now.plusSeconds(config.badInputsBanDuration.toSeconds)
 
@@ -786,6 +823,7 @@ class VortexCoordinator private (
           }
 
           // add inputs
+          logger.trace("Adding inputs to transaction")
           txBuilder ++= inputDbs.map(_.transactionInput)
 
           val usedExcess = if (excess < Satoshis.zero) Satoshis.zero else excess
@@ -798,20 +836,25 @@ class VortexCoordinator private (
           val outputsToAdd =
             targetOutputs ++ changeOutputs :+ coordinatorFeeOutput
 
+          logger.trace("Adding outputs to transaction")
           txBuilder ++= outputsToAdd
 
+          logger.trace("Constructing transaction")
           val transaction = txBuilder.buildTx()
 
           val outPoints = transaction.inputs.map(_.previousOutput)
 
+          logger.trace("Constructing PSBT")
           val unsigned = PSBT.fromUnsignedTx(transaction)
 
+          logger.debug("Adding utxos to PSBT")
           val psbt = outPoints.zipWithIndex.foldLeft(unsigned) {
             case (psbt, (outPoint, idx)) =>
               val prevOut = inputDbs.find(_.outPoint == outPoint).get.output
               psbt.addWitnessUTXOToInput(prevOut, idx)
           }
 
+          logger.debug("Updating round status and adding psbt")
           val updatedRound =
             roundDb.copy(psbtOpt = Some(psbt), status = SigningPhase)
           val updatedInputs = inputDbs.map { db =>
@@ -819,8 +862,9 @@ class VortexCoordinator private (
             db.copy(indexOpt = Some(index))
           }
 
+          logger.debug("Creating signedPeersMap")
           inputDbs.map(_.peerId).distinct.foreach { peerId =>
-            signedPMap.put(peerId, false)
+            signedPeersMap.put(peerId, false)
           }
 
           for {
@@ -857,6 +901,7 @@ class VortexCoordinator private (
           case Some(unsignedPsbt) =>
             val correctNumInputs = inputs.size == aliceDb.numInputs
             val sameTx = unsignedPsbt.transaction == psbt.transaction
+            logger.debug("Verifying psbt signatures")
             lazy val validSigs =
               Try(
                 inputs
@@ -868,7 +913,7 @@ class VortexCoordinator private (
               logger.info(s"${peerId.hex} successfully registered signatures")
               for {
                 _ <- aliceDAO.update(aliceDb.markSigned(psbt))
-                _ = signedPMap.update(peerId, true)
+                _ = signedPeersMap.update(peerId, true)
               } yield ()
             } else {
               val bannedUntil =
@@ -915,6 +960,7 @@ class VortexCoordinator private (
   }
 
   def cancelRound(): Future[Unit] = {
+    logger.info(s"Canceling round ${roundId.hex}")
     val action = for {
       roundDb <- currentRoundAction()
       _ <- roundDAO.updateAction(roundDb.copy(status = Canceled))
@@ -927,15 +973,17 @@ class VortexCoordinator private (
   }
 
   def reconcileRound(): Future[Vector[RestartRoundMessage]] = {
+    logger.info(s"Reconciling round ${roundId.hex}")
     // Cancel other potentials calls of this function
     completedTxP.tryFailure(new RuntimeException("Reconciling round"))
 
     val action = for {
       round <- currentRoundAction()
+      _ = logger.debug("Setting round status to Reconciled")
       updated = round.copy(status = Reconciled)
       _ <- roundDAO.updateAction(updated)
 
-      // get alices
+      _ = logger.debug("Finding honest alices alices")
       alices <- aliceDAO.findRegisteredForRoundAction(round.roundId)
       unsignedPeerIds = alices.filterNot(_.signed).map(_.peerId)
       signedPeerIds = alices.filter(_.signed).map(_.peerId)
@@ -948,6 +996,7 @@ class VortexCoordinator private (
       banReason = s"Alice never signed in round ${round.roundId.hex}"
       banDbs = inputsToBan.map(db =>
         BannedUtxoDb(db.outPoint, bannedUntil, banReason))
+      _ = logger.debug(s"Banning inputs ${banDbs.size} that did not sign")
       _ <- bannedUtxoDAO.upsertAllAction(banDbs)
 
       // delete previous inputs and outputs so they can be registered again
@@ -964,10 +1013,12 @@ class VortexCoordinator private (
       // restart round with good alices
       nextCoordinator <- VortexCoordinator.nextRound(this, announce = false)
 
+      _ = logger.info("Sending restart round messages to honest alices")
       actions = signedPeerIds.map { id =>
         nextCoordinator
           .getNonceAction(peerId = id, nextCoordinator.roundId)
           .flatMap { db =>
+            logger.trace(s"Sending restart round message to ${id.hex}")
             val nonceMsg = NonceMessage(db.nonce)
             val restartMsg =
               RestartRoundMessage(nextCoordinator.roundParams, nonceMsg)
@@ -1087,7 +1138,7 @@ object VortexCoordinator extends Logging {
       old.disconnectPeers()
       // clear some memory
       old.connectionHandlerMap.clear()
-      old.signedPMap.clear()
+      old.signedPeersMap.clear()
 
       val roundDb = RoundDbs.newRound(
         roundId = roundId,

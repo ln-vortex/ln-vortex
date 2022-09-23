@@ -229,6 +229,8 @@ class CoordinatorRoutes(var coordinator: VortexCoordinator)(implicit
 
             nonceMsg = NonceMessage(aliceDb.nonce)
             _ <- queue.offer(TextMessage(Json.toJson(nonceMsg).toString))
+
+            _ <- coordinator.checkBeginInputRegistration()
           } yield {
             val flow = Flow.fromSinkAndSource(sink, source)
             val wsFlow = flow.watchTermination() { (_, termination) =>

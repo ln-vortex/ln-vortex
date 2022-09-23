@@ -61,6 +61,7 @@ class CoordinatorKeyManager()(implicit
   final private[server] def nextNonce(): DBIOAction[(SchnorrNonce, BIP32Path),
                                                     NoStream,
                                                     Effect.Read] = {
+    logger.trace("Getting next nonce for alice")
     nextNoncePath().map { path =>
       val nonce = extPrivateKey.deriveChildPrivKey(path).key.schnorrNonce
 
