@@ -46,6 +46,6 @@ services:
     depends_on:
       - tor
   tor:
-    image:  bitcoinscala/tor:latest
-    entrypoint: ["/tor", "--ExitRelay", "0", "--BridgeRelay",  "0", "--SOCKSPort", "0.0.0.0:9050", "--ControlPort", "0.0.0.0:9051", "--HashedControlPassword", "16:EF3A794FD6F30EF76049147EF252111809E7D51C049FEB353B547C1553"]
+    image: bitcoinscala/tor:latest
+    entrypoint: ["/tor", "--ExitRelay", "0", "--BridgeRelay",  "0", "--SOCKSPort", "0.0.0.0:9050"]
     restart: on-failure
