@@ -20,3 +20,5 @@ jobs:
           password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
       - name: Build and push
         run: sbt ++2.13.8 "rpcServer/docker:publish;coordinatorRpc/docker:publish"
+        env:
+          DOCKER_TAG: "master"
