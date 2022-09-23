@@ -91,7 +91,10 @@ class BitcoindVortexWalletTest extends BitcoinSFixture with CachedBitcoindV23 {
       }
 
       signed <- wallet.signPSBT(psbt, refs)
-    } yield assert(signed.extractTransactionAndValidate.isSuccess)
+
+      tx <- Future.fromTry(signed.extractTransactionAndValidate)
+      _ <- wallet.broadcastTransaction(tx)
+    } yield succeed
   }
 
   it must "correctly create input proofs" in { wallet =>

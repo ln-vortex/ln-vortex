@@ -339,6 +339,7 @@ object ClientStatus extends StringFactory[ClientStatus] {
 
   override def fromString(string: String): ClientStatus = {
     fromStringOpt(string).getOrElse(
-      sys.error(s"Could not find a ClientStatus for string $string"))
+      throw new IllegalArgumentException(
+        s"Could not find a ClientStatus for string $string"))
   }
 }

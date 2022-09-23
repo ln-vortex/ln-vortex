@@ -1,5 +1,6 @@
 package com.lnvortex.core
 
+import com.lnvortex.core.RoundDetails.{getNonceOpt, getRoundParamsOpt}
 import com.lnvortex.core.crypto.BlindingTweaks
 import org.bitcoins.core.currency._
 import org.bitcoins.core.protocol.script._
@@ -77,6 +78,24 @@ class RoundDetailsTest extends BitcoinSUnitTest {
     assert(amt == Satoshis(99424))
   }
 
+  it must "calculate expected change amount under the dust threshold" in {
+    val details = InputsRegistered(
+      requeue = false,
+      round = roundParams,
+      inputFee = Satoshis(149),
+      outputFee = Satoshis(43),
+      changeOutputFee = Satoshis(43),
+      nonce = ECPublicKey.freshPublicKey.schnorrNonce,
+      initDetails = testInitDetails(inputAmounts =
+                                      Vector(Satoshis(1000), roundAmount),
+                                    hasChange = true)
+    )
+
+    val amt = details.expectedAmtBack(numRemixes = 1, numNewEntrants = 1)
+
+    assert(amt == Satoshis.zero)
+  }
+
   it must "calculate expected change amount with no change" in {
     val details = InputsRegistered(
       requeue = false,
@@ -93,5 +112,39 @@ class RoundDetailsTest extends BitcoinSUnitTest {
     val amt = details.expectedAmtBack(numRemixes = 1, numNewEntrants = 1)
 
     assert(amt == Satoshis.zero)
+  }
+
+  it must "get nonce" in {
+    val details = InputsRegistered(
+      requeue = false,
+      round = roundParams,
+      inputFee = Satoshis(149),
+      outputFee = Satoshis(43),
+      changeOutputFee = Satoshis(43),
+      nonce = ECPublicKey.freshPublicKey.schnorrNonce,
+      initDetails = testInitDetails(inputAmounts =
+                                      Vector(Satoshis(100000), roundAmount),
+                                    hasChange = false)
+    )
+
+    assert(getNonceOpt(NoDetails(false)).isEmpty)
+    assert(getNonceOpt(details).isDefined)
+  }
+
+  it must "get round params" in {
+    val details = InputsRegistered(
+      requeue = false,
+      round = roundParams,
+      inputFee = Satoshis(149),
+      outputFee = Satoshis(43),
+      changeOutputFee = Satoshis(43),
+      nonce = ECPublicKey.freshPublicKey.schnorrNonce,
+      initDetails = testInitDetails(inputAmounts =
+                                      Vector(Satoshis(100000), roundAmount),
+                                    hasChange = false)
+    )
+
+    assert(getRoundParamsOpt(NoDetails(false)).isEmpty)
+    assert(getRoundParamsOpt(details).isDefined)
   }
 }

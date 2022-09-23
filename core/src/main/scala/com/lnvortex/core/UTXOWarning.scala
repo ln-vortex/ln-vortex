@@ -21,7 +21,7 @@ object UTXOWarning extends StringFactory[UTXOWarning] {
   override def fromString(string: String): UTXOWarning = {
     fromStringOpt(string)
       .getOrElse(
-        throw new RuntimeException(
+        throw new IllegalArgumentException(
           s"Could not find UTXOWarning for string: $string"))
   }
 }
