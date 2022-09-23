@@ -10,7 +10,7 @@ import org.bitcoins.core.currency._
 import org.bitcoins.core.protocol.BitcoinAddress
 import org.bitcoins.core.protocol.script.ScriptPubKey
 import org.bitcoins.core.protocol.transaction.TransactionOutput
-import org.bitcoins.core.util.{FutureUtil, TimeUtil}
+import org.bitcoins.core.util.TimeUtil
 
 import scala.concurrent._
 import scala.util._
@@ -40,19 +40,7 @@ trait PeerValidation extends Logging { self: VortexCoordinator =>
         case None => true
       }
 
-      callT = Try(
-        bitcoind.getTxOut(outPoint.txIdBE, outPoint.vout.toInt).map(Some(_)))
-
-      getTxOutF <- Future
-        .fromTry(callT)
-        .map(Some(_))
-        .recover(_ => None)
-
-      txOutOpt <- getTxOutF
-        .getOrElse(FutureUtil.none)
-        .recover { case _: Throwable =>
-          None
-        }
+      txOutOpt <- bitcoind.getTxOutOpt(outPoint.txIdBE, outPoint.vout.toLong)
     } yield {
       val isRealInput = txOutOpt match {
         case None => false
@@ -139,12 +127,9 @@ trait PeerValidation extends Logging { self: VortexCoordinator =>
 
       val enoughFunding = excess >= Satoshis.zero
 
-      lazy val changeSpkVec = registerInputs.changeSpkOpt match {
-        case Some(spk) => Vector(spk)
-        case None      => Vector.empty
-      }
       lazy val allSpks =
-        registerInputs.inputs.map(_.output.scriptPubKey) ++ changeSpkVec
+        registerInputs.inputs.map(
+          _.output.scriptPubKey) ++ registerInputs.changeSpkOpt.toVector
 
       lazy val uniqueSpks = allSpks.size == allSpks.distinct.size
 
