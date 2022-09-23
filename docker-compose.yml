@@ -15,7 +15,7 @@ services:
     depends_on:
       - vortexd
   vortexd:
-    image: lnvortex/vortexd:0.0.0-387-ae87716a-SNAPSHOT@sha256:6f1ee215f74600a401b6112ed112065ccd084ecbf4dce5a7063cc5cb9bd079a0
+    image: lnvortex/vortexd:master
     entrypoint: ["/opt/docker/bin/vortexd", "--datadir", "/ln-vortex", "--conf", "/opt/docker/docker-application.conf"]
     user: 0:1000
     restart: on-failure
