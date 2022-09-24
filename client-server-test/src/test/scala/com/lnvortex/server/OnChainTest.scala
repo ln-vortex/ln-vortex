@@ -101,7 +101,9 @@ class OnChainTest
       txs <- client.listTransactions()
     } yield {
       assert(roundDbs.size == 2)
-      assert(txs.exists(_.isVortex))
+      val vortexTx = txs.find(_.isVortex)
+      assert(vortexTx.isDefined)
+      assert(vortexTx.exists(_.label.contains("Vortex")))
     }
   }
 }

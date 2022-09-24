@@ -139,7 +139,7 @@ case class LndVortexWallet(lndRpcClient: LndRpcClient)(implicit
   override def labelTransaction(
       txId: DoubleSha256Digest,
       label: String): Future[Unit] = {
-    val request = LabelTransactionRequest(txId.bytes, label)
+    val request = LabelTransactionRequest(txId.bytes, label, overwrite = true)
     lndRpcClient.wallet.labelTransaction(request).map(_ => ())
   }
 
