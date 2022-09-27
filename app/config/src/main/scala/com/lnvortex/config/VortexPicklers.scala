@@ -170,8 +170,12 @@ object VortexPicklers {
   implicit val ChannelDetailsReads: Reads[ChannelDetails] =
     Json.reads[ChannelDetails]
 
-  implicit val ChannelDetailsWrites: OWrites[ChannelDetails] =
-    Json.writes[ChannelDetails]
+  implicit val ChannelDetailsWrites: OWrites[ChannelDetails] = OWrites { c =>
+    val original = Json.writes[ChannelDetails].writes(c)
+    val extra = Json.obj("channelId" -> c.shortChannelId.u64.toLong)
+
+    original ++ extra
+  }
 
   implicit val nodeIdPickler: ReadWriter[NodeId] = {
     readwriter[String].bimap(_.hex, NodeId.fromHex)
