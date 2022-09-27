@@ -39,6 +39,33 @@ object VortexMessage extends Logging {
       .orElse(json.validate[RestartRoundMessage])
       .orElse(json.validate[CancelRegistrationMessage])
   }
+
+  implicit val vortexMessageWrites: Writes[VortexMessage] = Writes {
+    case r: RegisterInputs =>
+      RegisterInputs.RegisterInputsWrites.writes(r)
+    case r: RegisterOutput =>
+      RegisterOutput.RegisterOutputWrites.writes(r)
+    case s: SignedPsbtMessage =>
+      SignedPsbtMessage.SignedPsbtMessageWrites.writes(s)
+    case c: CancelRegistrationMessage =>
+      CancelRegistrationMessage.CancelRegistrationMessageWrites.writes(c)
+    case r: RoundParameters =>
+      RoundParameters.RoundParametersWrites.writes(r)
+    case f: FeeRateHint =>
+      FeeRateHint.FeeRateHintWrites.writes(f)
+    case n: NonceMessage =>
+      NonceMessage.NonceMessageWrites.writes(n)
+    case a: AskInputs =>
+      AskInputs.AskInputsWrites.writes(a)
+    case b: BlindedSig =>
+      BlindedSig.BlindedSigWrites.writes(b)
+    case u: UnsignedPsbtMessage =>
+      UnsignedPsbtMessage.UnsignedPsbtMessageWrites.writes(u)
+    case s: SignedTxMessage =>
+      SignedTxMessage.SignedTxMessageWrites.writes(s)
+    case r: RestartRoundMessage =>
+      RestartRoundMessage.RestartRoundMessageWrites.writes(r)
+  }
 }
 
 sealed abstract class ServerAnnouncementMessage extends ServerVortexMessage
