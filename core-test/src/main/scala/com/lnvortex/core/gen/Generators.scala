@@ -157,4 +157,27 @@ object Generators {
       nonce <- CryptoGenerators.schnorrNonce
     } yield CancelRegistrationMessage(nonce, roundId)
   }
+
+  def feeRateHint: Gen[FeeRateHint] = {
+    for {
+      fee <- FeeUnitGen.satsPerVirtualByte
+    } yield FeeRateHint(fee)
+  }
+
+  def vortexMessage: Gen[VortexMessage] = {
+    Gen.oneOf(
+      feeRateHint,
+      roundParameters,
+      nonceMsg,
+      askInputs,
+      registerInputs,
+      blindedSig,
+      registerOutput,
+      unsignedPsbtMessage,
+      signedPsbtMessage,
+      signedTxMessage,
+      restartRoundMessage,
+      cancelRegistrationMessage
+    )
+  }
 }

@@ -88,4 +88,23 @@ class VortexMessageSerializationTest extends BitcoinSUnitTest {
       assert(Json.toJson(msg).as[VortexMessage] == msg)
     }
   }
+
+  "FeeRateHint" must "have serialization symmetry" in {
+    forAll(Generators.feeRateHint) { msg =>
+      assert(Json.toJson(msg).as[FeeRateHint] == msg)
+      assert(Json.toJson(msg).as[VortexMessage] == msg)
+    }
+  }
+
+  "VortexMessage" must "have serialization symmetry" in {
+    forAll(Generators.vortexMessage) { msg =>
+      assert(Json.toJson(msg).as[VortexMessage] == msg)
+    }
+  }
+
+  it must "parse the static test vector" in {
+    val json = Json.parse(getClass.getResourceAsStream("/vortex_messages.json"))
+    val messages = json.as[Vector[VortexMessage]]
+    assert(messages.size == 1000)
+  }
 }
