@@ -580,16 +580,19 @@ class VortexCoordinator private (
     val isRemixF = if (registerInputs.inputs.size == 1) {
       logger.debug("Checking if alice is remixing")
       val inputRef = registerInputs.inputs.head
-      bitcoind.getRawTransactionRaw(inputRef.outPoint.txIdBE).map { tx =>
-        Try {
-          // Make sure this was previously in a coinjoin
-          val anonSet = getAnonymitySet(tx, inputRef.outPoint.vout.toInt)
-          // make sure it wasn't a change output
-          val wasTargetUtxo = inputRef.output.value == config.roundAmount
-          val noChange = registerInputs.changeSpkOpt.isEmpty
-          anonSet > 1 && wasTargetUtxo && noChange
-        }.getOrElse(false)
-      }
+      bitcoind
+        .getRawTransactionRaw(inputRef.outPoint.txIdBE)
+        .map { tx =>
+          Try {
+            // Make sure this was previously in a coinjoin
+            val anonSet = getAnonymitySet(tx, inputRef.outPoint.vout.toInt)
+            // make sure it wasn't a change output
+            val wasTargetUtxo = inputRef.output.value == config.roundAmount
+            val noChange = registerInputs.changeSpkOpt.isEmpty
+            anonSet > 1 && wasTargetUtxo && noChange
+          }.getOrElse(false)
+        }
+        .recover(_ => false)
     } else Future.successful(false)
 
     val action = for {
