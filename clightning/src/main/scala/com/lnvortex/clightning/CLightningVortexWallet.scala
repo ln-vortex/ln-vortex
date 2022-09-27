@@ -8,6 +8,7 @@ import com.lnvortex.core.{InputReference, UnspentCoin}
 import org.bitcoins.core.config._
 import org.bitcoins.core.currency._
 import org.bitcoins.core.hd.AddressType
+import org.bitcoins.core.number.UInt64
 import org.bitcoins.core.protocol.BitcoinAddress
 import org.bitcoins.core.protocol.ln.node.NodeId
 import org.bitcoins.core.protocol.script.ScriptWitness
@@ -184,6 +185,7 @@ case class CLightningVortexWallet(clightning: CLightningRpcClient)(implicit
           alias = "todo", // todo waiting on PR to bitcoin-s
           outPoint = EmptyTransactionOutPoint,
           remotePubkey = remote,
+          channelId = UInt64(0), // todo when added to bitcoin-s
           shortChannelId = channel.short_channel_id,
           public = channel.public,
           amount = channel.satoshis,
