@@ -4,7 +4,7 @@ import akka.actor.ActorSystem
 import com.lnvortex.client.VortexClientManager
 import com.lnvortex.config.LnVortexRpcServerConfig
 import com.lnvortex.coordinator
-import com.lnvortex.coordinator.rpc.{LnVortexAppConfig => _, _}
+import com.lnvortex.coordinator.rpc._
 import com.lnvortex.core.config.ServerArgParser
 import com.lnvortex.lnd.LndVortexWallet
 import com.lnvortex.rpc._
@@ -46,9 +46,10 @@ object CreateLocalDevEnvironment extends App with Logging {
     s"vortex-dev-env-${FileUtil.randomDirName}")
   implicit val ec: ExecutionContext = system.dispatcher
 
-  implicit val coordConfig: coordinator.rpc.LnVortexAppConfig =
-    coordinator.rpc.LnVortexAppConfig
-      .fromDatadir(dataDir, Vector(serverArgParser.toConfig("coordinator")))
+  implicit val coordConfig: CoordinatorRpcAppConfig =
+    CoordinatorRpcAppConfig.fromDatadir(
+      dataDir,
+      Vector(serverArgParser.toConfig("coordinator")))
 
   import coordConfig.coordinatorConfig
 

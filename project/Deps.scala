@@ -11,7 +11,11 @@ object Deps {
 
     val scoptV = "4.1.0"
 
-    val sttpV = "1.7.2"
+    val sttpCoreV = "1.7.2"
+    val sttpV = "3.8.0"
+
+    val twitterV = "8.0"
+    val telegramV = "5.4.2"
 
     val microPickleV = "2.0.0"
 
@@ -20,6 +24,15 @@ object Deps {
   }
 
   object Compile {
+
+    val akkaSttp =
+      "com.softwaremill.sttp.client3" %% "akka-http-backend" % V.sttpV withSources () withJavadoc ()
+
+    val telegram =
+      "com.bot4s" %% "telegram-akka" % V.telegramV withSources () withJavadoc ()
+
+    val twitter4s =
+      "com.danielasfregola" %% "twitter4s" % V.twitterV withSources () withJavadoc ()
 
     val akkaHttp =
       "com.typesafe.akka" %% "akka-http" % V.akkaV withSources () withJavadoc ()
@@ -34,7 +47,7 @@ object Deps {
       "com.typesafe.akka" %% "akka-slf4j" % V.akkaStreamV withSources () withJavadoc ()
 
     val sttp =
-      "com.softwaremill.sttp" %% "core" % V.sttpV withSources () withJavadoc ()
+      "com.softwaremill.sttp" %% "core" % V.sttpCoreV withSources () withJavadoc ()
 
     val micoPickle =
       "com.lihaoyi" %% "upickle" % V.microPickleV withSources () withJavadoc ()
@@ -93,6 +106,17 @@ object Deps {
 
   val rpcServer: List[ModuleID] =
     List(
+      Compile.akkaHttp,
+      Compile.akkaSlf4j,
+      Compile.micoPickle,
+      Compile.grizzledSlf4j
+    )
+
+  val coordinatorRpc: List[ModuleID] =
+    List(
+      Compile.twitter4s,
+      Compile.telegram,
+      Compile.akkaSttp,
       Compile.akkaHttp,
       Compile.akkaSlf4j,
       Compile.micoPickle,
