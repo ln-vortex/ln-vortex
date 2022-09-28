@@ -4,6 +4,7 @@ import akka.http.scaladsl.model.ws.Message
 import akka.stream._
 import akka.stream.scaladsl._
 import com.lnvortex.core.RoundDetails.getInitDetailsOpt
+import com.lnvortex.server.config._
 import com.lnvortex.testkit._
 import org.bitcoins.core.script.ScriptType
 import org.bitcoins.core.script.ScriptType._
@@ -12,6 +13,8 @@ import org.bitcoins.testkit.EmbeddedPg
 import org.bitcoins.testkit.async.TestAsyncUtil
 import scodec.bits.ByteVector
 
+import java.util.concurrent.atomic.AtomicInteger
+import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 
 class DualClientTest
@@ -113,6 +116,23 @@ class DualClientTest
     case (client, badClient, coordinator) =>
       val peerLnd = badClient.vortexWallet.lndRpcClient
 
+      val completeCallback = new AtomicInteger(0)
+      val onRoundComplete: OnRoundComplete = { _ =>
+        completeCallback.incrementAndGet()
+        Future.unit
+      }
+
+      val reconcileCallback = new AtomicInteger(0)
+      val onRoundReconciled: OnRoundReconciled = { _ =>
+        reconcileCallback.incrementAndGet()
+        Future.unit
+      }
+      val callbacks = CoordinatorCallbacks(onRoundComplete, onRoundReconciled)
+      coordinator.config.addCallbacks(callbacks)
+
+      assert(coordinator.config.callBacks.onRoundComplete.nonEmpty)
+      assert(coordinator.config.callBacks.onRoundReconciled.nonEmpty)
+
       for {
         all <- client.listCoins()
         _ <- registerInputsAndOutputs(peerIdA,
@@ -193,6 +213,9 @@ class DualClientTest
         newCoinsA <- client.listCoins()
         newCoinsB <- badClient.listCoins()
       } yield {
+        assert(completeCallback.get() == 1)
+        assert(reconcileCallback.get() == 1)
+
         assert(banned.size == 1)
         assert(!banned.exists(_.outPoint == outPointA))
         assert(banned.exists(_.outPoint == outPointB))

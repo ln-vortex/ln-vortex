@@ -468,11 +468,15 @@ class VortexCoordinator private (
         roundDAO.updateAction(updatedRoundDb)
       }
 
-      _ <- safeDatabase.run(action)
+      roundDb <- safeDatabase.run(action)
       _ <- Future.sequence(sendFs)
 
       _ = logger.info("Round complete!")
       _ <- VortexCoordinator.nextRound(this)
+
+      // execute callback after new round is created so we can
+      // safely read data from the database
+      _ <- config.callBacks.executeOnRoundComplete(roundDb)
     } yield ()
 
     f.failed.foreach { err =>
@@ -1007,10 +1011,10 @@ class VortexCoordinator private (
       _ <- outputsDAO.deleteByRoundIdAction(round.roundId)
       // delete alices that will be remade so they can register again
       _ <- aliceDAO.deleteByPeerIdsAction(signedPeerIds)
-    } yield signedPeerIds
+    } yield (signedPeerIds, updated)
 
     for {
-      signedPeerIds <- safeDatabase.run(action)
+      (signedPeerIds, roundDb) <- safeDatabase.run(action)
       // clone connectionHandlerMap because newRound() will clear it
       oldMap = connectionHandlerMap.clone()
       // restart round with good alices
@@ -1041,6 +1045,10 @@ class VortexCoordinator private (
       restartMsgs <- safeDatabase.run(DBIO.sequence(actions))
       // change state so they can begin registering inputs
       _ <- nextCoordinator.beginInputRegistration()
+
+      // execute callback after new round is created so we can
+      // safely read data from the database
+      _ <- config.callBacks.executeOnRoundReconciled(roundDb)
     } yield restartMsgs
   }
 

@@ -5,11 +5,15 @@ import akka.stream._
 import akka.stream.scaladsl._
 import com.lnvortex.core.RoundDetails.getInitDetailsOpt
 import com.lnvortex.core._
+import com.lnvortex.server.config._
 import com.lnvortex.testkit._
 import org.bitcoins.core.script.ScriptType
 import org.bitcoins.core.script.ScriptType._
 import org.bitcoins.crypto.Sha256Digest
 import org.bitcoins.testkit.EmbeddedPg
+
+import java.util.concurrent.atomic.AtomicInteger
+import scala.concurrent.Future
 
 class ClientServerPairTest
     extends ClientServerPairFixture
@@ -91,12 +95,22 @@ class ClientServerPairTest
   }
 
   it must "open a channel" in { case (client, coordinator, peerLnd) =>
+    val completeCallback = new AtomicInteger(0)
+    val onRoundComplete: OnRoundComplete = { _ =>
+      completeCallback.incrementAndGet()
+      Future.unit
+    }
+
+    val callbacks = CoordinatorCallbacks(onRoundComplete)
+    coordinator.config.addCallbacks(callbacks)
+
     for {
       _ <- completeChannelRound(peerId, client, coordinator, peerLnd)
 
       roundDbs <- coordinator.roundDAO.findAll()
       txs <- client.listTransactions()
     } yield {
+      assert(completeCallback.get() == 1)
       assert(roundDbs.size == 2)
       assert(txs.exists(_.isVortex))
     }
