@@ -172,7 +172,7 @@ object VortexPicklers {
 
   implicit val ChannelDetailsWrites: OWrites[ChannelDetails] = OWrites { c =>
     val original = Json.writes[ChannelDetails].writes(c)
-    val extra = Json.obj("channelId" -> c.shortChannelId.u64.toLong.toString)
+    val extra = Json.obj("channelId" -> c.shortChannelId.u64.toBigInt.toString)
 
     original ++ extra
   }
