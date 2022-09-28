@@ -8,6 +8,7 @@ import com.typesafe.config.Config
 import grizzled.slf4j.Logging
 import monix.execution.atomic.AtomicInt
 import org.bitcoins.commons.config._
+import org.bitcoins.core.api.CallbackConfig
 import org.bitcoins.core.config._
 import org.bitcoins.core.currency.Satoshis
 import org.bitcoins.core.hd.HDPurposes
@@ -49,11 +50,15 @@ case class VortexCoordinatorAppConfig(
     with JdbcProfileComponent[VortexCoordinatorAppConfig]
     with DbManagement
     with VortexUtils
+    with CallbackConfig[CoordinatorCallbacks]
     with Logging {
   import system.dispatcher
 
   override val moduleName: String = VortexCoordinatorAppConfig.moduleName
   override type ConfigType = VortexCoordinatorAppConfig
+
+  override lazy val callbackFactory: CoordinatorCallbacks.type =
+    CoordinatorCallbacks
 
   override val appConfig: VortexCoordinatorAppConfig = this
 
