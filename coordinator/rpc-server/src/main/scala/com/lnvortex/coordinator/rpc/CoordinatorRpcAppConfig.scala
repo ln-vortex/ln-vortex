@@ -52,6 +52,7 @@ case class CoordinatorRpcAppConfig(
     for {
       _ <- coordinatorConfig.start()
       _ <- rpcConfig.start()
+      _ <- telegramHandlerOpt.map(_.start()).getOrElse(Future.unit)
     } yield ()
   }
 

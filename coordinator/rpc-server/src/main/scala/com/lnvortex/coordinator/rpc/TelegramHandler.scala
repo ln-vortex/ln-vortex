@@ -8,6 +8,7 @@ import com.bot4s.telegram.clients.FutureSttpClient
 import com.bot4s.telegram.future.TelegramBot
 import com.lnvortex.core.VortexUtils
 import com.lnvortex.server.models.RoundDb
+import grizzled.slf4j.Logging
 import org.bitcoins.core.config.{MainNet, RegTest, SigNet, TestNet3}
 import org.bitcoins.core.currency.CurrencyUnit
 import org.bitcoins.core.util.StartStopAsync
@@ -17,7 +18,6 @@ import sttp.client3.akkahttp.AkkaHttpBackend
 
 import java.net.URLEncoder
 import java.text.NumberFormat
-import java.util.Locale
 import scala.concurrent.Future
 
 class TelegramHandler(telegramCreds: String, myTelegramId: String)(implicit
@@ -25,12 +25,10 @@ class TelegramHandler(telegramCreds: String, myTelegramId: String)(implicit
     system: ActorSystem)
     extends TelegramBot
     with VortexUtils
-    with StartStopAsync[Unit] {
+    with StartStopAsync[Unit]
+    with Logging {
 
-  val intFormatter: NumberFormat = java.text.NumberFormat.getIntegerInstance
-
-  val currencyFormatter: NumberFormat =
-    java.text.NumberFormat.getCurrencyInstance(Locale.US)
+  val intFormatter: NumberFormat = NumberFormat.getIntegerInstance
 
   implicit private val backend: SttpBackend[Future, AkkaStreams] =
     AkkaHttpBackend.usingActorSystem(system)
@@ -42,7 +40,7 @@ class TelegramHandler(telegramCreds: String, myTelegramId: String)(implicit
     for {
       _ <- run()
       _ <- sendTelegramMessage("Connected!", myTelegramId)
-    } yield ()
+    } yield logger.info("Telegram handler started")
   }
 
   override def stop(): Future[Unit] = Future.unit
@@ -72,9 +70,9 @@ class TelegramHandler(telegramCreds: String, myTelegramId: String)(implicit
          |🔔 🔔 New Vortex Transaction! 🔔 🔔
          |Coordinator: ${config.coordinatorConfig.coordinatorName}
          |
-         |num inputs: ${tx.inputs.size}
-         |num outputs: ${tx.outputs.size}
-         |anon set: ${getMaxAnonymitySet(tx)}
+         |Inputs: ${intFormatter.format(tx.inputs.size)}
+         |Outputs: ${intFormatter.format(tx.outputs.size)}
+         |Anonymity set: ${intFormatter.format(getMaxAnonymitySet(tx))}
          |profit: ${printAmount(roundDb.profitOpt.get)}
          |
          |$mempoolLink

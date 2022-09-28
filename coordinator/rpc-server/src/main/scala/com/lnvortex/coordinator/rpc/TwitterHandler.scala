@@ -7,12 +7,15 @@ import com.lnvortex.server.models.RoundDb
 import grizzled.slf4j.Logging
 import org.bitcoins.core.config._
 
+import java.text.NumberFormat
 import scala.concurrent.Future
 
 class TwitterHandler(client: TwitterRestClient)(implicit
     config: CoordinatorRpcAppConfig)
     extends Logging
     with VortexUtils {
+
+  private val intFormatter: NumberFormat = NumberFormat.getIntegerInstance
 
   private def sendTweet(message: String): Future[Tweet] = {
     client.createTweet(status = message.trim)
@@ -32,9 +35,9 @@ class TwitterHandler(client: TwitterRestClient)(implicit
       s"""⚡ 🌪️ New Vortex Transaction! 🌪️ ⚡
          |Coordinator: ${config.coordinatorConfig.coordinatorName}
          |
-         |Inputs: ${tx.inputs.size}
-         |Outputs: ${tx.outputs.size}
-         |Anonymity set: ${getMaxAnonymitySet(tx)}
+         |Inputs: ${intFormatter.format(tx.inputs.size)}
+         |Outputs: ${intFormatter.format(tx.outputs.size)}
+         |Anonymity set: ${intFormatter.format(getMaxAnonymitySet(tx))}
          |
          |$mempoolLink
          |""".stripMargin
