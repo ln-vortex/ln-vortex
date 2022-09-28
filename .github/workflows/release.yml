@@ -1,0 +1,105 @@
+name: Release
+on:
+  push:
+    branches: [ master, main, release-action ]
+    tags: [ "*" ]
+  release:
+    types: [ published ]
+
+jobs:
+  # Build rpcServer and coordinatorRpc zips
+  server:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ macos-latest, ubuntu-latest, windows-latest ]
+        include:
+          - os: macos-latest
+            TARGET: mac
+          - os: ubuntu-latest
+            TARGET: linux
+          - os: windows-latest
+            TARGET: windows
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Setup Scala
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'adopt'
+          java-version: '17'
+          cache: 'sbt'
+      - name: Get Previous tag
+        id: previoustag
+        uses: WyriHaximus/github-action-get-previous-tag@v1
+        with:
+          fallback: 1.0.0 # Optional fallback tag to use when no tag can be found
+      # Tested building specific projects that are being exported only, but global packageBin seems to be faster
+      - name: Build all zips
+        shell: bash # windows needs shell defined
+        run: sbt "universal:stage;universal:packageBin"
+      - name: Upload vortexd zip
+        uses: actions/upload-artifact@v3
+        env:
+          pkg-version: ${{steps.previoustag.outputs.tag}}
+        with:
+          name: vortexd-${{ matrix.TARGET }}
+          path: app/rpc-server/target/universal/stage
+      - name: (release) Upload vortexd zip
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          name: vortexd-${{ matrix.TARGET }}-${{steps.previoustag.outputs.tag}}
+          files: app/rpc-server/target/universal/*.zip
+        env:
+          pkg-version: ${{steps.previoustag.outputs.tag}}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload vortex-coordinator zip
+        uses: actions/upload-artifact@v3
+        env:
+          pkg-version: ${{steps.previoustag.outputs.tag}}
+        with:
+          name: vortex-coordinator-${{ matrix.TARGET }}
+          path: coordinator/rpc-server/target/universal/stage
+      - name: (release) Upload vortexd zip
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          name: vortex-coordinator-${{ matrix.TARGET }}-${{steps.previoustag.outputs.tag}}
+          files: coordinator/rpc-server/target/universal/*.zip
+        env:
+          pkg-version: ${{steps.previoustag.outputs.tag}}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload vortex-cli
+        uses: actions/upload-artifact@v3
+        env:
+          pkg-version: ${{steps.previoustag.outputs.tag}}
+        with:
+          name: vortex-cli-${{ matrix.TARGET }}
+          path: app/cli/target/universal/stage/
+      - name: (release) Upload vortex-cli
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          name: vortex-cli-${{ matrix.TARGET }}-${{steps.previoustag.outputs.tag}}
+          files: app/cli/target/universal/*.zip
+        env:
+          pkg-version: ${{steps.previoustag.outputs.tag}}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload coordinator-cli
+        uses: actions/upload-artifact@v3
+        env:
+          pkg-version: ${{steps.previoustag.outputs.tag}}
+        with:
+          name: coordinator-cli-${{ matrix.TARGET }}
+          path: coordinator/cli/target/universal/stage/
+      - name: (release) Upload vortex-cli
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          name: coordinator-cli-${{ matrix.TARGET }}-${{steps.previoustag.outputs.tag}}
+          files: coordinator/cli/target/universal/*.zip
+        env:
+          pkg-version: ${{steps.previoustag.outputs.tag}}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -13,6 +13,8 @@ assembly / assemblyMergeStrategy := {
   case _                                   => MergeStrategy.first
 }
 
+debianPackageDependencies := Seq("java11-runtime-headless")
+
 run / fork := true
 
 mainClass := Some("com.lnvortex.coordinator.rpc.Daemon")
