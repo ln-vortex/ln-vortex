@@ -26,15 +26,18 @@ object Daemon extends App with Logging {
     s"ln-vortex-coordinator-${System.currentTimeMillis()}-$randomStr")
   implicit val ec: ExecutionContext = system.dispatcher
 
-  implicit val config: LnVortexAppConfig = serverArgParser.datadirOpt match {
-    case Some(datadir) =>
-      LnVortexAppConfig.fromDatadir(
-        datadir,
-        Vector(serverArgParser.toConfig(VortexCoordinatorAppConfig.moduleName)))
-    case None =>
-      LnVortexAppConfig.fromDefaultDatadir(
-        Vector(serverArgParser.toConfig(VortexCoordinatorAppConfig.moduleName)))
-  }
+  implicit val config: CoordinatorRpcAppConfig =
+    serverArgParser.datadirOpt match {
+      case Some(datadir) =>
+        CoordinatorRpcAppConfig.fromDatadir(
+          datadir,
+          Vector(
+            serverArgParser.toConfig(VortexCoordinatorAppConfig.moduleName)))
+      case None =>
+        CoordinatorRpcAppConfig.fromDefaultDatadir(
+          Vector(
+            serverArgParser.toConfig(VortexCoordinatorAppConfig.moduleName)))
+    }
 
   implicit val serverConfig: LnVortexRpcServerConfig =
     config.rpcConfig

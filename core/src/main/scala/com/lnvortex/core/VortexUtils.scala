@@ -15,6 +15,10 @@ trait VortexUtils {
     Math.min(numInputs, equalOutputs)
   }
 
+  def getMaxAnonymitySet(transaction: Transaction): Int = {
+    transaction.outputs.indices.map(getAnonymitySet(transaction, _)).max
+  }
+
   def isMinimalSelection(
       outputRefs: Vector[OutputReference],
       target: CurrencyUnit): Boolean = {

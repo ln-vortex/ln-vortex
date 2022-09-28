@@ -156,7 +156,7 @@ lazy val coordinatorRpc = project
   .settings(CommonSettings.appSettings: _*)
   .settings(CommonSettings.dockerSettings: _*)
   .settings(CommonSettings.dockerBuildxSettings: _*)
-  .settings(libraryDependencies ++= Deps.rpcServer)
+  .settings(libraryDependencies ++= Deps.coordinatorRpc)
   .dependsOn(server, coordinatorConfig)
   .enablePlugins(
     JavaAppPackaging,
