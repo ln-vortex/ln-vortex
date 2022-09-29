@@ -18,19 +18,30 @@ jobs:
         with:
           filepath: docs/async-api.yml
 
-      - name: Generating HTML from my AsyncAPI document
+      - name: Generating markdown from my AsyncAPI document
         uses: docker://asyncapi/github-action-for-generator:latest
         with:
-          template: '@asyncapi/html-template'
           filepath: docs/async-api.yml
-          output: generated-html
+          output: website/docs
 
-      - name: Deploy to GitHub Pages
-        uses: JamesIves/github-pages-deploy-action@3.4.2
+      - uses: actions/setup-node@v3
         with:
-          ACCESS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          BRANCH: gh-pages
-          FOLDER: generated-html
+          node-version: 18
+
+      - name: Install dependencies
+        working-directory: website
+        run: yarn install --frozen-lockfile
+      - name: Build website
+        working-directory: website
+        run: yarn build
+
+      # Popular action to deploy to GitHub Pages:
+      # Docs: https://github.com/peaceiris/actions-gh-pages#%EF%B8%8F-docusaurus
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./website/build
 
   # Build rpcServer and coordinatorRpc zips
   server:
