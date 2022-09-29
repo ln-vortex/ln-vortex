@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+    <id>https://lnvortex.com/blog</id>
+    <title>Vortex Blog</title>
+    <updated>2022-09-29T06:32:10.000Z</updated>
+    <generator>https://github.com/jpmonette/feed</generator>
+    <link rel="alternate" href="https://lnvortex.com/blog"/>
+    <subtitle>Vortex Blog</subtitle>
+    <icon>https://lnvortex.com/img/favicon.ico</icon>
+    <entry>
+        <title type="html"><![CDATA[intro]]></title>
+        <id>/intro</id>
+        <link href="https://lnvortex.com/blog/intro"/>
+        <updated>2022-09-29T06:32:10.000Z</updated>
+    </entry>
+</feed>

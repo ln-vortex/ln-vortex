@@ -1,0 +1,1 @@
+"use strict";(self.webpackChunklnvortex_com=self.webpackChunklnvortex_com||[]).push([[415],{3769:e=>{e.exports=JSON.parse('{"name":"docusaurus-plugin-content-docs","id":"default"}')}}]);
