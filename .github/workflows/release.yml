@@ -1,7 +1,7 @@
 name: Release
 on:
   push:
-    branches: [ master, main ]
+    branches: [ master, main, website ]
     tags: [ "*" ]
   release:
     types: [ published ]
@@ -21,16 +21,28 @@ jobs:
       - name: Generating HTML from my AsyncAPI document
         uses: docker://asyncapi/github-action-for-generator:latest
         with:
-          template: '@asyncapi/html-template'
           filepath: docs/async-api.yml
-          output: generated-html
+          output: website/docs
 
-      - name: Deploy to GitHub Pages
-        uses: JamesIves/github-pages-deploy-action@3.4.2
+      - uses: actions/setup-node@v3
         with:
-          ACCESS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          BRANCH: gh-pages
-          FOLDER: generated-html
+          node-version: 18
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+      - name: Build website
+        working-directory: website
+        run: yarn build
+
+      # Popular action to deploy to GitHub Pages:
+      # Docs: https://github.com/peaceiris/actions-gh-pages#%EF%B8%8F-docusaurus
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          # Build output to publish to the `gh-pages` branch:
+          publish_dir: .website/build
 
   # Build rpcServer and coordinatorRpc zips
   server:
