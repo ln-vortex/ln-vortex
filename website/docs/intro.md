@@ -4,10 +4,8 @@ sidebar_position: 1
 
 # Intro
 
-<div>
-  <img src="vortex-light-mode.svg#gh-light-mode-only" alt="ln-vortex"/>
-  <img src="vortex-dark-mode.svg#gh-dark-mode-only" alt="ln-vortex"/>
-</div>
+![ln-vortex dark](/img/vortex-light-mode.svg#gh-dark-mode-only)
+![ln-vortex light](/img/vortex-dark-mode.svg#gh-dark-mode-only)
 
 ---
 
