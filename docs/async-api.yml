@@ -1,0 +1,368 @@
+asyncapi: 2.4.0
+info:
+  title: Vortex API
+  version: 1.0.0
+
+channels:
+  /rounds/:chain_hash:
+    subscribe:
+      description: Peers can subscribe to this channel to receive information about coordinator rounds.
+      message:
+        oneOf:
+          - $ref: '#/components/messages/roundParameters'
+          - $ref: '#/components/messages/feeRateHint'
+
+  /register/:round_id:
+    publish:
+      description: Message sent by peers to register for round.
+      message:
+        oneOf:
+          - $ref: '#/components/messages/registerInputs'
+          - $ref: '#/components/messages/signedPsbt'
+          - $ref: '#/components/messages/cancelRegistration'
+    subscribe:
+      description: Messages received during the coordinator round.
+      message:
+        oneOf:
+          - $ref: '#/components/messages/nonceMessage'
+          - $ref: '#/components/messages/askInputs'
+          - $ref: '#/components/messages/blindedSignature'
+          - $ref: '#/components/messages/unsignedPsbt'
+          - $ref: '#/components/messages/signedTransaction'
+          - $ref: '#/components/messages/restartRound'
+
+components:
+  schemas:
+    output:
+      type: object
+      properties:
+        value:
+          type: integer
+          description: The value of the output
+        scriptPubKey:
+          type: string
+          description: The scriptPubKey of the output
+    outPoint:
+      type: object
+      properties:
+        txId:
+          type: string
+          description: The transaction ID of the output
+        vout:
+          type: integer
+          description: The index of the output
+    inputReference:
+      type: object
+      properties:
+        inputProof:
+          type: string
+          description: The proof that the input is owned by the peer
+        outputReference:
+          type: object
+          properties:
+            outPoint:
+              $ref: '#/components/schemas/outPoint'
+            output:
+              $ref: '#/components/schemas/output'
+
+    roundParameters:
+      type: object
+      properties:
+        version:
+          type: integer
+          enum:
+            - 0
+        roundId:
+          type: string
+          description: The ID of the round
+        amount:
+          type: integer
+          description: The amount of the target utxo
+        coordinatorFee:
+          type: integer
+          description: The fee the coordinator takes per new entrant
+        publicKey:
+          type: string
+          description: The public key of the coordinator
+        time:
+          type: integer
+          description: The time the round begins
+        inputType:
+          type: string
+          enum:
+            - witness_v0_keyhash
+            - witness_v0_scripthash
+            - witness_v1_taproot
+          description: The type of input that must be registered
+        outputType:
+          type: string
+          enum:
+            - witness_v0_keyhash
+            - witness_v0_scripthash
+            - witness_v1_taproot
+          description: The type of output that must be registered
+        changeType:
+          type: string
+          enum:
+            - witness_v0_keyhash
+            - witness_v0_scripthash
+            - witness_v1_taproot
+          description: The type of change output that must be registered
+        minPeers:
+          type: integer
+          description: The minimum number of peers that must register
+        maxPeers:
+          type: integer
+          description: The maximum number of peers that can register
+        status:
+          type: string
+          description: The status of the round
+        title:
+          type: string
+          description: The title of the round
+        feeRate:
+          type: integer
+          description: The expected fee rate of the round in sats/vbyte
+
+    feeRateHint:
+      type: object
+      properties:
+        feeRate:
+          type: integer
+          description: The new expected fee rate of the round in sats/vbyte
+
+    nonceMessage:
+      type: object
+      properties:
+        schnorrNonce:
+          type: string
+          description: The schnorr nonce of the peer used for blind signing
+
+    askInputs:
+      type: object
+      properties:
+        roundId:
+          type: string
+          description: The ID of the round
+        inputFee:
+          type: integer
+          description: The fee the peer has to pay for each input
+        outputFee:
+          type: integer
+          description: The fee the peer has to pay for each output
+        changeOutputFee:
+          type: integer
+          description: The fee the peer has to pay for each change output
+
+    registerInputs:
+      type: object
+      properties:
+        inputs:
+          type: array
+          description: Array of inputs to register
+          items:
+            $ref: '#/components/schemas/inputReference'
+        blindedOutput:
+          type: string
+          description: The blinded output of the peer
+        changeSpkOpt:
+          type: string
+          description: Optional, the scriptPubKey of the change output
+
+    blindedSignature:
+      type: object
+      properties:
+        blindOutputSig:
+          type: string
+          description: The blind signature from the coordinator
+
+    registerOutput:
+      type: object
+      properties:
+        sig:
+          type: string
+          description: The unblinded signature from the coordinator
+        output:
+          $ref: '#/components/schemas/output'
+
+    unsignedPsbt:
+      type: object
+      properties:
+        psbt:
+          type: string
+          description: PSBT of the transaction to sign
+
+    signedPsbt:
+      type: object
+      properties:
+        signedPsbt:
+          type: string
+          description: PSBT signed by the peer
+
+    signedTransaction:
+      type: object
+      properties:
+        transaction:
+          type: string
+          description: Fully constructed signed transaction
+
+    restartRound:
+      type: object
+      properties:
+        roundParameters:
+          $ref: '#/components/schemas/roundParameters'
+        nonceMessage:
+          $ref: '#/components/schemas/nonceMessage'
+
+    cancelRegistration:
+      type: object
+      properties:
+        nonce:
+          type: string
+          description: Received nonce from the coordinator
+        roundId:
+          type: string
+          description: The ID of the round
+
+  messages:
+    roundParameters:
+      description: Details of the round
+      payload:
+        $ref: '#/components/schemas/roundParameters'
+      examples:
+        - payload:
+            version: 0
+            roundId: 030756a3dbf5eea34295337a73368905cc60321e9e47cdad6e091e26d311f4ac
+            amount: 40000
+            coordinatorFee: 1000
+            publicKey: 03b9cbebc3e2a1d4b8b2e5f2fbaa1e2d1f3e4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c
+            time: 1619222400
+            inputType: witness_v0_keyhash
+            outputType: witness_v1_taproot
+            changeType: witness_v0_keyhash
+            minPeers: 2
+            maxPeers: 10
+            status: Example Status
+            title: Example Title
+            feeRate: 2
+
+    feeRateHint:
+      description: A new fee rate hint for the round
+      payload:
+        $ref: '#/components/schemas/feeRateHint'
+      examples:
+        - payload:
+            feeRate: 2
+
+    nonceMessage:
+      description: The nonce message sent by the coordinator
+      payload:
+        $ref: '#/components/schemas/nonceMessage'
+      examples:
+        - payload:
+            schnorrNonce: 08469f5f8161f406a133a679d247afb71ecce631f91b997ed826751389879550
+
+    askInputs:
+      description: The coordinator asking peers to register inputs
+      payload:
+        $ref: '#/components/schemas/askInputs'
+      examples:
+        - payload:
+            roundId: 030756a3dbf5eea34295337a73368905cc60321e9e47cdad6e091e26d311f4ac
+            inputFee: 1000
+            outputFee: 1000
+            changeOutputFee: 1000
+
+    registerInputs:
+      description: The inputs the peer wants to register
+      payload:
+        $ref: '#/components/schemas/registerInputs'
+      examples:
+        - payload:
+            inputs:
+              - inputProof: 304402204d00239127580f515b4f0b00585525546b248d95e7eb35aef4da525658f901f402206a37d04aa970af1f9999a58ac10bebfc22c578110791b56c68ffc4de08ecbc63010279a147dc244c1747356c65c5c8f5c0d429dfac936ab2c83d819fc53fed634bb7
+                outputReference:
+                  outPoint:
+                    txId: 030756a3dbf5eea34295337a73368905cc60321e9e47cdad6e091e26d311f4ac
+                    vout: 0
+                  output:
+                    value: 40000
+                    scriptPubKey: 0014b9cbebc3e2a1d4b8b2e5f2fbaa1e2d1f3e4a5b6c7
+            blindedOutput: 02b9cbebc3e2a1d4b8b2e5f2fbaa1e2d1f3e4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c
+            changeSpkOpt: 0014b9cbebc3e2a1d4b8b2e5f2fbaa1e2d1f3e4a5b6c7
+
+    blindedSignature:
+      description: The blind signature from the coordinator
+      payload:
+        $ref: '#/components/schemas/blindedSignature'
+      examples:
+        - payload:
+            blindOutputSig: 4006D4D069F3B51E968762FF8074153E278E5BCD221AABE0743CA001B77E79F581863CCED9B25C6E7A0FED8EB6F393CD65CD7306D385DCF85CC6567DAA4E041B
+
+    registerOutput:
+      description: The unblinded signature from the coordinator
+      payload:
+        $ref: '#/components/schemas/registerOutput'
+      examples:
+        - payload:
+            sig: 4006D4D069F3B51E968762FF8074153E278E5BCD221AABE0743CA001B77E79F581863CCED9B25C6E7A0FED8EB6F393CD65CD7306D385DCF85CC6567DAA4E041B
+            output:
+              value: 40000
+              scriptPubKey: 0014b9cbebc3e2a1d4b8b2e5f2fbaa1e2d1f3e4a5b6c7
+
+    unsignedPsbt:
+      description: PSBT of the transaction to sign
+      payload:
+        $ref: '#/components/schemas/unsignedPsbt'
+      examples:
+        - payload:
+            psbt: cHNidP8BAJoCAAAAAljoeiG1ba8MI76OcHBFbDNvfLqlyHV5JPVFiHuyq911AAAAAAD/////g40EJ9DsZQpoqka7CwmK6kQiwHGyyng1Kgd5WdB86h0BAAAAAP////8CcKrwCAAAAAAWABTYXCtx0AYLCcmIauuBXlCZHdoSTQDh9QUAAAAAFgAUAK6pouXw+HaliN9VRuh0LR2HAI8AAAAAAAEAuwIAAAABqtc5MQGL0l+ErkALaISL4J23BurCrBgpi6vucatlb4sAAAAASEcwRAIgWPb8fGoz4bMVSNSByCbAFb0wE1qtQs1neQ2rZtKtJDsCIEoc7SYExnNbY5PltBaR3XiwDwxZQvufdRhW+qk4FX26Af7///8CgPD6AgAAAAAXqRQPuUY0IWlrgsgzryQceMF9295JNIfQ8gonAQAAABepFCnKdPigj4GZlCgYXJe12FLkBj9hh2UAAAABBEdSIQKVg785rgpgl0etGZrd1jT6YQhVnWxc05tMIYPxq5bgfyEC2rYf9JoU22p9ArDNH7t4/EsYMStbTlTa5Nui+/71NtdSriIGApWDvzmuCmCXR60Zmt3WNPphCFWdbFzTm0whg/GrluB/ENkMak8AAACAAAAAgAAAAIAiBgLath/0mhTban0CsM0fu3j8SxgxK1tOVNrk26L7/vU21xDZDGpPAAAAgAAAAIABAACAAAEBIADC6wsAAAAAF6kUt/X69A49QKWkWbHbNTXyty+pIeiHAQQiACCMI1MXN0O1ld+0oHtyuo5C43l9p06H/n2ddJfjsgKJAwEFR1IhAwidwQx6xttU+RMpr2FzM9s4jOrQwjH3IzedG5kDCwLcIQI63ZBPPW3PWd25BrDe4jUpt/+57VDl6GFRkmhgIh8Oc1KuIgYCOt2QTz1tz1nduQaw3uI1Kbf/ue1Q5ehhUZJoYCIfDnMQ2QxqTwAAAIAAAACAAwAAgCIGAwidwQx6xttU+RMpr2FzM9s4jOrQwjH3IzedG5kDCwLcENkMak8AAACAAAAAgAIAAIAAIgIDqaTDf1mW06ol26xrVwrwZQOUSSlCRgs1R1Ptnuylh3EQ2QxqTwAAAIAAAACABAAAgAAiAgJ/Y5l1fS7/VaE2rQLGhLGDi2VW5fG2s0KCqUtrUAUQlhDZDGpPAAAAgAAAAIAFAACAAA&#61;&#61;
+
+    signedPsbt:
+      description: PSBT signed by the peer
+      payload:
+        $ref: '#/components/schemas/signedPsbt'
+      examples:
+        - payload:
+            signedPsbt: cHNidP8BAJoCAAAAAljoeiG1ba8MI76OcHBFbDNvfLqlyHV5JPVFiHuyq911AAAAAAD/////g40EJ9DsZQpoqka7CwmK6kQiwHGyyng1Kgd5WdB86h0BAAAAAP////8CcKrwCAAAAAAWABTYXCtx0AYLCcmIauuBXlCZHdoSTQDh9QUAAAAAFgAUAK6pouXw+HaliN9VRuh0LR2HAI8AAAAAAAEAuwIAAAABqtc5MQGL0l+ErkALaISL4J23BurCrBgpi6vucatlb4sAAAAASEcwRAIgWPb8fGoz4bMVSNSByCbAFb0wE1qtQs1neQ2rZtKtJDsCIEoc7SYExnNbY5PltBaR3XiwDwxZQvufdRhW+qk4FX26Af7///8CgPD6AgAAAAAXqRQPuUY0IWlrgsgzryQceMF9295JNIfQ8gonAQAAABepFCnKdPigj4GZlCgYXJe12FLkBj9hh2UAAAABBEdSIQKVg785rgpgl0etGZrd1jT6YQhVnWxc05tMIYPxq5bgfyEC2rYf9JoU22p9ArDNH7t4/EsYMStbTlTa5Nui+/71NtdSriIGApWDvzmuCmCXR60Zmt3WNPphCFWdbFzTm0whg/GrluB/ENkMak8AAACAAAAAgAAAAIAiBgLath/0mhTban0CsM0fu3j8SxgxK1tOVNrk26L7/vU21xDZDGpPAAAAgAAAAIABAACAAAEBIADC6wsAAAAAF6kUt/X69A49QKWkWbHbNTXyty+pIeiHAQQiACCMI1MXN0O1ld+0oHtyuo5C43l9p06H/n2ddJfjsgKJAwEFR1IhAwidwQx6xttU+RMpr2FzM9s4jOrQwjH3IzedG5kDCwLcIQI63ZBPPW3PWd25BrDe4jUpt/+57VDl6GFRkmhgIh8Oc1KuIgYCOt2QTz1tz1nduQaw3uI1Kbf/ue1Q5ehhUZJoYCIfDnMQ2QxqTwAAAIAAAACAAwAAgCIGAwidwQx6xttU+RMpr2FzM9s4jOrQwjH3IzedG5kDCwLcENkMak8AAACAAAAAgAIAAIAAIgIDqaTDf1mW06ol26xrVwrwZQOUSSlCRgs1R1Ptnuylh3EQ2QxqTwAAAIAAAACABAAAgAAiAgJ/Y5l1fS7/VaE2rQLGhLGDi2VW5fG2s0KCqUtrUAUQlhDZDGpPAAAAgAAAAIAFAACAAA&#61;&#61;
+
+    signedTransaction:
+      description: Fully constructed signed transaction
+      payload:
+        $ref: '#/components/schemas/signedTransaction'
+      examples:
+        - payload:
+            transaction: 0200000000010258e87a21b56daf0c23be8e7070456c336f7cbaa5c8757924f545887bb2abdd7500000000da00473044022074018ad4180097b873323c0015720b3684cc8123891048e7dbcd9b55ad679c99022073d369b740e3eb53dcefa33823c8070514ca55a7dd9544f157c167913261118c01483045022100f61038b308dc1da865a34852746f015772934208c6d24454393cd99bdf2217770220056e675a675a6d0a02b85b14e5e29074d8a25a9b5760bea2816f661910a006ea01475221029583bf39ae0a609747ad199addd634fa6108559d6c5cd39b4c2183f1ab96e07f2102dab61ff49a14db6a7d02b0cd1fbb78fc4b18312b5b4e54dae4dba2fbfef536d752aeffffffff838d0427d0ec650a68aa46bb0b098aea4422c071b2ca78352a077959d07cea1d01000000232200208c2353173743b595dfb4a07b72ba8e42e3797da74e87fe7d9d7497e3b2028903ffffffff0270aaf00800000000160014d85c2b71d0060b09c9886aeb815e50991dda124d00e1f5050000000016001400aea9a2e5f0f876a588df5546e8742d1d87008f000400473044022062eb7a556107a7c73f45ac4ab5a1dddf6f7075fb1275969a7f383efff784bcb202200c05dbb7470dbf2f08557dd356c7325c1ed30913e996cd3840945db12228da5f01473044022065f45ba5998b59a27ffe1a7bed016af1f1f90d54b3aa8f7450aa5f56a25103bd02207f724703ad1edb96680b284b56d4ffcb88f7fb759eabbe08aa30f29b851383d20147522103089dc10c7ac6db54f91329af617333db388cead0c231f723379d1b99030b02dc21023add904f3d6dcf59ddb906b0dee23529b7ffb9ed50e5e86151926860221f0e7352ae00000000
+
+    restartRound:
+      description: Indicates that the round should be restarted, new round params and nonce are provided so peer can register inputs
+      payload:
+        $ref: '#/components/schemas/restartRound'
+      examples:
+        - payload:
+            roundParams:
+              version: 0
+              roundId: 030756a3dbf5eea34295337a73368905cc60321e9e47cdad6e091e26d311f4ac
+              amount: 40000
+              coordinatorFee: 1000
+              publicKey: 03b9cbebc3e2a1d4b8b2e5f2fbaa1e2d1f3e4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c
+              time: 1619222400
+              inputType: witness_v0_keyhash
+              outputType: witness_v1_taproot
+              changeType: witness_v0_keyhash
+              minPeers: 2
+              maxPeers: 10
+              status: Example Status
+              title: Example Title
+              feeRate: 2
+            nonceMessage:
+              schnorrNonce: 08469f5f8161f406a133a679d247afb71ecce631f91b997ed826751389879550
+
+    cancelRegistration:
+      description: Indicates that the peer wants to cancel registration for the round
+      payload:
+        $ref: '#/components/schemas/cancelRegistration'
+      examples:
+        - payload:
+            nonce: 08469f5f8161f406a133a679d247afb71ecce631f91b997ed826751389879550
+            roundId: 030756a3dbf5eea34295337a73368905cc60321e9e47cdad6e091e26d311f4ac

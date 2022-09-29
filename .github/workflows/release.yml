@@ -1,12 +1,37 @@
 name: Release
 on:
   push:
-    branches: [ master, main, release-action ]
+    branches: [ master, main ]
     tags: [ "*" ]
   release:
     types: [ published ]
 
 jobs:
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Validating AsyncAPI document
+        uses: WaleedAshraf/asyncapi-github-action@v0.0.8
+        with:
+          filepath: docs/async-api.yml
+
+      - name: Generating HTML from my AsyncAPI document
+        uses: docker://asyncapi/github-action-for-generator:latest
+        with:
+          template: '@asyncapi/html-template'
+          filepath: docs/async-api.yml
+          output: generated-html
+
+      - name: Deploy to GitHub Pages
+        uses: JamesIves/github-pages-deploy-action@3.4.2
+        with:
+          ACCESS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH: gh-pages
+          FOLDER: generated-html
+
   # Build rpcServer and coordinatorRpc zips
   server:
     runs-on: ${{ matrix.os }}
