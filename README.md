@@ -6,7 +6,7 @@
 ---
 
 [![Build Status](https://github.com/ln-vortex/ln-vortex/workflows/CI%20to%20Docker%20Hub/badge.svg)](https://github.com/ln-vortex/ln-vortex/actions)
-[![Coverage Status](https://coveralls.io/repos/github/ln-vortex/ln-vortex/badge.svg?branch=master)](https://coveralls.io/github/ln-vortex/ln-vortex?branch=master)
+[![codecov](https://codecov.io/gh/ln-vortex/ln-vortex/branch/master/graph/badge.svg?token=NKJCZXAN7V)](https://codecov.io/gh/ln-vortex/ln-vortex)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 Vortex is a tool to allow users to open lightning channels in a collaborative transaction when
