@@ -5,10 +5,13 @@ import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import Layout from '@theme/Layout';
 
 import styles from './index.module.css';
+import Head from "@docusaurus/Head";
 
 function HomepageHeader() {
   const {siteConfig} = useDocusaurusContext();
   return (
+    <>
+    <Head><title>Vortex</title></Head>
     <header className={clsx('hero hero--primary', styles.heroBanner)}>
       <div className="container">
         <h1 className="hero__title">{siteConfig.title}</h1>
@@ -22,6 +25,7 @@ function HomepageHeader() {
         </div>
       </div>
     </header>
+    </>
   );
 }
 
