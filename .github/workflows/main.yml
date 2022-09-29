@@ -94,10 +94,12 @@ jobs:
         run: sbt downloadBitcoind downloadLnd downloadCLightning
       - name: Run Tests
         run: sbt clean coverage test
-      - name: Upload coverage data to Coveralls
-        run: sbt coverageAggregate coveralls
-        env:
-          COVERALLS_REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Coverage Report
+        run: sbt coverageReport
+      - name: Upload coverage data to Codecov
+        uses: codecov/codecov-action@v2
+        with:
+          fail_ci_if_error: true
 
   postgres:
     needs: linuxCompile
