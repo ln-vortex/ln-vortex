@@ -1,5 +1,7 @@
 ---
 sidebar_position: 2
+title: RPC Docs
+id: rpc-docs
 ---
 
 # RPC Docs
