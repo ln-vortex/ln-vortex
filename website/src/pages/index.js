@@ -63,18 +63,6 @@ function Home() {
                 </div>
             </header>
             <main>
-                {backends && backends.length && (
-                    <section className={styles.features}>
-                        <div className="container">
-                            <h1 style={{textAlign: 'center'}}>Use with your favorite setup</h1>
-                            <div className="row">
-                                {backends.map((props, idx) => (
-                                    <Feature key={idx} {...props} />
-                                ))}
-                            </div>
-                        </div>
-                    </section>
-                )}
                 <section className={classnames('darkSection', styles.features)}>
                     <div className="container">
                         <div className="row">
@@ -83,8 +71,32 @@ function Home() {
                                 alignItems: 'center',
                                 justifyContent: 'center',
                             }}>
-                                <img style={{borderRadius: 80}} src="img/carrot-tornado.png" width={'400px'}/>
+                                <img src="img/undraw_nakamoto_-2-iv6.svg" width={'400px'}/>
                             </div>
+                            {/*TODO figure out how properly vertically center this*/}
+                            <div style={{marginTop: '40px'}}
+                                 className={classnames('col col--6 text--center', styles.feature)}>
+                                <h2>Step up your Lightning privacy</h2>
+                                <p>
+                                    Vortex allows you to take the next step in your Lightning privacy journey.
+                                    With privacy-preserving collaborative transactions, you can now open Lightning
+                                    channels without worry of bad actors surveilling your wallet. Not opening any
+                                    channels? Use the taproot collaborative transactions to preserve your privacy for
+                                    your on-chain utxos for a later date.
+                                </p>
+                                {/* TODO make internal blog w/ privacy stuff highlighted */}
+                                <p>
+                                    Want to learn more about the Lightning privacy?
+                                    <span className="learn-more"><a
+                                        href="https://www.abytesjourney.com/lightning-privacy/"> Learn more →</a></span>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                <section className={classnames(styles.features)}>
+                    <div className="container">
+                        <div className="row">
                             {/*TODO figure out how properly vertically center this*/}
                             <div style={{marginTop: '100px'}}
                                  className={classnames('col col--6 text--center', styles.feature)}>
@@ -101,9 +113,28 @@ function Home() {
                                     <span className="learn-more"><a href="https://river.com/learn/what-is-taproot/"> Learn more →</a></span>
                                 </p>
                             </div>
+                            <div className="col col--6" style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                            }}>
+                                <img style={{borderRadius: 80}} src="img/carrot-tornado.png" width={'400px'}/>
+                            </div>
                         </div>
                     </div>
                 </section>
+                {backends && backends.length && (
+                    <section className={classnames('darkSection', styles.features)}>
+                        <div className="container">
+                            <h1 style={{textAlign: 'center'}}>Use with your favorite setup</h1>
+                            <div className="row">
+                                {backends.map((props, idx) => (
+                                    <Feature key={idx} {...props} />
+                                ))}
+                            </div>
+                        </div>
+                    </section>
+                )}
             </main>
         </Layout>
     );
