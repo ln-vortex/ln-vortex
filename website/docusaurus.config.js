@@ -47,6 +47,10 @@ const config = {
         ],
     ],
 
+    stylesheets: [
+        'https://at-ui.github.io/feather-font/css/iconfont.css'
+    ],
+
     themeConfig:
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
         {
