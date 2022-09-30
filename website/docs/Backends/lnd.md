@@ -17,7 +17,7 @@ the [lnd documentation](https://docs.lightning.engineering/lightning-network-too
 
 ## Configuration
 
-First in your `vortex.conf` file you'll need to set the `backend` to `lnd`:
+First in your `vortex.conf` file you'll need to set the `lightningImplementation` to `lnd`:
 
 ```toml
 vortex.lightningImplementation = "lnd"
