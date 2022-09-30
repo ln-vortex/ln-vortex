@@ -103,9 +103,9 @@ function Home() {
                                 <h2>Taproot Enabled</h2>
                                 <p>
                                     Vortex is the first taproot enabled collaborative transaction project.
-                                    Taproot lays the foundation for a new era of privacy and fungibility in bitcoin
-                                    and lightning. Vortex is the first step in this direction and aims to be the
-                                    on the forefront of this new era.
+                                    Taproot lays the foundation for a new era of privacy and fungibility in bitcoin.
+                                    Vortex takes one of the first steps in this direction and aims to be the on the
+                                    forefront of this new era.
                                 </p>
                                 {/* TODO make internal blog w/ privacy stuff highlighted */}
                                 <p>
