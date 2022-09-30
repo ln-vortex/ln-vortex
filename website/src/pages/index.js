@@ -6,7 +6,7 @@ import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 import styles from './index.module.css';
 
-const features = [
+const backends = [
     {
         title: 'Core Lightning',
         imageUrl: 'img/cln.png',
@@ -30,7 +30,7 @@ function Feature({imageUrl, title, description, pageUrl}) {
         <div className={classnames('col col--4 text--center', styles.feature)}>
             {imgUrl && (
                 <div className="text--center">
-                    <img className={styles.featureImage} src={imgUrl} alt={title} />
+                    <img className={styles.featureImage} src={imgUrl} alt={title}/>
                 </div>
             )}
             <h2>{title}</h2>
@@ -63,18 +63,47 @@ function Home() {
                 </div>
             </header>
             <main>
-                {features && features.length && (
+                {backends && backends.length && (
                     <section className={styles.features}>
                         <div className="container">
                             <h1 style={{textAlign: 'center'}}>Use with your favorite setup</h1>
                             <div className="row">
-                                {features.map((props, idx) => (
+                                {backends.map((props, idx) => (
                                     <Feature key={idx} {...props} />
                                 ))}
                             </div>
                         </div>
                     </section>
                 )}
+                <section className={classnames('darkSection', styles.features)}>
+                    <div className="container">
+                        <div className="row">
+                            <div className="col col--6" style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                            }}>
+                                <img src="img/carrot-tornado.png" width={'400px'}/>
+                            </div>
+                            {/*TODO figure out how properly vertically center this*/}
+                            <div style={{marginTop: '100px'}}
+                                 className={classnames('col col--6 text--center', styles.feature)}>
+                                <h2>Taproot Enabled</h2>
+                                <p>
+                                    Vortex is the first taproot enabled collaborative transaction project.
+                                    Taproot lays the foundation for a new era of privacy and fungibility in bitcoin
+                                    and lightning. Vortex is the first step in this direction and aims to be the
+                                    on the forefront of this new era.
+                                </p>
+                                {/* TODO make internal blog w/ privacy stuff highlighted */}
+                                <p>
+                                    Unsure what taproot is?
+                                    <span className="learn-more"><a href="https://river.com/learn/what-is-taproot/"> Learn more →</a></span>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
             </main>
         </Layout>
     );
