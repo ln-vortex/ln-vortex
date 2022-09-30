@@ -83,7 +83,7 @@ function Home() {
                                 alignItems: 'center',
                                 justifyContent: 'center',
                             }}>
-                                <img src="img/carrot-tornado.png" width={'400px'}/>
+                                <img style={{borderRadius: 80}} src="img/carrot-tornado.png" width={'400px'}/>
                             </div>
                             {/*TODO figure out how properly vertically center this*/}
                             <div style={{marginTop: '100px'}}
