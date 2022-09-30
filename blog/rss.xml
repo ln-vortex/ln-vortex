@@ -4,7 +4,7 @@
         <title>Vortex Blog</title>
         <link>https://lnvortex.com/blog</link>
         <description>Vortex Blog</description>
-        <lastBuildDate>Fri, 30 Sep 2022 01:27:46 GMT</lastBuildDate>
+        <lastBuildDate>Fri, 30 Sep 2022 02:56:43 GMT</lastBuildDate>
         <docs>https://validator.w3.org/feed/docs/rss2.html</docs>
         <generator>https://github.com/jpmonette/feed</generator>
         <language>en</language>
@@ -12,7 +12,7 @@
             <title><![CDATA[intro]]></title>
             <link>https://lnvortex.com/blog/intro</link>
             <guid>/intro</guid>
-            <pubDate>Fri, 30 Sep 2022 01:27:46 GMT</pubDate>
+            <pubDate>Fri, 30 Sep 2022 02:56:43 GMT</pubDate>
         </item>
     </channel>
 </rss>
