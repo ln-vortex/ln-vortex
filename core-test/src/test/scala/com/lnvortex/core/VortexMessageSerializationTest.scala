@@ -6,10 +6,15 @@ import play.api.libs.json._
 
 class VortexMessageSerializationTest extends BitcoinSUnitTest {
 
+  implicit override val generatorDrivenConfig: PropertyCheckConfiguration =
+    generatorDrivenConfigNewCode
+
   "RoundParameters" must "have serialization symmetry" in {
     forAll(Generators.roundParameters) { msg =>
       assert(Json.toJson(msg).as[RoundParameters] == msg)
       assert(Json.toJson(msg).as[VortexMessage] == msg)
+      val vtx: VortexMessage = msg
+      assert(Json.toJson(vtx).as[VortexMessage] == msg)
     }
   }
 
@@ -17,6 +22,8 @@ class VortexMessageSerializationTest extends BitcoinSUnitTest {
     forAll(Generators.askInputs) { msg =>
       assert(Json.toJson(msg).as[AskInputs] == msg)
       assert(Json.toJson(msg).as[VortexMessage] == msg)
+      val vtx: VortexMessage = msg
+      assert(Json.toJson(vtx).as[VortexMessage] == msg)
     }
   }
 
@@ -37,6 +44,8 @@ class VortexMessageSerializationTest extends BitcoinSUnitTest {
     forAll(Generators.registerInputs) { msg =>
       assert(Json.toJson(msg).as[RegisterInputs] == msg)
       assert(Json.toJson(msg).as[VortexMessage] == msg)
+      val vtx: VortexMessage = msg
+      assert(Json.toJson(vtx).as[VortexMessage] == msg)
     }
   }
 
@@ -44,6 +53,8 @@ class VortexMessageSerializationTest extends BitcoinSUnitTest {
     forAll(Generators.blindedSig) { msg =>
       assert(Json.toJson(msg).as[BlindedSig] == msg)
       assert(Json.toJson(msg).as[VortexMessage] == msg)
+      val vtx: VortexMessage = msg
+      assert(Json.toJson(vtx).as[VortexMessage] == msg)
     }
   }
 
@@ -58,6 +69,8 @@ class VortexMessageSerializationTest extends BitcoinSUnitTest {
     forAll(Generators.unsignedPsbtMessage) { msg =>
       assert(Json.toJson(msg).as[UnsignedPsbtMessage] == msg)
       assert(Json.toJson(msg).as[VortexMessage] == msg)
+      val vtx: VortexMessage = msg
+      assert(Json.toJson(vtx).as[VortexMessage] == msg)
     }
   }
 
@@ -65,6 +78,8 @@ class VortexMessageSerializationTest extends BitcoinSUnitTest {
     forAll(Generators.signedPsbtMessage) { msg =>
       assert(Json.toJson(msg).as[SignedPsbtMessage] == msg)
       assert(Json.toJson(msg).as[VortexMessage] == msg)
+      val vtx: VortexMessage = msg
+      assert(Json.toJson(vtx).as[VortexMessage] == msg)
     }
   }
 
@@ -72,6 +87,8 @@ class VortexMessageSerializationTest extends BitcoinSUnitTest {
     forAll(Generators.signedTxMessage) { msg =>
       assert(Json.toJson(msg).as[SignedTxMessage] == msg)
       assert(Json.toJson(msg).as[VortexMessage] == msg)
+      val vtx: VortexMessage = msg
+      assert(Json.toJson(vtx).as[VortexMessage] == msg)
     }
   }
 
@@ -79,6 +96,8 @@ class VortexMessageSerializationTest extends BitcoinSUnitTest {
     forAll(Generators.restartRoundMessage) { msg =>
       assert(Json.toJson(msg).as[RestartRoundMessage] == msg)
       assert(Json.toJson(msg).as[VortexMessage] == msg)
+      val vtx: VortexMessage = msg
+      assert(Json.toJson(vtx).as[VortexMessage] == msg)
     }
   }
 
@@ -86,6 +105,8 @@ class VortexMessageSerializationTest extends BitcoinSUnitTest {
     forAll(Generators.cancelRegistrationMessage) { msg =>
       assert(Json.toJson(msg).as[CancelRegistrationMessage] == msg)
       assert(Json.toJson(msg).as[VortexMessage] == msg)
+      val vtx: VortexMessage = msg
+      assert(Json.toJson(vtx).as[VortexMessage] == msg)
     }
   }
 
@@ -93,6 +114,8 @@ class VortexMessageSerializationTest extends BitcoinSUnitTest {
     forAll(Generators.feeRateHint) { msg =>
       assert(Json.toJson(msg).as[FeeRateHint] == msg)
       assert(Json.toJson(msg).as[VortexMessage] == msg)
+      val vtx: VortexMessage = msg
+      assert(Json.toJson(vtx).as[VortexMessage] == msg)
     }
   }
 
