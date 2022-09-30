@@ -129,7 +129,7 @@ const config = {
                             },
                             {
                                 label: 'GitHub',
-                                href: 'https://github.com/ln-vortex/ln-vortex',
+                                to: 'https://github.com/ln-vortex/ln-vortex',
                             },
                         ],
                     },
