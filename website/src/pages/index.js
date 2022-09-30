@@ -46,8 +46,7 @@ function Home() {
     const {siteConfig = {}} = context;
     return (
         <Layout
-            title="Home"
-            description="Add strong authentication, fine-grained authorization in your apps, devices, and APIs.">
+            description={siteConfig.tagline}>
             <header className={classnames('hero hero--primary', styles.heroBanner)}>
                 <div className="container">
                     <h1 className="hero__title">{siteConfig.title}</h1>
