@@ -56,7 +56,8 @@ const config = {
         {
             image: 'img/logo.svg',
             colorMode: {
-                respectPrefersColorScheme: true,
+                defaultMode: 'dark',
+                disableSwitch: true,
             },
             metadata: [
                 {name: 'twitter:card', content: 'summary'},
