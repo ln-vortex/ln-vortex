@@ -126,7 +126,7 @@ lazy val rpcServer = project
   .settings(CommonSettings.dockerBuildxSettings: _*)
   .settings(libraryDependencies ++= Deps.rpcServer)
   .settings(name := "vortexd")
-  .dependsOn(client, lnd, clightning, config)
+  .dependsOn(client, lnd, clightning, bitcoind, config)
   .enablePlugins(
     JavaAppPackaging,
     DockerPlugin,
