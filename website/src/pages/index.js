@@ -135,6 +135,28 @@ function Home() {
                         </div>
                     </section>
                 )}
+                <section className={classnames(styles.features)}>
+                    <div className="container">
+                        <div className="row">
+                            <div style={{marginTop: '100px'}} className={classnames('col col--6 text--center', styles.feature)}>
+                                <h2>Vortex GUI</h2>
+                                <p>
+                                    Vortex GUI is an application used for interacting with the Vortex Client.
+                                </p>
+                                <p>
+                                    Download <span className="learn-more"><a href="https://github.com/ln-vortex/ln-vortex-gui"> here →</a></span>
+                                </p>
+                            </div>
+                            <div className="col col--6" style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                            }}>
+                                <img style={{borderRadius: 0}} src="img/vortex-gui.png" width={'600px'}/>
+                            </div>
+                        </div>
+                    </div>
+                </section>
             </main>
         </Layout>
     );
