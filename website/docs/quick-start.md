@@ -17,7 +17,7 @@ Vortex needs a wallet to use for collaborative transactions. Currently, Vortex s
 - [CLN](/docs/Backends/cln)
 - [Bitcoin Core](/docs/Backends/bitcoind)
 
-LND is the most popular Lightning implementation, and it is the recommended implementation to use with Vortex and will
+LND is the most popular Lightning implementation, and it is the recommended implementation to use with Vortex as will
 give you access to the most features.
 
 ## Part 1: Install Vortex
