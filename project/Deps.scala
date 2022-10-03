@@ -7,7 +7,7 @@ object Deps {
     val akkaStreamV = "2.6.20"
     val akkaActorV: String = akkaStreamV
 
-    val bitcoinsV = "1.9.4-31-2a0cb57c-SNAPSHOT"
+    val bitcoinsV = "1.9.4-41-6d0c7689-SNAPSHOT"
 
     val scoptV = "4.1.0"
 
@@ -15,7 +15,7 @@ object Deps {
     val sttpV = "3.8.0"
 
     val twitterV = "8.0"
-    val telegramV = "5.4.2"
+    val telegramV = "5.6.0"
 
     val microPickleV = "2.0.0"
 
