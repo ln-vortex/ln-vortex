@@ -4,6 +4,14 @@ id: vortex-gui
 sidebar_position: 6
 ---
 
+<div>
+    <img src="/img/home-screen.png" alt="home screen"/>
+</div>
+
+---
+
+<br />
+
 GUI for interacting with the [LnVortex client](https://github.com/ln-vortex/ln-vortex).
 
 ## Local Development
@@ -22,4 +30,11 @@ Run the app in development mode:
 yarn dev
 ```
 
-Open http://localhost:3000/ to see the app.
+Or run an optimized production build:
+
+```
+yarn build
+yarn start
+```
+
+Open [http://localhost:3000/](http://localhost:3000/) to see the app.
