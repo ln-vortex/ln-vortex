@@ -12,15 +12,15 @@ object Deps {
     val scoptV = "4.1.0"
 
     val sttpCoreV = "1.7.2"
-    val sttpV = "3.8.0"
+    val sttpV = "3.8.2"
 
     val twitterV = "8.0"
-    val telegramV = "5.6.0"
+    val telegramV = "5.6.1"
 
     val microPickleV = "2.0.0"
 
     val grizzledSlf4jV = "1.3.4"
-    val logback = "1.4.1"
+    val logback = "1.4.3"
   }
 
   object Compile {
