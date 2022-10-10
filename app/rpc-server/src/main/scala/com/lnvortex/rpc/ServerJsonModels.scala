@@ -9,6 +9,7 @@ import org.bitcoins.core.protocol.ln.node.NodeId
 import org.bitcoins.core.protocol.transaction._
 import org.bitcoins.core.psbt.PSBT
 import org.bitcoins.core.util.TimeUtil
+import play.api.libs.json.JsObject
 import ujson._
 import upickle.{default => up}
 import upickle.default._
@@ -30,6 +31,10 @@ object SelectCoordinator extends ServerJsonModels {
 
   def fromJsObj(obj: ujson.Obj): Try[SelectCoordinator] = {
     Try(upickle.default.read[SelectCoordinator](obj))
+  }
+
+  def fromJsonObj(obj: JsObject): Try[SelectCoordinator] = {
+    fromJsObj(ujson.read(obj.toString()).obj)
   }
 }
 
@@ -83,6 +88,10 @@ object QueueCoins extends ServerJsonModels {
 
   def fromJsObj(obj: ujson.Obj): Try[QueueCoins] = {
     Try(upickle.default.read[QueueCoins](obj))
+  }
+
+  def fromJsonObj(obj: JsObject): Try[QueueCoins] = {
+    fromJsObj(ujson.read(obj.toString()).obj)
   }
 }
 

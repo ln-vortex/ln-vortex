@@ -25,6 +25,9 @@ object Deps {
 
   object Compile {
 
+    val upickleMarshall =
+      "de.heikoseeberger" %% "akka-http-play-json" % "1.40.0-RC3" withSources () withJavadoc ()
+
     val akkaSttp =
       "com.softwaremill.sttp.client3" %% "akka-http-backend" % V.sttpV withSources () withJavadoc ()
 
@@ -106,6 +109,7 @@ object Deps {
 
   val rpcServer: List[ModuleID] =
     List(
+      Compile.upickleMarshall,
       Compile.akkaHttp,
       Compile.akkaSlf4j,
       Compile.micoPickle,
@@ -117,6 +121,7 @@ object Deps {
       Compile.twitter4s,
       Compile.telegram,
       Compile.akkaSttp,
+      Compile.upickleMarshall,
       Compile.akkaHttp,
       Compile.akkaSlf4j,
       Compile.micoPickle,

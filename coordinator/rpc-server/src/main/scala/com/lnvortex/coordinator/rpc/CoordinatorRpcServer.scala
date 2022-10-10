@@ -8,7 +8,7 @@ import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server._
 import akka.http.scaladsl.server.directives.{Credentials, DebuggingDirectives}
-import de.heikoseeberger.akkahttpupickle.UpickleSupport._
+import de.heikoseeberger.akkahttpplayjson.PlayJsonSupport
 import grizzled.slf4j.Logging
 import upickle.{default => up}
 
@@ -20,13 +20,14 @@ case class CoordinatorRpcServer(
     rpcPort: Int,
     rpcUser: String,
     rpcPassword: String)(implicit system: ActorSystem)
-    extends Logging {
+    extends PlayJsonSupport
+    with Logging {
 
   import system.dispatcher
 
   /** Handles all server commands by throwing a MethodNotFound */
   private val catchAllHandler: PartialFunction[ServerCommand, StandardRoute] = {
-    case ServerCommand(name, _) => throw HttpError.MethodNotFound(name)
+    case ServerCommand(_, name, _) => throw HttpError.MethodNotFound(name)
   }
 
   def authenticator(credentials: Credentials): Option[Done] =
