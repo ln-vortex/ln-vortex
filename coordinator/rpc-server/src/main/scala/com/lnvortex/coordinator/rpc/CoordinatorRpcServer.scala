@@ -68,7 +68,7 @@ case class CoordinatorRpcServer(
 
     handleRejections(rejectionHandler) {
       handleExceptions(exceptionHandler) {
-        corsHandler(route)
+        route
       }
     }
   }
