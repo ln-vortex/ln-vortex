@@ -139,12 +139,10 @@ function Home() {
                     <div className="container">
                         <div className="row">
                             <div style={{marginTop: '100px'}} className={classnames('col col--6 text--center', styles.feature)}>
-                                <h2>Vortex GUI</h2>
+                                <h2>Easy to use</h2>
                                 <p>
-                                    Vortex GUI is an application used for interacting with the Vortex Client.
-                                </p>
-                                <p>
-                                    Download <span className="learn-more"><a href="https://github.com/ln-vortex/ln-vortex-gui"> here →</a></span>
+                                    Vortex comes with an easy to use GUI that is usable as a desktop application or as web server.
+                                    Vortex handles all the hard work and privacy is only a click away.
                                 </p>
                             </div>
                             <div className="col col--6" style={{
