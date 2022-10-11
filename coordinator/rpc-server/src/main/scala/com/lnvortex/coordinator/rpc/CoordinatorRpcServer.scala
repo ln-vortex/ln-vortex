@@ -21,7 +21,8 @@ case class CoordinatorRpcServer(
     rpcUser: String,
     rpcPassword: String)(implicit system: ActorSystem)
     extends PlayJsonSupport
-    with Logging {
+    with Logging
+    with CORSHandler {
 
   import system.dispatcher
 
@@ -67,7 +68,7 @@ case class CoordinatorRpcServer(
 
     handleRejections(rejectionHandler) {
       handleExceptions(exceptionHandler) {
-        route
+        corsHandler(route)
       }
     }
   }
@@ -75,16 +76,32 @@ case class CoordinatorRpcServer(
   val route: Route =
     DebuggingDirectives.logRequestResult(
       ("http-rpc-server", Logging.DebugLevel)) {
-      authenticateBasic("auth", authenticator) { _ =>
-        withErrorHandling {
-          pathSingleSlash {
-            post {
-              entity(as[ServerCommand]) { cmd =>
-                val init = PartialFunction.empty[ServerCommand, Route]
-                val handler = handlers.foldLeft(init) { case (accum, curr) =>
-                  accum.orElse(curr.handleCommand)
+      pathSingleSlash {
+        corsHandler {
+          extractMethod { method =>
+            if (method == HttpMethods.OPTIONS) {
+              complete(StatusCodes.OK)
+            } else {
+              authenticateBasic("auth", authenticator) { _ =>
+                entity(as[ServerCommand]) { cmd =>
+                  withErrorHandling {
+                    logger.trace(s"Received rpc call ($cmd)!")
+                    val validMethods = Seq(HttpMethods.GET,
+                                           HttpMethods.POST,
+                                           HttpMethods.DELETE,
+                                           HttpMethods.PUT)
+                    if (validMethods.contains(method)) {
+                      val init = PartialFunction.empty[ServerCommand, Route]
+                      val handler = handlers.foldLeft(init) {
+                        case (accum, curr) =>
+                          accum.orElse(curr.handleCommand)
+                      }
+                      handler.orElse(catchAllHandler).apply(cmd)
+                    } else
+                      throw new RuntimeException(
+                        s"Invalid http method ${method.value}")
+                  }
                 }
-                handler.orElse(catchAllHandler).apply(cmd)
               }
             }
           }

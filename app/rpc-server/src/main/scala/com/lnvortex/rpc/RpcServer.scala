@@ -20,8 +20,9 @@ case class RpcServer(
     rpcPort: Int,
     rpcUser: String,
     rpcPassword: String)(implicit system: ActorSystem)
-    extends Logging
-    with PlayJsonSupport {
+    extends PlayJsonSupport
+    with Logging
+    with CORSHandler {
 
   import system.dispatcher
 
@@ -77,26 +78,36 @@ case class RpcServer(
   val route: Route =
     DebuggingDirectives.logRequestResult(
       ("http-rpc-server", Logging.DebugLevel)) {
-      authenticateBasic("auth", authenticator) { _ =>
-        pathSingleSlash {
-          entity(as[ServerCommand]) { cmd =>
-            extractMethod { method =>
-              withErrorHandling(
-                {
-                  logger.trace(s"Received rpc call ($cmd)!")
-                  if (method == HttpMethods.GET || method == HttpMethods.POST) {
-                    val init = PartialFunction.empty[ServerCommand, Route]
-                    val handler = handlers.foldLeft(init) {
-                      case (accum, curr) =>
-                        accum.orElse(curr.handleCommand)
-                    }
-                    handler.orElse(catchAllHandler).apply(cmd)
-                  } else
-                    throw new RuntimeException(
-                      s"Invalid http method ${method.value}")
-                },
-                cmd.id
-              )
+      pathSingleSlash {
+        corsHandler {
+          extractMethod { method =>
+            if (method == HttpMethods.OPTIONS) {
+              complete(StatusCodes.OK)
+            } else {
+              authenticateBasic("auth", authenticator) { _ =>
+                entity(as[ServerCommand]) { cmd =>
+                  withErrorHandling(
+                    {
+                      logger.trace(s"Received rpc call ($cmd)!")
+                      val validMethods = Seq(HttpMethods.GET,
+                                             HttpMethods.POST,
+                                             HttpMethods.DELETE,
+                                             HttpMethods.PUT)
+                      if (validMethods.contains(method)) {
+                        val init = PartialFunction.empty[ServerCommand, Route]
+                        val handler = handlers.foldLeft(init) {
+                          case (accum, curr) =>
+                            accum.orElse(curr.handleCommand)
+                        }
+                        handler.orElse(catchAllHandler).apply(cmd)
+                      } else
+                        throw new RuntimeException(
+                          s"Invalid http method ${method.value}")
+                    },
+                    cmd.id
+                  )
+                }
+              }
             }
           }
         }
