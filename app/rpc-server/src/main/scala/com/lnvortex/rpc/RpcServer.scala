@@ -8,7 +8,7 @@ import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server._
 import akka.http.scaladsl.server.directives.{Credentials, DebuggingDirectives}
-import de.heikoseeberger.akkahttpupickle.UpickleSupport._
+import de.heikoseeberger.akkahttpplayjson.PlayJsonSupport
 import grizzled.slf4j.Logging
 import play.api.libs.json._
 
@@ -20,7 +20,8 @@ case class RpcServer(
     rpcPort: Int,
     rpcUser: String,
     rpcPassword: String)(implicit system: ActorSystem)
-    extends Logging {
+    extends Logging
+    with PlayJsonSupport {
 
   import system.dispatcher
 

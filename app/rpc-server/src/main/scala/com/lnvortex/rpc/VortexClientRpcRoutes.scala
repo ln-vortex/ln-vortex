@@ -73,7 +73,7 @@ case class VortexClientRpcRoutes(
       }
 
     case ServerCommand(id, "getstatus", obj) =>
-      withValidServerCommand(SelectCoordinator.fromJsObj(obj)) {
+      withValidServerCommand(SelectCoordinator.fromJsonObj(obj)) {
         case SelectCoordinator(coordinator) =>
           complete {
             val client = getClient(coordinator)
@@ -83,7 +83,7 @@ case class VortexClientRpcRoutes(
       }
 
     case ServerCommand(id, "cancelcoins", obj) =>
-      withValidServerCommand(SelectCoordinator.fromJsObj(obj)) {
+      withValidServerCommand(SelectCoordinator.fromJsonObj(obj)) {
         case SelectCoordinator(coordinator) =>
           complete {
             val client = getClient(coordinator)
@@ -94,7 +94,7 @@ case class VortexClientRpcRoutes(
       }
 
     case ServerCommand(id, "queuecoins", obj) =>
-      withValidServerCommand(QueueCoins.fromJsObj(obj)) {
+      withValidServerCommand(QueueCoins.fromJsonObj(obj)) {
         case QueueCoins(coordinator,
                         outpoints,
                         addrOpt,

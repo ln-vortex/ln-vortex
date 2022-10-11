@@ -17,7 +17,7 @@ case class VortexCoordinatorRpcRoutes(server: VortexHttpServer)(implicit
   private def coordinator: VortexCoordinator = server.currentCoordinator
 
   override def handleCommand: PartialFunction[ServerCommand, Route] = {
-    case ServerCommand("getinfo", _) =>
+    case ServerCommand(_, "getinfo", _) =>
       complete {
         for {
           addr <- server.getHostAddress
