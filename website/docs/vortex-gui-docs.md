@@ -14,6 +14,14 @@ sidebar_position: 5
 
 GUI for interacting with the [LnVortex client](https://github.com/ln-vortex/ln-vortex).
 
+The Vortex GUI is the recommended way for users to interact with the client. It is fully featured and makes everything only a few clicks away.
+
+The Vortex GUI available as an electron app or as a web service.
+
+## Electron App
+
+TODO when electron app is complete
+
 ## Local Development
 
 ### Configuration
