@@ -23,6 +23,7 @@ jobs:
           path: |
             ~/.ivy2/cache
             ~/.sbt
+            ~/.bitcoin-s/binaries
           key: ${{ runner.os }}-sbt-${{ hashFiles('**/build.sbt') }}
       - name: Run tor tests
         run: sbt clientServerTest/test
