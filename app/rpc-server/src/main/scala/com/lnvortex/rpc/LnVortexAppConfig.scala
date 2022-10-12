@@ -26,10 +26,11 @@ import org.bitcoins.rpc.client.v21.BitcoindV21RpcClient
 import org.bitcoins.rpc.client.v22.BitcoindV22RpcClient
 import org.bitcoins.rpc.client.v23.BitcoindV23RpcClient
 import org.bitcoins.rpc.config.{BitcoindInstance, BitcoindRpcAppConfig}
+import scodec.bits.ByteVector
 
 import java.io.File
 import java.net.URI
-import java.nio.file.{Path, Paths}
+import java.nio.file.{Files, Path, Paths}
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Properties, Try}
 
@@ -84,6 +85,19 @@ case class LnVortexAppConfig(
     }
   }
 
+  private lazy val lndMacaroonOpt: Option[String] = {
+    config.getStringOrNone(s"$moduleName.lnd.macaroonFile").map { pathStr =>
+      val path = Paths.get(pathStr)
+      val bytes = Files.readAllBytes(path)
+
+      ByteVector(bytes).toHex
+    }
+  }
+
+  private lazy val lndTlsCertOpt: Option[File] = {
+    config.getStringOrNone(s"$moduleName.lnd.tlsCert").map(Paths.get(_).toFile)
+  }
+
   private lazy val lndBinary: File = {
     config.getStringOrNone(s"$moduleName.lnd.binary").map(new File(_)) match {
       case Some(file) => file
@@ -95,18 +109,27 @@ case class LnVortexAppConfig(
   }
 
   private lazy val lndInstance: LndInstance = {
-    val dir = lndDataDir.toFile
-    require(dir.exists, s"$lndDataDir does not exist!")
-    require(dir.isDirectory, s"$lndDataDir is not a directory!")
+    lndMacaroonOpt match {
+      case Some(value) =>
+        LndInstanceRemote(
+          rpcUri = lndRpcUri.getOrElse(new URI("http://127.0.0.1:10009")),
+          macaroon = value,
+          certFileOpt = lndTlsCertOpt,
+          certificateOpt = None)
+      case None =>
+        val dir = lndDataDir.toFile
+        require(dir.exists, s"$lndDataDir does not exist!")
+        require(dir.isDirectory, s"$lndDataDir is not a directory!")
 
-    val confFile = lndDataDir.resolve("lnd.conf").toFile
-    val config = LndConfig(confFile, dir)
+        val confFile = lndDataDir.resolve("lnd.conf").toFile
+        val config = LndConfig(confFile, dir)
 
-    val remoteConfig = config.lndInstanceRemote
+        val remoteConfig = config.lndInstanceRemote
 
-    lndRpcUri match {
-      case Some(uri) => remoteConfig.copy(rpcUri = uri)
-      case None      => remoteConfig
+        lndRpcUri match {
+          case Some(uri) => remoteConfig.copy(rpcUri = uri)
+          case None      => remoteConfig
+        }
     }
   }
 
