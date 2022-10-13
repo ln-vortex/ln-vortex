@@ -124,11 +124,13 @@ lazy val rpcServer = project
   .settings(CommonSettings.appSettings: _*)
   .settings(CommonSettings.dockerSettings: _*)
   .settings(CommonSettings.dockerBuildxSettings: _*)
+  .settings(jlinkIgnoreMissingDependency := CommonSettings.jlinkIgnore)
   .settings(libraryDependencies ++= Deps.rpcServer)
   .settings(name := "vortexd")
   .dependsOn(client, lnd, clightning, bitcoind, config)
   .enablePlugins(
     JavaAppPackaging,
+    JlinkPlugin,
     DockerPlugin,
     // JlinkPlugin,
     // needed for windows, else we have the 'The input line is too long` on windows OS
@@ -156,10 +158,12 @@ lazy val coordinatorRpc = project
   .settings(CommonSettings.appSettings: _*)
   .settings(CommonSettings.dockerSettings: _*)
   .settings(CommonSettings.dockerBuildxSettings: _*)
+  .settings(jlinkIgnoreMissingDependency := CommonSettings.jlinkIgnore)
   .settings(libraryDependencies ++= Deps.coordinatorRpc)
   .dependsOn(server, coordinatorConfig)
   .enablePlugins(
     JavaAppPackaging,
+    JlinkPlugin,
     DockerPlugin,
     // JlinkPlugin,
     // needed for windows, else we have the 'The input line is too long` on windows OS
