@@ -150,7 +150,7 @@ function Home() {
                                 alignItems: 'center',
                                 justifyContent: 'center',
                             }}>
-                                <img style={{borderRadius: 0}} src="img/vortex-gui.png" width={'600px'}/>
+                                <img style={{borderRadius: 0}} src="img/home-screen.png" width={'500px'}/>
                             </div>
                         </div>
                     </div>
