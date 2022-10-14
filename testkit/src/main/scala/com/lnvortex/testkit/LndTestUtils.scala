@@ -14,7 +14,7 @@ import scala.concurrent._
 
 trait LndTestUtils {
 
-  val lndVersion: Option[String] = Some("v0.15.1-beta")
+  val lndVersion: Option[String] = Some("v0.15.2-beta")
 
   def fundLndNodes(
       bitcoind: BitcoindRpcClient,
