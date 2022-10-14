@@ -69,9 +69,9 @@ case class LnVortexAppConfig(
   }
 
   private lazy val lndDataDir: Path = {
-    config.getStringOrNone(s"$moduleName.lnd.datadir").map(Paths.get(_)) match {
-      case Some(path) => path
-      case None       => LndInstanceLocal.DEFAULT_DATADIR
+    config.getStringOrNone(s"$moduleName.lnd.datadir") match {
+      case Some(str) => Paths.get(str.replace("~", Properties.userHome))
+      case None      => LndInstanceLocal.DEFAULT_DATADIR
     }
   }
 
@@ -87,7 +87,7 @@ case class LnVortexAppConfig(
 
   private lazy val lndMacaroonOpt: Option[String] = {
     config.getStringOrNone(s"$moduleName.lnd.macaroonFile").map { pathStr =>
-      val path = Paths.get(pathStr)
+      val path = Paths.get(pathStr.replace("~", Properties.userHome))
       val bytes = Files.readAllBytes(path)
 
       ByteVector(bytes).toHex
@@ -95,12 +95,15 @@ case class LnVortexAppConfig(
   }
 
   private lazy val lndTlsCertOpt: Option[File] = {
-    config.getStringOrNone(s"$moduleName.lnd.tlsCert").map(Paths.get(_).toFile)
+    config.getStringOrNone(s"$moduleName.lnd.tlsCert").map { pathStr =>
+      val path = Paths.get(pathStr.replace("~", Properties.userHome))
+      path.toFile
+    }
   }
 
   private lazy val lndBinary: File = {
-    config.getStringOrNone(s"$moduleName.lnd.binary").map(new File(_)) match {
-      case Some(file) => file
+    config.getStringOrNone(s"$moduleName.lnd.binary") match {
+      case Some(str) => new File(str.replace("~", Properties.userHome))
       case None =>
         NativeProcessFactory
           .findExecutableOnPath("lnd")
@@ -137,15 +140,15 @@ case class LnVortexAppConfig(
     new LndRpcClient(lndInstance, Try(lndBinary).toOption)
 
   private lazy val clnDataDir: Path = {
-    config.getStringOrNone(s"$moduleName.cln.datadir").map(Paths.get(_)) match {
-      case Some(path) => path
-      case None       => Paths.get(Properties.userHome, ".lightning")
+    config.getStringOrNone(s"$moduleName.cln.datadir") match {
+      case Some(str) => Paths.get(str.replace("~", Properties.userHome))
+      case None      => Paths.get(Properties.userHome, ".lightning")
     }
   }
 
   private lazy val clnBinary: File = {
-    config.getStringOrNone(s"$moduleName.cln.binary").map(new File(_)) match {
-      case Some(file) => file
+    config.getStringOrNone(s"$moduleName.cln.binary") match {
+      case Some(str) => new File(str.replace("~", Properties.userHome))
       case None =>
         NativeProcessFactory
           .findExecutableOnPath("lightningd")
