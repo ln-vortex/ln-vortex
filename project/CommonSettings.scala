@@ -3,6 +3,7 @@
 import com.typesafe.sbt.SbtNativePackager.Docker
 import com.typesafe.sbt.SbtNativePackager.autoImport.packageName
 import com.typesafe.sbt.packager.Keys._
+import com.typesafe.sbt.packager.archetypes.jlink.JlinkPlugin.autoImport.JlinkIgnore
 import com.typesafe.sbt.packager.docker.DockerPlugin.autoImport.dockerBaseImage
 import sbt.Keys._
 import sbt.{Def, _}
@@ -267,4 +268,110 @@ object CommonSettings {
 
   lazy val binariesPath: Path =
     Paths.get(Properties.userHome, ".bitcoin-s", "binaries")
+
+
+  //see https://www.scala-sbt.org/sbt-native-packager/archetypes/jlink_plugin.html?highlight=jlinkignore#jlink-plugin
+  val jlinkIgnore = {
+    val deps = Vector(
+      //direct_dependency -> transitive dependency
+      "com.zaxxer.hikari.hibernate" -> "org.hibernate.service.spi",
+      "com.zaxxer.hikari.metrics.dropwizard" -> "com.codahale.metrics.health",
+      "com.zaxxer.hikari.metrics.micrometer" -> "io.micrometer.core.instrument",
+      "com.zaxxer.hikari.metrics.prometheus" -> "io.prometheus.client",
+      "com.zaxxer.hikari.pool" -> "com.codahale.metrics.health",
+      "com.zaxxer.hikari.pool" -> "io.micrometer.core.instrument",
+      "com.zaxxer.hikari.util" -> "javassist",
+      "com.zaxxer.hikari.util" -> "javassist.bytecode",
+      "monix.execution.misc" -> "scala.tools.nsc",
+      "org.flywaydb.core.api.configuration" -> "software.amazon.awssdk.services.s3",
+      "org.flywaydb.core.internal.database.oracle" -> "oracle.jdbc",
+      "org.flywaydb.core.internal.logging.apachecommons" -> "org.apache.commons.logging",
+      "org.flywaydb.core.internal.logging.log4j2" -> "org.apache.logging.log4j",
+      "org.flywaydb.core.internal.resource.s3" -> "software.amazon.awssdk.awscore.exception",
+      "org.flywaydb.core.internal.resource.s3" -> "software.amazon.awssdk.core",
+      "org.flywaydb.core.internal.resource.s3" -> "software.amazon.awssdk.services.s3",
+      "org.flywaydb.core.internal.resource.s3" -> "software.amazon.awssdk.services.s3.model",
+      "org.flywaydb.core.internal.scanner.classpath" -> "org.osgi.framework",
+      "org.flywaydb.core.internal.scanner.classpath.jboss" -> "org.jboss.vfs",
+      "org.flywaydb.core.internal.scanner.cloud.s3" -> "software.amazon.awssdk.core.exception",
+      "org.flywaydb.core.internal.scanner.cloud.s3" -> "software.amazon.awssdk.services.s3",
+      "org.flywaydb.core.internal.scanner.cloud.s3" -> "software.amazon.awssdk.services.s3.model",
+      "org.flywaydb.core.internal.util" -> "com.google.gson",
+      "org.flywaydb.core.internal.util" -> "com.google.gson.reflect",
+      "org.postgresql.osgi" -> "org.osgi.framework",
+      "org.postgresql.osgi" -> "org.osgi.service.jdbc",
+      "org.postgresql.sspi" -> "com.sun.jna",
+      "org.postgresql.sspi" -> "com.sun.jna.platform.win32",
+      "org.postgresql.sspi" -> "com.sun.jna.ptr",
+      "org.postgresql.sspi" -> "com.sun.jna.win32",
+      "org.postgresql.sspi" -> "waffle.windows.auth",
+      "org.postgresql.sspi" -> "waffle.windows.auth.impl",
+      "scala.meta.internal.svm_subs" -> "com.oracle.svm.core.annotate",
+      "shapeless" -> "scala.reflect.macros.contexts",
+      "shapeless" -> "scala.tools.nsc",
+      "shapeless" -> "scala.tools.nsc.ast",
+      "shapeless" -> "scala.tools.nsc.typechecker",
+
+      "akka.grpc.javadsl" -> "ch.megard.akka.http.cors.javadsl",
+    "akka.grpc.javadsl" -> "ch.megard.akka.http.cors.javadsl.settings",
+    "akka.grpc.javadsl" -> "ch.megard.akka.http.cors.scaladsl.settings",
+    "akka.grpc.scaladsl" -> "ch.megard.akka.http.cors.scaladsl",
+    "akka.grpc.scaladsl" -> "ch.megard.akka.http.cors.scaladsl.model",
+    "akka.grpc.scaladsl" -> "ch.megard.akka.http.cors.scaladsl.settings",
+    "ch.qos.logback.classic" -> "jakarta.servlet.http",
+    "ch.qos.logback.classic.helpers" -> "jakarta.servlet",
+    "ch.qos.logback.classic.helpers" -> "jakarta.servlet.http",
+    "ch.qos.logback.classic.selector.servlet" -> "jakarta.servlet",
+    "ch.qos.logback.classic.servlet" -> "jakarta.servlet",
+    "ch.qos.logback.core.boolex" -> "org.codehaus.janino",
+    "ch.qos.logback.core.joran.conditional" -> "org.codehaus.commons.compiler",
+    "ch.qos.logback.core.joran.conditional" -> "org.codehaus.janino",
+    "ch.qos.logback.core.net" -> "jakarta.mail",
+    "ch.qos.logback.core.net" -> "jakarta.mail.internet",
+    "ch.qos.logback.core.status" -> "jakarta.servlet",
+    "ch.qos.logback.core.status" -> "jakarta.servlet.http",
+    "com.zaxxer.hikari" -> "com.codahale.metrics.health",
+    "com.zaxxer.hikari.hibernate" -> "org.hibernate",
+    "com.zaxxer.hikari.hibernate" -> "org.hibernate.cfg",
+    "com.zaxxer.hikari.hibernate" -> "org.hibernate.engine.jdbc.connections.spi",
+    "com.zaxxer.hikari.hibernate" -> "org.hibernate.service",
+    "io.grpc.netty.shaded.io.netty.handler.codec.compression" -> "com.aayushatharva.brotli4j",
+    "io.grpc.netty.shaded.io.netty.handler.codec.compression" -> "com.aayushatharva.brotli4j.decoder",
+    "io.grpc.netty.shaded.io.netty.handler.codec.compression" -> "com.aayushatharva.brotli4j.encoder",
+    "io.grpc.netty.shaded.io.netty.handler.codec.compression" -> "com.github.luben.zstd",
+    "io.grpc.netty.shaded.io.netty.handler.codec.compression" -> "com.jcraft.jzlib",
+    "io.grpc.netty.shaded.io.netty.handler.codec.compression" -> "com.ning.compress",
+    "io.grpc.netty.shaded.io.netty.handler.codec.compression" -> "com.ning.compress.lzf",
+    "io.grpc.netty.shaded.io.netty.handler.codec.compression" -> "com.ning.compress.lzf.util",
+    "io.grpc.netty.shaded.io.netty.handler.codec.compression" -> "lzma.sdk",
+    "io.grpc.netty.shaded.io.netty.handler.codec.compression" -> "lzma.sdk.lzma",
+    "io.grpc.netty.shaded.io.netty.handler.codec.compression" -> "net.jpountz.lz4",
+    "io.grpc.netty.shaded.io.netty.handler.codec.compression" -> "net.jpountz.xxhash",
+    "io.grpc.netty.shaded.io.netty.handler.codec.http" -> "com.aayushatharva.brotli4j.encoder",
+    "io.grpc.netty.shaded.io.netty.handler.codec.http2" -> "com.aayushatharva.brotli4j.encoder",
+    "io.grpc.netty.shaded.io.netty.handler.codec.marshalling" -> "org.jboss.marshalling",
+    "io.grpc.netty.shaded.io.netty.handler.codec.protobuf" -> "com.google.protobuf.nano",
+    "io.grpc.netty.shaded.io.netty.handler.codec.spdy" -> "com.jcraft.jzlib",
+    "io.grpc.netty.shaded.io.netty.handler.ssl" -> "org.conscrypt",
+    "io.grpc.netty.shaded.io.netty.handler.ssl" -> "org.eclipse.jetty.alpn",
+    "io.grpc.netty.shaded.io.netty.handler.ssl" -> "org.eclipse.jetty.npn",
+    "io.grpc.netty.shaded.io.netty.handler.ssl.util" -> "org.bouncycastle.cert",
+    "io.grpc.netty.shaded.io.netty.handler.ssl.util" -> "org.bouncycastle.cert.jcajce",
+    "io.grpc.netty.shaded.io.netty.handler.ssl.util" -> "org.bouncycastle.operator",
+    "io.grpc.netty.shaded.io.netty.handler.ssl.util" -> "org.bouncycastle.operator.jcajce",
+    "io.grpc.netty.shaded.io.netty.util" -> "com.oracle.svm.core.annotate",
+    "io.grpc.netty.shaded.io.netty.util.concurrent" -> "org.jetbrains.annotations",
+    "io.grpc.netty.shaded.io.netty.util.internal" -> "reactor.blockhound",
+    "io.grpc.netty.shaded.io.netty.util.internal" -> "reactor.blockhound.integration",
+    "io.grpc.netty.shaded.io.netty.util.internal.logging" -> "org.apache.commons.logging",
+    "io.grpc.netty.shaded.io.netty.util.internal.logging" -> "org.apache.log4j",
+    "io.grpc.netty.shaded.io.netty.util.internal.logging" -> "org.apache.logging.log4j",
+    "io.grpc.netty.shaded.io.netty.util.internal.logging" -> "org.apache.logging.log4j.message",
+    "io.grpc.netty.shaded.io.netty.util.internal.logging" -> "org.apache.logging.log4j.spi",
+    "io.grpc.netty.shaded.io.netty.util.internal.svm" -> "com.oracle.svm.core.annotate",
+     "com.thoughtworks.paranamer" -> "javax.inject"
+    )
+
+    JlinkIgnore.byPackagePrefix(deps:_*)
+  }
 }

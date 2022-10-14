@@ -35,6 +35,7 @@ services:
 
       VORTEX_LND_RPC_URI: "$APP_LIGHTNING_NODE_IP:$APP_LIGHTNING_NODE_GRPC_PORT"
       VORTEX_LND_DATADIR: "/lnd/"
+      DISABLE_JLINK: "1"
     ports:
       - "2522:2522"
       - "12522:12522"
