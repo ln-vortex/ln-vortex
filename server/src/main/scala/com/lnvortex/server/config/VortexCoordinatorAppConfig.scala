@@ -27,6 +27,8 @@ import org.bitcoins.keymanager.config.KeyManagerAppConfig
 import org.bitcoins.keymanager.config.KeyManagerAppConfig._
 import org.bitcoins.tor.TorParams
 import org.bitcoins.tor.config.TorAppConfig
+import org.scalastr.client.NostrClient
+import org.scalastr.core.NostrEvent
 
 import java.io.File
 import java.net.InetSocketAddress
@@ -227,6 +229,29 @@ case class VortexCoordinatorAppConfig(
 
   lazy val coordinatorName: String = {
     config.getStringOrElse(s"$moduleName.name", DEFAULT_WALLET_NAME)
+  }
+
+  lazy val externalAddrs: Vector[String] = {
+    config.getStringList(s"$moduleName.externalAddrs").asScala.toVector
+  }
+
+  lazy val nostrRelays: Vector[String] = {
+    config.getStringList(s"$moduleName.nostr.relays").asScala.toVector
+  }
+
+  lazy val nostrClients: Vector[NostrClient] = {
+    nostrRelays.map { relay =>
+      new NostrClient(relay, torConf.socks5ProxyParams) {
+
+        override def processEvent(
+            subscriptionId: String,
+            event: NostrEvent): Future[Unit] = {
+          Future.unit
+        }
+
+        override def processNotice(notice: String): Future[Unit] = Future.unit
+      }
+    }
   }
 
   override lazy val dbPath: Path = {

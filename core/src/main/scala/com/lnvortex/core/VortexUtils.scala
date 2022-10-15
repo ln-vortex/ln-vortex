@@ -6,6 +6,8 @@ import org.bitcoins.core.protocol.transaction._
 
 trait VortexUtils {
 
+  final val NOSTR_KIND: Int = 2523
+
   def getAnonymitySet(transaction: Transaction, outputIndex: Int): Int = {
     val output = transaction.outputs(outputIndex)
     val equalOutputs = transaction.outputs.count(_.value == output.value)

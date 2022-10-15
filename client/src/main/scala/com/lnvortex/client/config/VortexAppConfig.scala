@@ -1,6 +1,8 @@
 package com.lnvortex.client.config
 
 import akka.actor.ActorSystem
+import akka.stream.OverflowStrategy
+import akka.stream.scaladsl.{BroadcastHub, Keep, Source}
 import com.lnvortex.client.db.UTXODAO
 import com.lnvortex.core.VortexUtils
 import com.lnvortex.core.VortexUtils.CONFIG_FILE_NAME
@@ -11,8 +13,10 @@ import org.bitcoins.commons.config._
 import org.bitcoins.core.config._
 import org.bitcoins.core.util._
 import org.bitcoins.db._
-import org.bitcoins.tor.config.TorAppConfig
 import org.bitcoins.tor._
+import org.bitcoins.tor.config.TorAppConfig
+import org.scalastr.client.NostrClient
+import org.scalastr.core.NostrEvent
 
 import java.nio.file.{Files, Path, Paths}
 import scala.concurrent._
@@ -82,6 +86,32 @@ case class VortexAppConfig(baseDatadir: Path, configOverrides: Vector[Config])(
     }
 
     list.toVector
+  }
+
+  lazy val nostrRelays: Vector[String] = {
+    config.getStringList(s"$moduleName.nostr.relays").asScala.toVector
+  }
+
+  lazy val (nostrQueue, nostrSource) = Source
+    .queue[NostrEvent](bufferSize = 1_000,
+                       OverflowStrategy.backpressure,
+                       maxConcurrentOffers = 2)
+    .toMat(BroadcastHub.sink)(Keep.both)
+    .run()
+
+  lazy val nostrClients: Vector[NostrClient] = {
+    nostrRelays.map { relay =>
+      new NostrClient(relay, torConf.socks5ProxyParams) {
+
+        override def processEvent(
+            subscriptionId: String,
+            event: NostrEvent): Future[Unit] = {
+          nostrQueue.offer(event).map(_ => ())(system.dispatcher)
+        }
+
+        override def processNotice(notice: String): Future[Unit] = Future.unit
+      }
+    }
   }
 
   override lazy val appConfig: VortexAppConfig = this

@@ -8,12 +8,18 @@ import com.lnvortex.core.api._
 import grizzled.slf4j.Logging
 import org.bitcoins.core.config.BitcoinNetwork
 import org.bitcoins.core.util.StartStopAsync
+import org.scalastr.core.NostrFilter
+import com.lnvortex.core.api.CoordinatorAddress._
+import play.api.libs.json._
 
+import scala.collection.mutable
 import scala.concurrent._
+import scala.util._
 
 class VortexClientManager[+T <: VortexWalletApi](
     private[lnvortex] val vortexWallet: T,
-    extraCoordinators: Vector[CoordinatorAddress] = Vector.empty)(implicit
+    val extraCoordinators: mutable.Buffer[CoordinatorAddress] =
+      mutable.Buffer.empty)(implicit
     val system: ActorSystem,
     val config: VortexAppConfig)
     extends StartStopAsync[Unit]
@@ -27,7 +33,7 @@ class VortexClientManager[+T <: VortexWalletApi](
 
   lazy val coordinators: Vector[CoordinatorAddress] = {
     val all = config.coordinatorAddresses ++ extraCoordinators
-    all.filter(_.network == vortexWallet.network)
+    all.filter(_.network == vortexWallet.network).distinctBy(_.onion)
   }
 
   lazy val clients: Vector[VortexClient[VortexWalletApi]] = {
@@ -53,7 +59,54 @@ class VortexClientManager[+T <: VortexWalletApi](
   }
 
   override def start(): Future[Unit] = {
+    val filter =
+      NostrFilter(
+        ids = None,
+        authors = None,
+        kinds = Some(Vector(VortexUtils.NOSTR_KIND)),
+        `#e` = None,
+        `#p` = None,
+        since = None,
+        until = None,
+        limit = None
+      )
+
+    config.nostrSource
+      .mapAsync(5) { msg =>
+        if (msg.kind == VortexUtils.NOSTR_KIND) {
+          Try(Json.parse(msg.content)) match {
+            case Failure(err) =>
+              err.printStackTrace()
+
+              Future.unit
+            case Success(json) =>
+              json.validate[CoordinatorAddress] match {
+                case JsError(errors) =>
+                  logger.error(
+                    s"Failed to parse coordinator address from nostr: ${errors
+                        .mkString("\n")}")
+                  Future.unit
+                case JsSuccess(addr, _) =>
+                  if (addr.network == network) {
+                    logger.info(s"Adding coordinator $addr")
+                    extraCoordinators.addOne(addr)
+                  } else {
+                    logger.debug(
+                      s"Coordinator address $addr is not on the same network as the wallet")
+                  }
+                  Future.unit
+              }
+          }
+        } else Future.unit
+      }
+      .run()
+
     for {
+      // start nostr clients
+      _ <- Future.sequence(config.nostrClients.map(_.start()))
+      _ = logger.info("Requesting coordinators from nostr relays!")
+      _ <- Future.sequence(config.nostrClients.map(_.subscribe(filter)))
+
       _ <- vortexWallet.start()
       coins <- vortexWallet.listCoins()
       _ <- utxoDAO.createMissing(coins)
@@ -66,5 +119,17 @@ class VortexClientManager[+T <: VortexWalletApi](
   override def stop(): Future[Unit] = {
     val stopFs = clients.map(_.stop())
     Future.sequence(stopFs).map(_ => ())
+  }
+}
+
+object VortexClientManager extends Logging {
+
+  def apply[T <: VortexWalletApi](
+      vortexWallet: T,
+      extraCoordinators: Vector[CoordinatorAddress] = Vector.empty)(implicit
+      system: ActorSystem,
+      config: VortexAppConfig): VortexClientManager[T] = {
+    new VortexClientManager(vortexWallet,
+                            mutable.Buffer.from(extraCoordinators))
   }
 }

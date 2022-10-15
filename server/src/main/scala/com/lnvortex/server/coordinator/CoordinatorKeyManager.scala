@@ -69,7 +69,7 @@ class CoordinatorKeyManager()(implicit
     }
   }
 
-  private[this] lazy val privKey: ECPrivateKey =
+  private[server] lazy val privKey: ECPrivateKey =
     extPrivateKey.deriveChildPrivKey(pubKeyPath).key
 
   lazy val publicKey: SchnorrPublicKey = privKey.schnorrPublicKey

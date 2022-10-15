@@ -9,6 +9,8 @@ object Deps {
 
     val bitcoinsV = "1.9.4-41-6d0c7689-SNAPSHOT"
 
+    val scalastrV = "0.0.0-30-ae89b538-SNAPSHOT"
+
     val scoptV = "4.1.0"
 
     val sttpCoreV = "1.7.2"
@@ -19,6 +21,8 @@ object Deps {
 
     val microPickleV = "2.0.0"
 
+    val testContainersV = "0.40.10"
+
     val grizzledSlf4jV = "1.3.4"
     val logback = "1.4.3"
   }
@@ -27,6 +31,9 @@ object Deps {
 
     val upickleMarshall =
       "de.heikoseeberger" %% "akka-http-play-json" % "1.40.0-RC3" withSources () withJavadoc ()
+
+    val scalastr =
+      "org.scalastr" %% "client" % V.scalastrV withSources () withJavadoc ()
 
     val akkaSttp =
       "com.softwaremill.sttp.client3" %% "akka-http-backend" % V.sttpV withSources () withJavadoc ()
@@ -96,6 +103,9 @@ object Deps {
 
     val bitcoinsDbCommons =
       "org.bitcoin-s" %% "bitcoin-s-db-commons" % V.bitcoinsV withSources () withJavadoc ()
+
+    val testContainers =
+      "com.dimafeng" %% "testcontainers-scala-scalatest" % V.testContainersV withSources () withJavadoc ()
   }
 
   val config: List[ModuleID] = List(Compile.bitcoinsAppCommons)
@@ -146,6 +156,7 @@ object Deps {
          Compile.grizzledSlf4j)
 
   val client: List[ModuleID] = List(
+    Compile.scalastr,
     Compile.bitcoinsTor,
     Compile.bitcoinsDbCommons,
     Compile.akkaActor,
@@ -157,6 +168,7 @@ object Deps {
 
   val server: List[ModuleID] =
     List(
+      Compile.scalastr,
       Compile.bitcoinsKeyManager,
       Compile.bitcoinsFeeProvider,
       Compile.bitcoinsBitcoindRpc,
@@ -172,7 +184,10 @@ object Deps {
   val coreTest: List[ModuleID] = List(Compile.bitcoinsTestkitCore) ++ core
 
   val testkit: List[ModuleID] =
-    List(Compile.bitcoinsTestkit, Compile.bitcoinsBitcoindRpc)
+    List(Compile.bitcoinsTestkit,
+         Compile.bitcoinsBitcoindRpc,
+         Compile.scalastr,
+         Compile.testContainers)
 
   val develop: List[ModuleID] = List(Compile.logback)
 }

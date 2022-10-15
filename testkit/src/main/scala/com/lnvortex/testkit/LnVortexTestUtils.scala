@@ -53,6 +53,7 @@ trait LnVortexTestUtils { self: EmbeddedPg =>
          |}
          |
          |coordinator {
+         |  externalAddrs = ["127.0.0.1:$listenPort"]
          |  listen = "127.0.0.1:$listenPort"
          |  maxPeers = 2
          |  coordinatorFee = 10000
