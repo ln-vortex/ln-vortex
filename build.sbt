@@ -9,7 +9,7 @@ import scala.util.Properties
 
 name := "ln-vortex"
 
-scalaVersion := "2.13.8"
+scalaVersion := "2.13.10"
 
 resolvers ++= Resolver.sonatypeOssRepos("snapshots")
 
@@ -126,7 +126,8 @@ lazy val rpcServer = project
   .settings(CommonSettings.dockerBuildxSettings: _*)
   .settings(jlinkIgnoreMissingDependency := CommonSettings.jlinkIgnore)
   .settings(libraryDependencies ++= Deps.rpcServer)
-  .settings(bashScriptExtraDefines ++= IO.readLines(baseDirectory.value / "src" / "universal" / "rpc-server-extra-startup-script.sh"))
+  .settings(bashScriptExtraDefines ++= IO.readLines(
+    baseDirectory.value / "src" / "universal" / "rpc-server-extra-startup-script.sh"))
   .settings(name := "vortexd")
   .dependsOn(client, lnd, clightning, bitcoind, config)
   .enablePlugins(
@@ -159,7 +160,8 @@ lazy val coordinatorRpc = project
   .settings(CommonSettings.appSettings: _*)
   .settings(CommonSettings.dockerSettings: _*)
   .settings(CommonSettings.dockerBuildxSettings: _*)
-  .settings(bashScriptExtraDefines ++= IO.readLines(baseDirectory.value / "src" / "universal" / "coordinator-rpc-server-extra-startup-script.sh"))
+  .settings(bashScriptExtraDefines ++= IO.readLines(
+    baseDirectory.value / "src" / "universal" / "coordinator-rpc-server-extra-startup-script.sh"))
   .settings(jlinkIgnoreMissingDependency := CommonSettings.jlinkIgnore)
   .settings(libraryDependencies ++= Deps.coordinatorRpc)
   .dependsOn(server, coordinatorConfig)
