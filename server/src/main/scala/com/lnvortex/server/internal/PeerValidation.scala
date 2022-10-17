@@ -48,7 +48,14 @@ trait PeerValidation extends Logging { self: VortexCoordinator =>
           val spk = ScriptPubKey.fromAsmHex(out.scriptPubKey.hex)
           TransactionOutput(out.value, spk) == output
       }
-      lazy val isConfirmed = txOutOpt.exists(_.confirmations > 0)
+
+      lazy val isConfirmed = txOutOpt match {
+        case Some(txOut) =>
+          if (txOut.coinbase) txOut.confirmations >= 100
+          else txOut.confirmations >= 1
+        case None => false
+      }
+
       lazy val validConfs = isConfirmed || isRemix
 
       lazy val peerNonce = aliceDbOpt match {
