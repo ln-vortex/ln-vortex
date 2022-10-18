@@ -18,11 +18,13 @@ case class RpcServer(
     handlers: Seq[ServerRoute],
     rpcBindOpt: Option[String],
     rpcPort: Int,
-    rpcUser: String,
-    rpcPassword: String)(implicit system: ActorSystem)
+    rpcCreds: Vector[(String, String)])(implicit system: ActorSystem)
     extends PlayJsonSupport
     with Logging
     with CORSHandler {
+
+  require(rpcCreds.nonEmpty, "Must have at least one rpc credential")
+  require(rpcCreds.forall(_._2.nonEmpty), "Rpc password cannot be empty")
 
   import system.dispatcher
 
@@ -31,14 +33,17 @@ case class RpcServer(
     case ServerCommand(_, name, _) => throw HttpError.MethodNotFound(name)
   }
 
-  def authenticator(credentials: Credentials): Option[Done] =
+  def authenticator(credentials: Credentials): Option[Done] = {
     credentials match {
-      case p @ Credentials.Provided(_)
-          if rpcPassword.nonEmpty && p.verify(rpcPassword) =>
-        Some(Done)
-      case _ =>
+      case p: Credentials.Provided =>
+        rpcCreds.find(_._1 == p.identifier).flatMap { case (_, pass) =>
+          if (p.verify(pass)) Some(Done)
+          else None
+        }
+      case Credentials.Missing =>
         None
     }
+  }
 
   /** HTTP directive that handles both exceptions and rejections */
   private def withErrorHandling(

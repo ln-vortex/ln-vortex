@@ -4,8 +4,9 @@ import com.lnvortex.core.VortexUtils
 import com.lnvortex.core.VortexUtils.CONFIG_FILE_NAME
 import com.typesafe.config.Config
 import org.bitcoins.commons.config._
+import org.bitcoins.crypto.CryptoUtil
 
-import java.nio.file.{Path, Paths}
+import java.nio.file.{Files, Path, Paths}
 import scala.concurrent._
 import scala.util.Properties
 
@@ -31,11 +32,21 @@ case class LnVortexRpcServerConfig(
   override def start(): Future[Unit] = Future.unit
   override def stop(): Future[Unit] = Future.unit
 
-  lazy val rpcUsername: String =
-    config.getString(s"$moduleName.rpcUser")
+  lazy val rpcUsernameOpt: Option[String] =
+    config.getStringOrNone(s"$moduleName.rpcUser")
 
-  lazy val rpcPassword: String =
-    config.getString(s"$moduleName.rpcPassword")
+  lazy val rpcPasswordOpt: Option[String] =
+    config.getStringOrNone(s"$moduleName.rpcPassword")
+
+  private lazy val rpcCookieFile: Path = {
+    config.getStringOrNone(s"$moduleName.rpcCookieFile") match {
+      case Some(cookiePath) => Paths.get(cookiePath)
+      case None =>
+        datadir
+          .resolve(config.getString("bitcoin-s.network"))
+          .resolve(".rpc.cookie")
+    }
+  }
 
   lazy val rpcBind: Option[String] =
     config.getStringOrNone(s"$moduleName.rpcBind")
@@ -43,6 +54,34 @@ case class LnVortexRpcServerConfig(
   lazy val rpcPort: Int =
     config.getIntOrElse(s"$moduleName.rpcPort",
                         VortexUtils.getDefaultClientRpcPort(network))
+
+  lazy val rpcCreds: Vector[(String, String)] = {
+    val configured = for {
+      username <- rpcUsernameOpt
+      password <- rpcPasswordOpt
+    } yield (username, password)
+
+    getCookie +: configured.toVector
+  }
+
+  def getCookie: (String, String) = {
+    if (Files.exists(rpcCookieFile)) {
+      val cookie = Files.readAllLines(rpcCookieFile).get(0)
+      val split = cookie.split(":")
+      (split(0), split(1))
+    } else {
+      createCookieFile()
+    }
+  }
+
+  def createCookieFile(): (String, String) = {
+    val user = "__COOKIE__"
+    val password = CryptoUtil.randomBytes(32).toHex
+    val cookie = s"$user:$password"
+    Files.write(rpcCookieFile, cookie.getBytes())
+
+    (user, password)
+  }
 }
 
 object LnVortexRpcServerConfig

@@ -151,8 +151,8 @@ object ConsoleCli {
   }
 
   def exec(args: Vector[String]): Try[String] = {
-    val cliConfig = CliConfig(rpcUser = serverConfig.rpcUsername,
-                              rpcPassword = serverConfig.rpcPassword,
+    val cliConfig = CliConfig(rpcUser = CliConfig.rpcUser,
+                              rpcPassword = CliConfig.rpcPass,
                               rpcPortOpt = Some(serverConfig.rpcPort))
 
     val config = OParser.parse(parser, args, cliConfig) match {
@@ -278,8 +278,8 @@ object ConsoleCli {
 
 case class CliConfig(
     command: CliCommand = CliCommand.NoCommand,
-    rpcUser: String = serverConfig.rpcUsername,
-    rpcPassword: String = serverConfig.rpcUsername,
+    rpcUser: String = CliConfig.rpcUser,
+    rpcPassword: String = CliConfig.rpcPass,
     debug: Boolean = false,
     rpcPortOpt: Option[Int] = None,
     network: BitcoinNetwork = MainNet) {
@@ -288,6 +288,13 @@ case class CliConfig(
     case Some(port) => port
     case None       => VortexUtils.getDefaultClientRpcPort(network)
   }
+}
+
+object CliConfig {
+
+  val (rpcUser, rpcPass) = serverConfig.rpcCreds
+    .find(_._2.nonEmpty)
+    .getOrElse(throw new RuntimeException("No rpc credentials found"))
 }
 
 sealed abstract class CliCommand
