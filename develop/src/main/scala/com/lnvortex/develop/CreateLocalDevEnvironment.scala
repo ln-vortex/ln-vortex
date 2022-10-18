@@ -119,8 +119,7 @@ object CreateLocalDevEnvironment extends App with Logging {
       handlers = Vector(VortexClientRpcRoutes(clientManager)),
       rpcBindOpt = serverConfig.rpcBind,
       rpcPort = serverConfig.rpcPort,
-      rpcUser = serverConfig.rpcUsername,
-      rpcPassword = serverConfig.rpcPassword
+      rpcCreds = serverConfig.rpcCreds
     )
 
     val rpcStartF = configStartF.flatMap { _ =>
