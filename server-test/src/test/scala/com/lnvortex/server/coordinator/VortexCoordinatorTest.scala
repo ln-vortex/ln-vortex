@@ -278,6 +278,7 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
                                       coordinator.getCurrentRoundId)
       _ <- coordinator
         .beginInputRegistration()
+        .map(_ => ())
         .recover(_ => ())
 
       utxo <- bitcoind.listUnspent.map(_.head)

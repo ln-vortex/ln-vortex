@@ -9,7 +9,7 @@ import scala.util.Properties
 
 name := "ln-vortex"
 
-scalaVersion := "2.13.8"
+scalaVersion := "2.13.10"
 
 resolvers ++= Resolver.sonatypeOssRepos("snapshots")
 
