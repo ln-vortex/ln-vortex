@@ -39,6 +39,8 @@ object Daemon extends App with Logging {
 
   logger.info("Starting...")
 
+  val torF = config.clientConfig.torConf.start()
+
   val configStartF = serverConfig.start()
 
   val server = RpcServer(
@@ -59,6 +61,7 @@ object Daemon extends App with Logging {
   val clientF = configStartF.flatMap { _ =>
     for {
       _ <- clientManager.config.start()
+      _ <- torF
       _ <- clientManager.start()
     } yield ()
   }
