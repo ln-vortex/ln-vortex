@@ -285,6 +285,7 @@ class VortexCoordinator private (
                 logger.trace(s"Sending AskInputs to peer ${id.hex}")
                 peer
                   .offer(TextMessage(Json.toJson(msg).toString))
+                  .map(_ => ())
                   .recover { ex =>
                     logger.error(s"Failed to send AskInputs to peer ${id.hex}",
                                  ex)
@@ -448,6 +449,7 @@ class VortexCoordinator private (
         logger.trace(s"Sending SignedTxMessage to peer ${peerId.hex}")
         peer
           .offer(TextMessage(Json.toJson(msg).toString))
+          .map(_ => ())
           .recover { e =>
             logger.error(s"Error sending signed tx to ${peerId.hex}", e)
           }
@@ -1035,6 +1037,7 @@ class VortexCoordinator private (
             // recover failures for disconnected peers
             val sendF = connectionHandler
               .offer(TextMessage(Json.toJson(restartMsg).toString))
+              .map(_ => ())
               .recover(_ => ())
               .map(_ => restartMsg)
 
@@ -1115,6 +1118,7 @@ object VortexCoordinator extends Logging {
       config: VortexCoordinatorAppConfig): Future[VortexCoordinator] = {
     bitcoind
       .loadWallet("vortex")
+      .map(_ => ())
       .recover(_ => ())
       .flatMap { _ =>
         val km = new CoordinatorKeyManager()
@@ -1183,7 +1187,11 @@ object VortexCoordinator extends Logging {
               queue
                 .offer(
                   TextMessage(Json.toJson(newCoordinator.roundParams).toString))
-                .recover(_ => old.roundSubscribers -= queue)
+                .map(_ => ())
+                .recover { _ =>
+                  old.roundSubscribers -= queue
+                  ()
+                }
             }
 
             Future.sequence(offerFs)
