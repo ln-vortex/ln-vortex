@@ -78,6 +78,8 @@ case class LnVortexRpcServerConfig(
     val user = "__COOKIE__"
     val password = CryptoUtil.randomBytes(32).toHex
     val cookie = s"$user:$password"
+
+    Files.createDirectories(rpcCookieFile.getParent)
     Files.write(rpcCookieFile, cookie.getBytes())
 
     (user, password)
