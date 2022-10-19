@@ -56,8 +56,7 @@ trait CLNTestUtils {
     val actorSystemB =
       ActorSystem.create("ln-vortex-lnd-test-" + FileUtil.randomDirName)
     val lndClient =
-      LndRpcTestClient.fromSbtDownload(Some(bitcoind), LndTestUtils.lndVersion)(
-        actorSystemB)
+      LndRpcTestClient.fromSbtDownload(Some(bitcoind))(actorSystemB)
 
     val clientsF = for {
       a <- clnClient.start()

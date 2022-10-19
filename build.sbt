@@ -314,12 +314,12 @@ TaskKeys.downloadLnd := {
     Files.createDirectories(binaryDir)
   }
 
-  val version = "0.15.2-beta"
+  val version = "0.15.3-beta"
 
   val (platform, suffix) =
     if (Properties.isLinux) ("linux-amd64", "tar.gz")
     else if (Properties.isMac && System.getProperty("os.arch") == "aarch64")
-      ("darwin-a64rm", "tar.gz")
+      ("darwin-arm64", "tar.gz")
     else if (Properties.isMac) ("darwin-amd64", "tar.gz")
     else if (Properties.isWin) ("windows-amd64", "zip")
     else sys.error(s"Unsupported OS: ${Properties.osName}")
@@ -349,28 +349,33 @@ TaskKeys.downloadLnd := {
 
     val expectedHash =
       if (Properties.isLinux)
-        "dcac95349c658c9194d754b4ffa101507867d2ab064c0364a7db8d3fd9802993"
+        "1f7903c8f700860502d0e7d369130f86dc43e80b0887cc04d7dbeec3122dbf50"
       else if (Properties.isMac && System.getProperty("os.arch") == "aarch64")
-        "7befe3497041e784334a4dca1387b53883e479d3c7917d2cd082f1a4d802c476"
+        "97527ed84b2ba3bb628396f5594148fd090b4835a2e1417cdfd503a9971dcbe3"
       else if (Properties.isMac)
-        "fa451b24af0e4373c9ccb7b4b4065b179b3ecbf200fcc8d0bc883268623450a6"
+        "db7b9074e2003f35a1c497e4515fca0380f92d6f1abc432ca81d7820886297f9"
       else if (Properties.isWin)
-        "1853009ca9e072c4b236a0700c3e7bdb9ac1f6c8ac574236dacec6dbec44be0d"
+        "57cf19d5240960e31ac10202a829c647f1cd3d3d25b6dc83c88eb76981ee9b25"
       else sys.error(s"Unsupported OS: ${Properties.osName}")
 
-    if (hash.equalsIgnoreCase(expectedHash)) {
+    val success = hash.equalsIgnoreCase(expectedHash)
+    if (success) {
       logger.info(s"Download complete and verified, unzipping result")
 
       val extractCommand = s"tar -xzf $archiveLocation --directory $binaryDir"
       logger.info(s"Extracting archive with command: $extractCommand")
       extractCommand.!!
     } else {
-      sys.error(
+      logger.error(
         s"Downloaded invalid version of lnd, got $hash, expected $expectedHash")
     }
 
     logger.info(s"Deleting archive")
     Files.delete(archiveLocation)
+
+    if (!success) {
+      throw new RuntimeException(s"Failed to download lnd v$version")
+    }
   }
 }
 
@@ -385,8 +390,8 @@ TaskKeys.downloadBitcoind := {
     Files.createDirectories(binaryDir)
   }
 
-  val experimentalVersion = "0.18.99"
-  val versions = List("23.0")
+  val versions =
+    List("23.0", "22.0", "0.21.1", "0.20.1", "0.19.0.1", "0.18.1")
 
   logger.debug(
     s"(Maybe) downloading Bitcoin Core binaries for versions: ${versions.mkString(",")}")
@@ -395,6 +400,8 @@ TaskKeys.downloadBitcoind := {
     if (Properties.isLinux) ("x86_64-linux-gnu", "tar.gz")
     else if (Properties.isMac)
       version match {
+        case "23.0" if System.getProperty("os.arch") == "aarch64" =>
+          ("arm64-apple-darwin", "tar.gz")
         case "23.0" => ("x86_64-apple-darwin", "tar.gz")
         case _      => ("osx64", "tar.gz")
       }
@@ -408,9 +415,7 @@ TaskKeys.downloadBitcoind := {
     val (platform, suffix) = getPlatformAndSuffix(version)
     val archiveLocation = binaryDir resolve s"$version.$suffix"
     val location =
-      if (version == experimentalVersion)
-        s"https://s3-us-west-1.amazonaws.com/suredbits.com/bitcoin-core-$version/bitcoin-$version-$platform.$suffix"
-      else if (version.init.endsWith("rc")) { // if it is a release candidate
+      if (version.init.endsWith("rc")) { // if it is a release candidate
         val (base, rc) = version.splitAt(version.length - 3)
         s"https://bitcoincore.org/bin/bitcoin-core-$base/test.$rc/bitcoin-$version-$platform.$suffix"
       } else
@@ -464,22 +469,19 @@ TaskKeys.downloadBitcoind := {
               "0.21.1" -> "366eb44a7a0aa5bd342deea215ec19a184a11f2ca22220304ebb20b9c8917e2b",
               "0.20.1" -> "376194f06596ecfa40331167c39bc70c355f960280bd2a645fdbf18f66527397",
               "0.19.0.1" -> "732cc96ae2e5e25603edf76b8c8af976fe518dd925f7e674710c6c8ee5189204",
-              "0.18.1" -> "600d1db5e751fa85903e935a01a74f5cc57e1e7473c15fd3e17ed21e202cfe5a",
-              "0.17.0.1" -> "6ccc675ee91522eee5785457e922d8a155e4eb7d5524bd130eb0ef0f0c4a6008",
-              "0.16.3" -> "5d422a9d544742bc0df12427383f9c2517433ce7b58cf672b9a9b17c2ef51e4f",
-              experimentalVersion -> "f8b1a0ded648249e5e8c14fca3e11a733da8172b05523922c87557ea5eaaa4c5"
+              "0.18.1" -> "600d1db5e751fa85903e935a01a74f5cc57e1e7473c15fd3e17ed21e202cfe5a"
             )
           else if (Properties.isMac)
             Map(
-              "23.0" -> "c816780583009a9dad426dc0c183c89be9da98906e1e2c7ebae91041c1aaaaf3",
+              "23.0" -> (if (System.getProperty("os.arch") == "aarch64")
+                           "7c8bc63731aa872b7b334a8a7d96e33536ad77d49029bad179b09dca32cd77ac"
+                         else
+                           "c816780583009a9dad426dc0c183c89be9da98906e1e2c7ebae91041c1aaaaf3"),
               "22.0" -> "2744d199c3343b2d94faffdfb2c94d75a630ba27301a70e47b0ad30a7e0155e9",
               "0.21.1" -> "1ea5cedb64318e9868a66d3ab65de14516f9ada53143e460d50af428b5aec3c7",
               "0.20.1" -> "b9024dde373ea7dad707363e07ec7e265383204127539ae0c234bff3a61da0d1",
               "0.19.0.1" -> "a64e4174e400f3a389abd76f4d6b1853788730013ab1dedc0e64b0a0025a0923",
-              "0.18.1" -> "b7bbcee7a7540f711b171d6981f939ca8482005fde22689bc016596d80548bb1",
-              "0.17.0.1" -> "3b1fb3dd596edb656bbc0c11630392e201c1a4483a0e1a9f5dd22b6556cbae12",
-              "0.16.3" -> "78c3bff3b619a19aed575961ea43cc9e142959218835cf51aede7f0b764fc25d",
-              experimentalVersion -> "cfd4ed0b8db08fb1355aca44ca282b1de31e83b5862efaac527e3952b0987e55"
+              "0.18.1" -> "b7bbcee7a7540f711b171d6981f939ca8482005fde22689bc016596d80548bb1"
             )
           else if (Properties.isWin)
             Map(
@@ -488,14 +490,12 @@ TaskKeys.downloadBitcoind := {
               "0.21.1" -> "94c80f90184cdc7e7e75988a55b38384de262336abd80b1b30121c6e965dc74e",
               "0.20.1" -> "e59fba67afce011d32b5d723a3a0be12da1b8a34f5d7966e504520c48d64716d",
               "0.19.0.1" -> "7706593de727d893e4b1e750dc296ea682ccee79acdd08bbc81eaacf3b3173cf",
-              "0.18.1" -> "b0f94ab43c068bac9c10a59cb3f1b595817256a00b84f0b724f8504b44e1314f",
-              "0.17.0.1" -> "2d0a0aafe5a963beb965b7645f70f973a17f4fa4ddf245b61d532f2a58449f3e",
-              "0.16.3" -> "52469c56222c1b5344065ef2d3ce6fc58ae42939a7b80643a7e3ee75ec237da9",
-              experimentalVersion -> "b7ad8e6c0b91adf820499bf891f22f590e969b834980d4910efac5b082d83c49"
+              "0.18.1" -> "b0f94ab43c068bac9c10a59cb3f1b595817256a00b84f0b724f8504b44e1314f"
             )
           else sys.error(s"Unsupported OS: ${Properties.osName}")
 
-        if (hash.equalsIgnoreCase(expectedHash(version))) {
+        val success = hash.equalsIgnoreCase(expectedHash(version))
+        if (success) {
           logger.info(s"Download complete and verified, unzipping result")
 
           val extractCommand =
@@ -503,12 +503,15 @@ TaskKeys.downloadBitcoind := {
           logger.info(s"Extracting archive with command: $extractCommand")
           extractCommand.!!
         } else {
-          sys.error(
+          logger.error(
             s"Downloaded invalid version of bitcoind v$version, got $hash, expected ${expectedHash(version)}")
         }
 
         logger.info(s"Deleting archive")
         Files.delete(archiveLocation)
+
+        if (!success)
+          throw new RuntimeException(s"Failed to download bitcoind v$version")
       }
 
     }

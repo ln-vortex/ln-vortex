@@ -1,7 +1,6 @@
 package com.lnvortex.testkit
 
 import com.lnvortex.lnd.LndVortexWallet
-import com.lnvortex.testkit.LndTestUtils.lndVersion
 import org.bitcoins.core.currency.Bitcoins
 import org.bitcoins.core.number.UInt32
 import org.bitcoins.testkit.async.TestAsyncUtil
@@ -21,7 +20,7 @@ trait LndVortexWalletFixture extends BitcoinSFixture with CachedBitcoindV23 {
         for {
           bitcoind <- cachedBitcoindWithFundsF
 
-          client = LndRpcTestClient.fromSbtDownload(Some(bitcoind), lndVersion)
+          client = LndRpcTestClient.fromSbtDownload(Some(bitcoind))
           lnd <- client.start()
 
           addrA <- lnd.getNewAddress(AddressType.WITNESS_PUBKEY_HASH)

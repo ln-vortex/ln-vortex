@@ -5,7 +5,6 @@ import com.lnvortex.core.api.CoordinatorAddress
 import com.lnvortex.lnd.LndVortexWallet
 import com.lnvortex.server.coordinator.VortexCoordinator
 import com.lnvortex.server.networking.VortexHttpServer
-import com.lnvortex.testkit.LndTestUtils.lndVersion
 import org.bitcoins.core.config.RegTest
 import org.bitcoins.core.currency.Bitcoins
 import org.bitcoins.core.number.UInt32
@@ -41,7 +40,7 @@ trait VortexClientManagerFixture
           _ <- server.start()
           addr <- server.getBinding.map(_.localAddress)
 
-          client = LndRpcTestClient.fromSbtDownload(Some(bitcoind), lndVersion)
+          client = LndRpcTestClient.fromSbtDownload(Some(bitcoind))
           lnd <- client.start()
 
           addrA <- lnd.getNewAddress

@@ -18,7 +18,6 @@ import org.bitcoins.commons.util.NativeProcessFactory
 import org.bitcoins.lnd.rpc.LndRpcClient
 import org.bitcoins.lnd.rpc.config._
 import org.bitcoins.rpc.client.common.{BitcoindRpcClient, BitcoindVersion}
-import org.bitcoins.rpc.client.v17.BitcoindV17RpcClient
 import org.bitcoins.rpc.client.v18.BitcoindV18RpcClient
 import org.bitcoins.rpc.client.v19.BitcoindV19RpcClient
 import org.bitcoins.rpc.client.v20.BitcoindV20RpcClient
@@ -170,7 +169,6 @@ case class LnVortexAppConfig(
   lazy val bitcoind: BitcoindRpcClient = bitcoindConfig.versionOpt match {
     case Some(version) =>
       version match {
-        case BitcoindVersion.V17     => BitcoindV17RpcClient(instance)
         case BitcoindVersion.V18     => BitcoindV18RpcClient(instance)
         case BitcoindVersion.V19     => BitcoindV19RpcClient(instance)
         case BitcoindVersion.V20     => BitcoindV20RpcClient(instance)
