@@ -51,7 +51,7 @@ trait PeerValidation extends Logging { self: VortexCoordinator =>
 
       lazy val isConfirmed = txOutOpt match {
         case Some(txOut) =>
-          if (txOut.coinbase) txOut.confirmations >= 100
+          if (txOut.coinbase) txOut.confirmations > 100
           else txOut.confirmations >= 1
         case None => false
       }
