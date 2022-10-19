@@ -124,6 +124,53 @@ class VortexCoordinatorTest extends VortexCoordinatorFixture {
     } yield assert(msgs.size == 1)
   }
 
+  it must "fail to register an attempted double spend input" in { coordinator =>
+    val bitcoind = coordinator.bitcoind
+
+    for {
+      aliceDb <- coordinator.getNonce(Sha256Digest.empty,
+                                      dummyQueue(),
+                                      coordinator.getCurrentRoundId)
+      _ <- coordinator.beginInputRegistration()
+
+      utxo <- bitcoind.listUnspent.map(_.head)
+      outputRef = {
+        val outpoint = TransactionOutPoint(utxo.txid, UInt32(utxo.vout))
+        val output = TransactionOutput(utxo.amount, utxo.scriptPubKey.get)
+        OutputReference(outpoint, output)
+      }
+      tx = InputReference.constructInputProofTx(outputRef, aliceDb.nonce)
+      signed <- bitcoind.walletProcessPSBT(PSBT.fromUnsignedTx(tx))
+      proof =
+        signed.psbt.inputMaps.head.finalizedScriptWitnessOpt.get.scriptWitness
+
+      inputRef = InputReference(outputRef, proof)
+      addr <- bitcoind.getNewAddress
+
+      blind = ECPrivateKey.freshPrivateKey.fieldElement
+      registerInputs = RegisterInputs(Vector(inputRef),
+                                      blind,
+                                      Some(addr.scriptPubKey))
+
+      // spend utxo
+      addr2 <- bitcoind.getNewAddress
+      doubleSpend = {
+        val input = TransactionInput(outputRef.outPoint,
+                                     EmptyScriptSignature,
+                                     TransactionConstants.sequence)
+        val output = TransactionOutput(outputRef.output.value - Satoshis(500),
+                                       addr2.scriptPubKey)
+        BaseTransaction(Int32.two, Vector(input), Vector(output), UInt32.zero)
+      }
+      signedTx <- bitcoind.signRawTransactionWithWallet(doubleSpend)
+      _ <- bitcoind.sendRawTransaction(signedTx.hex)
+
+      err <- recoverToExceptionIf[InvalidInputsException](
+        coordinator.registerAlice(Sha256Digest.empty, registerInputs))
+    } yield assert(
+      err.getMessage.contains("given does not exist on the blockchain"))
+  }
+
   it must "fail to register banned inputs" in { coordinator =>
     val bitcoind = coordinator.bitcoind
 
