@@ -63,9 +63,11 @@ const config = {
                 {name: 'twitter:card', content: 'summary'},
                 {name: 'twitter:site', content: '@run_vortex'},
                 {name: 'twitter:creator', content: '@run_vortex'},
+                {name: 'twitter:image', content: 'img/vortex_logo1000.png'},
                 {name: 'og:url', content: 'https://lnvortex.com'},
                 {name: 'og:title', content: 'Vortex'},
                 {name: 'og:description', content: 'Lightning and Taproot enabled collaborative transactions'},
+                {name: 'og:image', content: 'img/vortex_logo1000.png'},
             ],
             navbar: {
                 title: '',
