@@ -14,8 +14,6 @@ import scala.concurrent._
 
 trait LndTestUtils {
 
-  val lndVersion: Option[String] = Some("v0.15.2-beta")
-
   def fundLndNodes(
       bitcoind: BitcoindRpcClient,
       client: LndRpcClient,
@@ -44,12 +42,12 @@ trait LndTestUtils {
     val actorSystemA =
       ActorSystem.create("bitcoin-s-lnd-test-" + FileUtil.randomDirName)
     val clientA =
-      LndRpcTestClient.fromSbtDownload(Some(bitcoind), lndVersion)(actorSystemA)
+      LndRpcTestClient.fromSbtDownload(Some(bitcoind))(actorSystemA)
 
     val actorSystemB =
       ActorSystem.create("bitcoin-s-lnd-test-" + FileUtil.randomDirName)
     val clientB =
-      LndRpcTestClient.fromSbtDownload(Some(bitcoind), lndVersion)(actorSystemB)
+      LndRpcTestClient.fromSbtDownload(Some(bitcoind))(actorSystemB)
 
     val clientsF = for {
       a <- clientA.start()
