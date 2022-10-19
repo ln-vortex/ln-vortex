@@ -120,7 +120,9 @@ case class CoordinatorRpcAppConfig(
     VortexCoordinatorAppConfig.fromDatadir(datadir, configOverrides)
 
   implicit lazy val bitcoindConfig: BitcoindRpcAppConfig =
-    BitcoindRpcAppConfig.fromDatadir(datadir, configOverrides)
+    new BitcoindRpcAppConfig(datadir, configOverrides) {
+      override def configFileName: String = CONFIG_FILE_NAME
+    }
 
   private lazy val instance: BitcoindInstance = bitcoindConfig.bitcoindInstance
 

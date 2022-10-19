@@ -162,7 +162,9 @@ case class LnVortexAppConfig(
     new CLightningRpcClient(clnInstance, clnBinary)
 
   implicit lazy val bitcoindConfig: BitcoindRpcAppConfig =
-    BitcoindRpcAppConfig.fromDatadir(datadir, configOverrides)
+    new BitcoindRpcAppConfig(datadir, configOverrides) {
+      override def configFileName: String = CONFIG_FILE_NAME
+    }
 
   private lazy val instance: BitcoindInstance = bitcoindConfig.bitcoindInstance
 
