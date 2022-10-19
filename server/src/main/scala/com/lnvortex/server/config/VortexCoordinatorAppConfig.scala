@@ -89,7 +89,9 @@ case class VortexCoordinatorAppConfig(
   }
 
   lazy val torConf: TorAppConfig =
-    TorAppConfig(directory, None, configOverrides)
+    new TorAppConfig(baseDatadir, None, configOverrides) {
+      override def configFileName: String = CONFIG_FILE_NAME
+    }
 
   lazy val kmConf: KeyManagerAppConfig =
     KeyManagerAppConfig(directory, configOverrides)

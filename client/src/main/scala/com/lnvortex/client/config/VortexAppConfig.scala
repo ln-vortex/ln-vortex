@@ -58,7 +58,9 @@ case class VortexAppConfig(baseDatadir: Path, configOverrides: Vector[Config])(
   override def stop(): Future[Unit] = Future.unit
 
   lazy val torConf: TorAppConfig =
-    TorAppConfig(baseDatadir, None, configOverrides)
+    new TorAppConfig(baseDatadir, None, configOverrides) {
+      override def configFileName: String = CONFIG_FILE_NAME
+    }
 
   lazy val socks5ProxyParams: Option[Socks5ProxyParams] = {
     torConf.socks5ProxyParams
