@@ -54,7 +54,7 @@ const config = {
     themeConfig:
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
         {
-            image: 'img/logo.svg',
+            image: 'img/vortex_logo1000.png',
             colorMode: {
                 defaultMode: 'dark',
                 disableSwitch: true,
