@@ -23,8 +23,8 @@ trait PeerValidation extends Logging { self: VortexCoordinator =>
       aliceDbOpt: Option[AliceDb],
       otherInputs: Vector[RegisteredInputDb]): Future[
     Option[InvalidInputsException]] = {
+    logger.debug(s"Validating input ${inputRef.outPoint.toHumanReadableString}")
     logger.trace(s"Validating input $inputRef")
-    logger.trace(s"Validating input ${inputRef.outPoint.toHumanReadableString}")
 
     val outPoint = inputRef.outPoint
     val output = inputRef.output
