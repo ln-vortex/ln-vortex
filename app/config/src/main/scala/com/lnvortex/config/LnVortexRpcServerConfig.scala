@@ -41,10 +41,7 @@ case class LnVortexRpcServerConfig(
   private lazy val rpcCookieFile: Path = {
     config.getStringOrNone(s"$moduleName.rpcCookieFile") match {
       case Some(cookiePath) => Paths.get(cookiePath)
-      case None =>
-        datadir
-          .resolve(config.getString("bitcoin-s.network"))
-          .resolve(".rpc.cookie")
+      case None => datadir.resolve(".rpc.cookie")
     }
   }
 
