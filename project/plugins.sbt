@@ -2,7 +2,7 @@
 // GraalVM native-image, executable JARs etc
 addSbtPlugin("com.github.sbt" % "sbt-native-packager" % "1.9.11")
 
-addSbtPlugin("com.github.sbt" % "sbt-ci-release" % "1.5.10")
+addSbtPlugin("com.github.sbt" % "sbt-ci-release" % "1.5.11")
 
 addSbtPlugin("com.eed3si9n" % "sbt-assembly" % "2.0.0")
 
