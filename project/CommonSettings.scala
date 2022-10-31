@@ -6,7 +6,7 @@ import com.typesafe.sbt.packager.Keys._
 import com.typesafe.sbt.packager.archetypes.jlink.JlinkPlugin.autoImport.JlinkIgnore
 import com.typesafe.sbt.packager.docker.DockerPlugin.autoImport.dockerBaseImage
 import sbt.Keys._
-import sbt.{Def, _}
+import sbt._
 import sbtassembly.AssemblyKeys._
 import sbtprotoc.ProtocPlugin.autoImport.PB
 import sbtdynver.DynVer
@@ -20,7 +20,7 @@ object CommonSettings {
   lazy val settings: Vector[Setting[_]] = Vector(
     scalaVersion := "2.13.10",
     organization := "com.lnvortex",
-    homepage := Some(url("https://github.com/benthecarman/ln-vortex")),
+    homepage := Some(url("https://lnvortex.com")),
     maintainer.withRank(
       KeyRanks.Invisible) := "benthecarman <benthecarman@live.com>",
     developers := List(
