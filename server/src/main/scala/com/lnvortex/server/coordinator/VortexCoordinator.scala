@@ -1116,9 +1116,12 @@ object VortexCoordinator extends Logging {
       system: ActorSystem,
       ec: ExecutionContext,
       config: VortexCoordinatorAppConfig): Future[VortexCoordinator] = {
+    logger.info("Initializing Vortex Coordinator")
+    logger.debug("Loading bitcoind wallet")
+
     bitcoind
       .loadWallet("vortex")
-      .map(_ => ())
+      .map(_ => logger.debug("Loaded bitcoind wallet"))
       .recover(_ => ())
       .flatMap { _ =>
         val km = new CoordinatorKeyManager()

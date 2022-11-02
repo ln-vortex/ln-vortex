@@ -38,6 +38,7 @@ class VortexHttpServer(coordinator: VortexCoordinator)(implicit
     val config = coordinator.config
 
     if (bindingP.isCompleted) {
+      logger.info("VortexHttpServer already started")
       Future.unit
     } else {
       val bindAddress = config.listenAddress
