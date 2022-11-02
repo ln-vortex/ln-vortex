@@ -1,6 +1,8 @@
 # https://docs.docker.com/ci-cd/github-actions/
-name: CI to Docker Hub
+name: Publish to Docker Hub
+
 on:
+  workflow_dispatch:
   push:
     branches: [master, main]
     tags: ["*"]
