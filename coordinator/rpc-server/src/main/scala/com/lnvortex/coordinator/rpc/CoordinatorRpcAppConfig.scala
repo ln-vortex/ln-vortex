@@ -65,7 +65,11 @@ case class CoordinatorRpcAppConfig(
         config.getStringOrNone(s"$moduleName.telegramCreds"))
 
       id <- envIdOpt.orElse(config.getStringOrNone(s"$moduleName.telegramId"))
-    } yield (creds, id)
+
+      res <-
+        if (creds.isEmpty || id.isEmpty) None
+        else Some((creds, id))
+    } yield res
   }
 
   lazy val telegramHandlerOpt: Option[TelegramHandler] = telegramCreds.map {
@@ -93,8 +97,13 @@ case class CoordinatorRpcAppConfig(
       accessSecret <- config.getStringOrNone(
         s"$moduleName.twitter.access.secret")
 
-      consumerToken = ConsumerToken(consumerKey, consumerSecret)
-      accessToken = AccessToken(accessKey, accessSecret)
+      consumerToken <-
+        if (consumerKey.isEmpty || consumerSecret.isEmpty) None
+        else Some(ConsumerToken(consumerKey, consumerSecret))
+
+      accessToken <-
+        if (accessKey.isEmpty || accessSecret.isEmpty) None
+        else Some(AccessToken(accessKey, accessSecret))
 
       client = TwitterRestClient.withActorSystem(consumerToken, accessToken)(
         system)
