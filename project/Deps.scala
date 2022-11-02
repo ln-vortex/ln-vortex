@@ -3,11 +3,11 @@ import sbt._
 object Deps {
 
   object V {
-    val akkaV = "10.2.10"
-    val akkaStreamV = "2.6.20"
+    val akkaV = "10.4.0"
+    val akkaStreamV = "2.7.0"
     val akkaActorV: String = akkaStreamV
 
-    val bitcoinsV = "1.9.6-25-49a7db38-SNAPSHOT"
+    val bitcoinsV = "1.9.6-38-07533ada-SNAPSHOT"
 
     val scoptV = "4.1.0"
 
