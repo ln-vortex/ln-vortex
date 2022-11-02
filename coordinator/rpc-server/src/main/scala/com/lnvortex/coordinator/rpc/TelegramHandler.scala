@@ -37,6 +37,7 @@ class TelegramHandler(telegramCreds: String, myTelegramId: String)(implicit
     telegramCreds)
 
   override def start(): Future[Unit] = {
+    logger.info("Starting telegram handler")
     for {
       _ <- run()
       _ <- sendTelegramMessage("Connected!", myTelegramId)
