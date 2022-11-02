@@ -5,7 +5,7 @@
 
 ---
 
-[![Build Status](https://github.com/ln-vortex/ln-vortex/workflows/CI%20to%20Docker%20Hub/badge.svg)](https://github.com/ln-vortex/ln-vortex/actions)
+[![Build Status](https://github.com/ln-vortex/ln-vortex/workflows/Release/badge.svg)](https://github.com/ln-vortex/ln-vortex/actions)
 [![codecov](https://codecov.io/gh/ln-vortex/ln-vortex/branch/master/graph/badge.svg?token=NKJCZXAN7V)](https://codecov.io/gh/ln-vortex/ln-vortex)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
