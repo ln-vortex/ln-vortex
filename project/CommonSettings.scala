@@ -170,7 +170,7 @@ object CommonSettings {
   lazy val dockerSettings: Seq[Setting[_]] = {
     Vector(
       // https://sbt-native-packager.readthedocs.io/en/latest/formats/docker.html
-      dockerBaseImage := "eclipse-temurin:17",
+      dockerBaseImage := "openjdk:11",
       dockerRepository := Some("lnvortex"),
       Docker / daemonUser := "ln-vortex",
       // needed for umbrel environment, container uids and host uids must matchup so we can
