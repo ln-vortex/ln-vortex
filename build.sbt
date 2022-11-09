@@ -160,16 +160,15 @@ lazy val coordinatorRpc = project
   .settings(CommonSettings.appSettings: _*)
   .settings(CommonSettings.dockerSettings: _*)
   .settings(CommonSettings.dockerBuildxSettings: _*)
-  .settings(bashScriptExtraDefines ++= IO.readLines(
-    baseDirectory.value / "src" / "universal" / "coordinator-rpc-server-extra-startup-script.sh"))
-  .settings(jlinkIgnoreMissingDependency := CommonSettings.jlinkIgnore)
+//  .settings(bashScriptExtraDefines ++= IO.readLines(
+//    baseDirectory.value / "src" / "universal" / "coordinator-rpc-server-extra-startup-script.sh"))
+//  .settings(jlinkIgnoreMissingDependency := CommonSettings.jlinkIgnore)
   .settings(libraryDependencies ++= Deps.coordinatorRpc)
   .dependsOn(server, coordinatorConfig)
   .enablePlugins(
     JavaAppPackaging,
-    JlinkPlugin,
+//    JlinkPlugin,
     DockerPlugin,
-    // JlinkPlugin,
     // needed for windows, else we have the 'The input line is too long` on windows OS
     LauncherJarPlugin
   )
