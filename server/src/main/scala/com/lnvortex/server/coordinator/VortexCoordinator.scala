@@ -689,7 +689,8 @@ class VortexCoordinator private (
       registerInputs: RegisterInputs,
       banError: VortexServerException,
       roundId: DoubleSha256Digest): Future[Nothing] = {
-    logger.info(s"Banning ${registerInputs.inputs.size} inputs for ${banError.getMessage}")
+    logger.info(
+      s"Banning ${registerInputs.inputs.size} inputs for ${banError.getMessage}")
     val bannedUntil =
       TimeUtil.now.plusSeconds(config.badInputsBanDuration.toSeconds)
 
@@ -1122,7 +1123,8 @@ object VortexCoordinator extends Logging {
     bitcoind
       .loadWallet("vortex")
       .map(_ => logger.debug("Loaded bitcoind wallet"))
-      .recover(_ => ())
+      .recover(e =>
+        logger.warn(s"Failed to load bitcoind wallet: ${e.getMessage}"))
       .flatMap { _ =>
         val km = new CoordinatorKeyManager()
         val dummyOld =

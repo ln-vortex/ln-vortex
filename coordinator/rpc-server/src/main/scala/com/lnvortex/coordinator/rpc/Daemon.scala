@@ -7,6 +7,7 @@ import com.lnvortex.server.config.VortexCoordinatorAppConfig
 import com.lnvortex.server.coordinator.VortexCoordinator
 import com.lnvortex.server.networking.VortexHttpServer
 import grizzled.slf4j.Logging
+import org.bitcoins.core.config.{MainNet, RegTest, SigNet, TestNet3}
 
 import scala.concurrent._
 import scala.concurrent.duration.DurationInt
@@ -49,6 +50,19 @@ object Daemon extends App with Logging {
 
   val f = for {
     _ <- config.start()
+
+    // check bitcoind is working
+    height <- config.bitcoind.getBlockCount
+    goodHeight = config.network match {
+      case MainNet  => height > 750_000
+      case TestNet3 => height > 2_000_000
+      case RegTest  => height >= 0
+      case SigNet   => height >= 0
+    }
+
+    _ = if (!goodHeight)
+      throw new RuntimeException("Failed to connect to bitcoind")
+
     coordinator <- VortexCoordinator.initialize(config.bitcoind)
 
     httpServer = new VortexHttpServer(coordinator)
