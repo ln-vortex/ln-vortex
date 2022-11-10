@@ -79,7 +79,7 @@ case class UTXODAO()(implicit
                    anonSet = anonSet,
                    warning = warning,
                    isChange = false,
-                   isVortex = true)
+                   isVortex = false)
           }
 
           createAllAction(dbs)
