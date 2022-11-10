@@ -689,7 +689,7 @@ class VortexCoordinator private (
       registerInputs: RegisterInputs,
       banError: VortexServerException,
       roundId: DoubleSha256Digest): Future[Nothing] = {
-    logger.info(s"Banning ${registerInputs.inputs.size} inputs")
+    logger.info(s"Banning ${registerInputs.inputs.size} inputs for ${banError.getMessage}")
     val bannedUntil =
       TimeUtil.now.plusSeconds(config.badInputsBanDuration.toSeconds)
 
