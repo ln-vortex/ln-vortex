@@ -102,16 +102,22 @@ case class RoundParameters(
     else {
       // this will cancel out and make this only give us the on-chain fees
       val inputAmt = amount - coordinatorFee
-      val Left(onChainFees) = FeeCalculator.calculateChangeOutput(
-        roundParams = this,
-        isRemix = isRemix,
-        numInputs = numInputs,
-        numRemixes = 0,
-        numNewEntrants = 1,
-        inputAmount = inputAmt,
-        changeSpkOpt = None)
 
-      amount + coordinatorFee + onChainFees
+      val feesE =
+        FeeCalculator.calculateChangeOutput(roundParams = this,
+                                            isRemix = isRemix,
+                                            numInputs = numInputs,
+                                            numRemixes = 0,
+                                            numNewEntrants = 1,
+                                            inputAmount = inputAmt,
+                                            changeSpkOpt = None)
+
+      val fees = feesE match {
+        case Left(fees) => fees
+        case Right(_)   => Satoshis.zero
+      }
+
+      amount + coordinatorFee + fees
     }
   }
 }
