@@ -52,7 +52,8 @@ case class LndChannelOpener(lndRpcClient: LndRpcClient)(implicit
       OpenChannelRequest(fundingShim = Some(fundingShim),
                          nodePubkey = nodeId.bytes,
                          localFundingAmount = fundingAmount.satoshis.toLong,
-                         `private` = privateChannel)
+                         `private` = privateChannel,
+                         scidAlias = true)
 
     lnd
       .openChannel(request)
