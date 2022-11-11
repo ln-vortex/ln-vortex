@@ -3,10 +3,14 @@ package com.lnvortex.server.networking
 import akka.actor._
 import akka.http.scaladsl.Http
 import com.lnvortex.core.VortexUtils
+import com.lnvortex.core.api.CoordinatorAddress
+import com.lnvortex.core.api.CoordinatorAddress._
 import com.lnvortex.server.coordinator.VortexCoordinator
 import grizzled.slf4j.Logging
-import org.bitcoins.core.util.StartStopAsync
+import org.bitcoins.core.util.{NetworkUtil, StartStopAsync, TimeUtil}
 import org.bitcoins.tor.TorController
+import org.scalastr.core.NostrEvent
+import play.api.libs.json.{JsArray, Json}
 
 import java.net.InetSocketAddress
 import scala.concurrent._
@@ -66,6 +70,37 @@ class VortexHttpServer(coordinator: VortexCoordinator)(implicit
         bind <- Http()
           .newServerAt(bindAddress.getHostName, bindAddress.getPort)
           .bind(routes.topLevelRoute)
+
+        broadcastAddrs = onionAddress
+          .map(_.getHostName)
+          .toVector ++ config.externalAddrs
+        fs = broadcastAddrs.map { addr =>
+          val fs = config.nostrClients.map { c =>
+            val inet = NetworkUtil.parseInetSocketAddress(
+              addr,
+              VortexUtils.getDefaultPort(config.network))
+            val coordAddr =
+              CoordinatorAddress(config.coordinatorName, config.network, inet)
+
+            val event =
+              NostrEvent.build(
+                privateKey = coordinator.km.privKey,
+                created_at = TimeUtil.currentEpochSecond,
+                kind = VortexUtils.NOSTR_KIND,
+                tags = JsArray.empty,
+                content = Json.toJson(coordAddr).toString
+              )
+
+            for {
+              _ <- c.start()
+              _ <- c.publishEvent(event)
+            } yield ()
+          }
+
+          Future.sequence(fs).map(_ => ())
+        }
+
+        _ <- Future.sequence(fs).map(_ => ())
       } yield {
         val addr = onionAddress.getOrElse(bind.localAddress)
         bindingP.success(bind)

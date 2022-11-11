@@ -35,7 +35,7 @@ import scala.concurrent.duration._
 import scala.util._
 
 class VortexCoordinator private (
-    private[coordinator] val km: CoordinatorKeyManager,
+    private[server] val km: CoordinatorKeyManager,
     val bitcoind: BitcoindRpcClient,
     val roundId: DoubleSha256Digest,
     var currentFeeRate: SatoshisPerVirtualByte,

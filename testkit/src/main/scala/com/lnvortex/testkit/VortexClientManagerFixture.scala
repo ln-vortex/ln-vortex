@@ -71,8 +71,8 @@ trait VortexClientManagerFixture
 
           coordinatorAddr = CoordinatorAddress("test", RegTest, addr)
           vtxWallet = LndVortexWallet(lnd)
-          clientManager = new VortexClientManager(vtxWallet,
-                                                  Vector(coordinatorAddr))
+          clientManager = VortexClientManager(vtxWallet,
+                                              Vector(coordinatorAddr))
           _ <- clientManager.start()
         } yield (clientManager, server)
       },
