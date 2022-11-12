@@ -4,7 +4,7 @@ id: lnd
 ---
 
 Lnd has first class support in Vortex. Lnd allows you to access every feature of Vortex and is the recommended backend
-for most users. Vortex is compatible with lnd version v0.15.2-beta and above. It is recommended to use the latest
+for most users. Vortex is compatible with lnd version v0.15.4-beta and above. It is recommended to use the latest
 version of lnd as this will have the most up-to-date security fixes and what vortex is tested against.
 
 If you are looking for a guide on how to set up lnd, please see
