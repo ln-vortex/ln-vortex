@@ -270,7 +270,7 @@ case class LndVortexWallet(lndRpcClient: LndRpcClient)(implicit
 
 object LndVortexWallet {
 
-  final val MIN_LND_VERSION = "0.15.2"
+  final val MIN_LND_VERSION = "0.15.4"
 
   // $COVERAGE-OFF$
   def addressTypeFromScriptType(scriptType: ScriptType): AddressType = {
