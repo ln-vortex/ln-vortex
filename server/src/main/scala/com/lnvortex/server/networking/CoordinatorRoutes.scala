@@ -316,6 +316,8 @@ class CoordinatorRoutes(var coordinator: VortexCoordinator)(implicit
       Json.obj(
         "name" -> c.name,
         "network" -> c.network.name,
+        "clearnet" -> c.clearnet.map(clearnet =>
+          s"${clearnet.getHostString}:${clearnet.getPort}"),
         "onion" -> s"${c.onion.getHostString}:${c.onion.getPort}"
       )
   }

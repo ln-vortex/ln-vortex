@@ -66,6 +66,17 @@ class VortexHttpServer(coordinator: VortexCoordinator)(implicit
         bind <- Http()
           .newServerAt(bindAddress.getHostName, bindAddress.getPort)
           .bind(routes.topLevelRoute)
+
+        _ <- (config.httpsPortOpt, config.httpOpt) match {
+          case (Some(httpsPort), Some(httpConf)) =>
+            Http()
+              .newServerAt(bindAddress.getHostName, httpsPort)
+              .enableHttps(httpConf)
+              .bind(routes.topLevelRoute)
+          case (Some(_), None) | (None, Some(_)) =>
+            Future.failed(new RuntimeException("Invalid https configuration"))
+          case (None, None) => Future.unit
+        }
       } yield {
         val addr = onionAddress.getOrElse(bind.localAddress)
         bindingP.success(bind)

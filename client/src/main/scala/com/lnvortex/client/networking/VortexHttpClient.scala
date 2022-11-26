@@ -14,7 +14,7 @@ import org.bitcoins.commons.serializers.JsonReaders._
 import com.lnvortex.core.api.{CoordinatorAddress, VortexWalletApi}
 import org.bitcoins.asyncutil.AsyncUtil
 import org.bitcoins.core.config.BitcoinNetwork
-import org.bitcoins.core.util.FutureUtil
+import org.bitcoins.core.util.{FutureUtil, NetworkUtil}
 import org.bitcoins.crypto._
 import org.bitcoins.tor.Socks5ClientTransport
 import play.api.libs.json._
@@ -27,8 +27,32 @@ import scala.util.Try
 trait VortexHttpClient[+V <: VortexWalletApi] { self: VortexClient[V] =>
 
   private val baseUrl: String = {
-    val addr = coordinatorAddress.onion
-    s"${addr.getHostString}:${addr.getPort}"
+    if (config.torConf.enabled) {
+      val addr = coordinatorAddress.onion
+      s"${addr.getHostString}:${addr.getPort}"
+    } else {
+      coordinatorAddress.clearnet match {
+        case Some(addr) => s"${addr.getHostString}:${addr.getPort}"
+        case None =>
+          if (NetworkUtil.isLoopbackAddress(coordinatorAddress.onion)) {
+            val addr = coordinatorAddress.onion
+            s"${addr.getHostString}:${addr.getPort}"
+          } else {
+            throw new RuntimeException(
+              s"Cannot connect to ${coordinatorAddress.name} without tor")
+          }
+      }
+    }
+  }
+
+  private val (httpProtocol, websocketProtocol): (String, String) = {
+    if (config.torConf.enabled) {
+      ("http", "ws")
+    } else if ("127.0.0.1" == baseUrl.split(":").head) {
+      ("http", "ws")
+    } else {
+      ("https", "wss")
+    }
   }
 
   private val http = Http()
@@ -40,7 +64,7 @@ trait VortexHttpClient[+V <: VortexWalletApi] { self: VortexClient[V] =>
 
   private def createHttpConnectionPoolSettings(): ConnectionPoolSettings = {
     Socks5ClientTransport.createConnectionPoolSettings(
-      new URI(s"http://$baseUrl"),
+      new URI(s"$httpProtocol://$baseUrl"),
       config.socks5ProxyParams)
   }
 
@@ -86,13 +110,13 @@ trait VortexHttpClient[+V <: VortexWalletApi] { self: VortexClient[V] =>
 
   def ping(): Future[Boolean] = {
     sendRequestAndParse[String](
-      HttpRequest(uri = "http://" + baseUrl + "/ping"),
+      HttpRequest(uri = s"$httpProtocol://" + baseUrl + "/ping"),
       newConnection = false).map(_ == "pong")
   }
 
   def getRoundParams(network: BitcoinNetwork): Future[RoundParameters] = {
     val request = Get(
-      "http://" + baseUrl + "/params/" + network.chainParams.genesisBlock.blockHeader.hashBE.hex)
+      s"$httpProtocol://" + baseUrl + "/params/" + network.chainParams.genesisBlock.blockHeader.hashBE.hex)
 
     sendRequestAndParse[RoundParameters](request, newConnection = false)
   }
@@ -100,7 +124,7 @@ trait VortexHttpClient[+V <: VortexWalletApi] { self: VortexClient[V] =>
   def getCoordinators(
       network: BitcoinNetwork): Future[Vector[CoordinatorAddress]] = {
     val request = Get(
-      "http://" + baseUrl + "/coordinators/" + network.chainParams.genesisBlock.blockHeader.hashBE.hex)
+      s"$httpProtocol://" + baseUrl + "/coordinators/" + network.chainParams.genesisBlock.blockHeader.hashBE.hex)
 
     sendRequestAndParse[Vector[CoordinatorAddress]](request,
                                                     newConnection = false)
@@ -113,7 +137,7 @@ trait VortexHttpClient[+V <: VortexWalletApi] { self: VortexClient[V] =>
       s"Connecting to coordinator ${coordinatorAddress.name}: $baseUrl")
 
     val url =
-      "ws://" + baseUrl + "/rounds/" + network.chainParams.genesisBlock.blockHeader.hashBE.hex
+      s"$websocketProtocol://" + baseUrl + "/rounds/" + network.chainParams.genesisBlock.blockHeader.hashBE.hex
 
     val sink = roundsFlow().toMat(Sink.ignore)(Keep.right)
 
@@ -159,14 +183,14 @@ trait VortexHttpClient[+V <: VortexWalletApi] { self: VortexClient[V] =>
 
   protected def registerOutput(msg: RegisterOutput): Future[Boolean] = {
     val request =
-      Post("http://" + baseUrl + "/output", Json.toJson(msg).toString)
+      Post(s"$httpProtocol://" + baseUrl + "/output", Json.toJson(msg).toString)
     sendRequestAndParse[Boolean](request, newConnection = true)
   }
 
   protected def cancelRegistration(
       msg: CancelRegistrationMessage): Future[Boolean] = {
     val request =
-      Post("http://" + baseUrl + "/cancel", Json.toJson(msg).toString)
+      Post(s"$httpProtocol://" + baseUrl + "/cancel", Json.toJson(msg).toString)
 
     // Need to do these synchronously so we get
     // the correct return from the coordinator
@@ -180,7 +204,7 @@ trait VortexHttpClient[+V <: VortexWalletApi] { self: VortexClient[V] =>
       roundId: DoubleSha256Digest): Future[NonceMessage] = {
     require(registrationQueue.isEmpty, "Already registered")
 
-    val url = "ws://" + baseUrl + "/register/" + roundId.hex
+    val url = s"$websocketProtocol://" + baseUrl + "/register/" + roundId.hex
 
     val (queue, source) = Source
       .queue[Message](bufferSize = 10,

@@ -7,7 +7,7 @@ import com.lnvortex.core._
 import com.lnvortex.core.api._
 import grizzled.slf4j.Logging
 import org.bitcoins.core.config.BitcoinNetwork
-import org.bitcoins.core.util.StartStopAsync
+import org.bitcoins.core.util.{NetworkUtil, StartStopAsync}
 
 import scala.concurrent._
 
@@ -27,7 +27,15 @@ class VortexClientManager[+T <: VortexWalletApi](
 
   lazy val coordinators: Vector[CoordinatorAddress] = {
     val all = config.coordinatorAddresses ++ extraCoordinators
-    all.filter(_.network == vortexWallet.network)
+    val sameNetwork = all.filter(_.network == vortexWallet.network)
+
+    // filter out tor-only coordinators if needed
+    if (config.torConf.enabled) sameNetwork
+    else {
+      sameNetwork.filter { c =>
+        c.clearnet.isDefined || NetworkUtil.isLoopbackAddress(c.onion)
+      }
+    }
   }
 
   lazy val clients: Vector[VortexClient[VortexWalletApi]] = {

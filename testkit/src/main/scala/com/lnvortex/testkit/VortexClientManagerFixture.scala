@@ -69,7 +69,7 @@ trait VortexClientManagerFixture
 
           _ <- clientConfig.start()
 
-          coordinatorAddr = CoordinatorAddress("test", RegTest, addr)
+          coordinatorAddr = CoordinatorAddress("test", RegTest, None, addr)
           vtxWallet = LndVortexWallet(lnd)
           clientManager = new VortexClientManager(vtxWallet,
                                                   Vector(coordinatorAddr))
