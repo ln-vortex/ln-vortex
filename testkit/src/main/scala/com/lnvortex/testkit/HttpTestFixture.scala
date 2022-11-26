@@ -38,7 +38,10 @@ trait HttpTestFixture
 
           _ <- clientConfig.start()
 
-          coordinatorAddr = CoordinatorAddress("test", RegTest, addr)
+          coordinatorAddr = CoordinatorAddress("test",
+                                               RegTest,
+                                               Some(addr),
+                                               addr)
           vortexClient = VortexClient(BitcoindVortexWallet(bitcoind),
                                       coordinatorAddr)(system, clientConfig)
         } yield (vortexClient, server)

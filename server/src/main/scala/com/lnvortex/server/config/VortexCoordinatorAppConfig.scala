@@ -1,6 +1,7 @@
 package com.lnvortex.server.config
 
 import akka.actor.ActorSystem
+import akka.http.scaladsl.{ConnectionContext, HttpsConnectionContext}
 import com.lnvortex.core.VortexUtils
 import com.lnvortex.core.api.CoordinatorAddress
 import com.lnvortex.server.models._
@@ -28,9 +29,11 @@ import org.bitcoins.keymanager.config.KeyManagerAppConfig._
 import org.bitcoins.tor.TorParams
 import org.bitcoins.tor.config.TorAppConfig
 
-import java.io.File
+import java.io.{File, InputStream}
 import java.net.InetSocketAddress
 import java.nio.file._
+import java.security.{KeyStore, SecureRandom}
+import javax.net.ssl.{KeyManagerFactory, SSLContext, TrustManagerFactory}
 import scala.concurrent._
 import scala.concurrent.duration._
 import scala.jdk.CollectionConverters._
@@ -256,6 +259,45 @@ case class VortexCoordinatorAppConfig(
     }
   }
 
+  lazy val jksPasswordOpt: Option[String] = {
+    config.getStringOrNone(s"$moduleName.jksPassword")
+  }
+
+  lazy val jksFileOpt: Option[String] = {
+    config.getStringOrNone(s"$moduleName.jksFile")
+  }
+
+  lazy val httpsPortOpt: Option[Int] = {
+    config.getIntOpt(s"$moduleName.httpsPort")
+  }
+
+  lazy val httpOpt: Option[HttpsConnectionContext] = jksFileOpt.flatMap {
+    jksFile =>
+      jksPasswordOpt.map { jksPassword =>
+        val ks: KeyStore = KeyStore.getInstance("PKCS12")
+        val keystore: InputStream =
+          getClass.getClassLoader.getResourceAsStream(jksFile)
+
+        require(keystore != null, "Keystore required!")
+        ks.load(keystore, jksPassword.toCharArray)
+
+        val keyManagerFactory: KeyManagerFactory =
+          KeyManagerFactory.getInstance("SunX509")
+        keyManagerFactory.init(ks, jksPassword.toCharArray)
+
+        val tmf: TrustManagerFactory =
+          TrustManagerFactory.getInstance("SunX509")
+        tmf.init(ks)
+
+        val sslContext: SSLContext = SSLContext.getInstance("TLS")
+        sslContext.init(keyManagerFactory.getKeyManagers,
+                        tmf.getTrustManagers,
+                        new SecureRandom)
+
+        ConnectionContext.httpsServer(sslContext)
+      }
+  }
+
   private val feeProvider: MempoolSpaceProvider =
     MempoolSpaceProvider(FastestFeeTarget, network, None)
 
@@ -324,13 +366,20 @@ case class VortexCoordinatorAppConfig(
       coordinatorConfig <- coordinators
       name = coordinatorConfig.getString("name")
       networkStr = coordinatorConfig.getString("network")
+      clearnetOpt = coordinatorConfig.getStringOrNone("clearnet")
       onion = coordinatorConfig.getString("onion")
     } yield {
       val network = BitcoinNetworks.fromString(networkStr)
-      val addr =
+      val clearnetAddr = clearnetOpt.map(
+        NetworkUtil.parseInetSocketAddress(_,
+                                           VortexUtils.getDefaultPort(network)))
+      val onionAddr =
         NetworkUtil.parseInetSocketAddress(onion,
                                            VortexUtils.getDefaultPort(network))
-      CoordinatorAddress(name = name, network = network, onion = addr)
+      CoordinatorAddress(name = name,
+                         network = network,
+                         clearnet = clearnetAddr,
+                         onion = onionAddr)
     }
 
     list.toVector.groupBy(_.network)

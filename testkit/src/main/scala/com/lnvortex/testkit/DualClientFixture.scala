@@ -62,7 +62,7 @@ trait DualClientFixture
           _ <- clientConfigA.start()
           _ <- clientConfigB.start()
 
-          coordinatorAddr = CoordinatorAddress("test", RegTest, addr)
+          coordinatorAddr = CoordinatorAddress("test", RegTest, None, addr)
 
           (lndA, lndB) <- LndTestUtils.createNodePair(bitcoind, inputScriptType)
           clientA = VortexClient(LndVortexWallet(lndA), coordinatorAddr)(

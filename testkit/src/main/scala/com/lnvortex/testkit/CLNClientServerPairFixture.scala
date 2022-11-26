@@ -58,7 +58,7 @@ trait CLNClientServerPairFixture
           _ = assert(serverConf.outputScriptType == outputScriptType)
 
           _ <- clientConfig.start()
-          coordinatorAddr = CoordinatorAddress("test", RegTest, addr)
+          coordinatorAddr = CoordinatorAddress("test", RegTest, None, addr)
 
           (cln, peerLnd) <- CLNTestUtils.createNodePair(bitcoind,
                                                         inputScriptType)

@@ -74,13 +74,20 @@ case class VortexAppConfig(baseDatadir: Path, configOverrides: Vector[Config])(
       coordinatorConfig <- coordinators
       name = coordinatorConfig.getString("name")
       networkStr = coordinatorConfig.getString("network")
+      clearnetOpt = coordinatorConfig.getStringOrNone("clearnet")
       onion = coordinatorConfig.getString("onion")
     } yield {
       val network = BitcoinNetworks.fromString(networkStr)
-      val addr =
+      val clearnetAddr = clearnetOpt.map(
+        NetworkUtil.parseInetSocketAddress(_,
+                                           VortexUtils.getDefaultPort(network)))
+      val onionAddr =
         NetworkUtil.parseInetSocketAddress(onion,
                                            VortexUtils.getDefaultPort(network))
-      CoordinatorAddress(name = name, network = network, onion = addr)
+      CoordinatorAddress(name = name,
+                         network = network,
+                         clearnet = clearnetAddr,
+                         onion = onionAddr)
     }
 
     list.toVector
