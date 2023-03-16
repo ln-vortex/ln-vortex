@@ -20,7 +20,7 @@ object Deps {
     val microPickleV = "2.0.0"
 
     val grizzledSlf4jV = "1.3.4"
-    val logback = "1.4.5"
+    val logback = "1.4.6"
   }
 
   object Compile {
