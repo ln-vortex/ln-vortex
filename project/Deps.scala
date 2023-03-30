@@ -12,7 +12,7 @@ object Deps {
     val scoptV = "4.1.0"
 
     val sttpCoreV = "1.7.2"
-    val sttpV = "3.8.7"
+    val sttpV = "3.8.14"
 
     val twitterV = "8.0"
     val telegramV = "5.6.3"
