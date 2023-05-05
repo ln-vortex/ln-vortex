@@ -12,7 +12,7 @@ addSbtPlugin("net.bzzt" % "sbt-reproducible-builds" % "0.30")
 
 addSbtPlugin("com.thesamet" % "sbt-protoc" % "1.0.6")
 
-addSbtPlugin("org.scalameta" % "sbt-native-image" % "0.3.2")
+addSbtPlugin("org.scalameta" % "sbt-native-image" % "0.3.4")
 
 addSbtPlugin("com.typesafe.sbt" % "sbt-web" % "1.4.4")
 
