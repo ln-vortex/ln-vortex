@@ -18,7 +18,7 @@ import scala.util.Properties
 object CommonSettings {
 
   lazy val settings: Vector[Setting[_]] = Vector(
-    scalaVersion := "2.13.10",
+    scalaVersion := "2.13.11",
     organization := "com.lnvortex",
     homepage := Some(url("https://lnvortex.com")),
     maintainer.withRank(
