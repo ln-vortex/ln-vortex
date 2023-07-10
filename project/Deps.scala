@@ -17,7 +17,7 @@ object Deps {
     val twitterV = "8.0"
     val telegramV = "5.6.3"
 
-    val microPickleV = "2.0.0"
+    val microPickleV = "3.1.2"
 
     val grizzledSlf4jV = "1.3.4"
     val logback = "1.4.5"
