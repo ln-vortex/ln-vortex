@@ -8,7 +8,7 @@ addSbtPlugin("com.eed3si9n" % "sbt-assembly" % "2.0.0")
 
 addSbtPlugin("org.scalameta" % "sbt-scalafmt" % "2.5.0")
 
-addSbtPlugin("net.bzzt" % "sbt-reproducible-builds" % "0.30")
+addSbtPlugin("net.bzzt" % "sbt-reproducible-builds" % "0.31")
 
 addSbtPlugin("com.thesamet" % "sbt-protoc" % "1.0.6")
 
