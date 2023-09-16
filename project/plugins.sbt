@@ -14,7 +14,7 @@ addSbtPlugin("com.thesamet" % "sbt-protoc" % "1.0.6")
 
 addSbtPlugin("org.scalameta" % "sbt-native-image" % "0.3.2")
 
-addSbtPlugin("com.typesafe.sbt" % "sbt-web" % "1.4.4")
+addSbtPlugin("com.github.sbt" % "sbt-web" % "1.5.0")
 
 addSbtPlugin("com.typesafe.sbt" % "sbt-digest" % "1.1.4")
 
